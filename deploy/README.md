@@ -123,14 +123,18 @@ Hay un workflow en `.github/workflows/deploy.yml`.
 
 Configurar estos secrets en GitHub:
 
-- `DROPLET_HOST`
-- `DROPLET_PORT`
-- `DROPLET_USER`
-- `DROPLET_SSH_KEY`
+- `DROPLET_HOST=147.182.166.174`
+- `DROPLET_PORT=22`
+- `DROPLET_USER=root`
+- `DROPLET_SSH_KEY` con el contenido completo de `C:\Users\Facundo Vozzi\.ssh\id_ed25519_copa_actions_nopass`
 
 Opcionales como repo variables de GitHub Actions:
 
 - `VITE_API_URL`
+
+Valor recomendado hoy:
+
+- `VITE_API_URL=/api`
 
 El usuario del secret debe poder ejecutar:
 
@@ -140,7 +144,9 @@ sudo RELEASE_ARCHIVE=/tmp/copa-leyendas-release.tgz bash /var/www/copa-leyendas/
 
 El workflow:
 
-- instala dependencias en GitHub Actions
+- admite `push` a `main` y disparo manual
+- instala dependencias deterministicas con `npm ci`
+- reutiliza cache de npm a partir de los `package-lock.json`
 - corre lint, tests y build
 - empaqueta artefactos Linux listos para deploy
 - los sube por `scp`
