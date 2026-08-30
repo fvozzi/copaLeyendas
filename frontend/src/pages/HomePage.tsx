@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import heroImage from '../assets/hero-copa-leyendas.png';
+import heroImage from '../assets/hero-copa-leyendas-femme.png';
 import { getPublicPosts } from '../lib/api';
 import { sectionMeta, tournamentHighlights, tournamentStory } from '../lib/content';
 import type { ContentPost } from '../types';
@@ -22,7 +22,7 @@ export function HomePage() {
       <section
         className="hero-band"
         style={{
-          backgroundImage: `linear-gradient(180deg, rgba(10, 20, 22, 0.35), rgba(10, 20, 22, 0.88)), url(${heroImage})`,
+          backgroundImage: `linear-gradient(90deg, rgba(7, 18, 21, 0.9) 0%, rgba(7, 18, 21, 0.82) 28%, rgba(7, 18, 21, 0.58) 54%, rgba(7, 18, 21, 0.5) 100%), url(${heroImage})`,
         }}
       >
         <div className="hero-content">
