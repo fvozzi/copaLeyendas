@@ -77,6 +77,9 @@ if [[ ! -f "$APP_DIR/shared/frontend/.env" ]]; then
   cp "$APP_DIR/app/frontend/.env.example" "$APP_DIR/shared/frontend/.env"
 fi
 
+chown "$APP_USER:$APP_GROUP" "$APP_DIR/shared/backend/.env" "$APP_DIR/shared/frontend/.env"
+chmod 640 "$APP_DIR/shared/backend/.env" "$APP_DIR/shared/frontend/.env"
+
 SERVICE_PATH="/etc/systemd/system/${APP_NAME}-backend.service"
 sed \
   -e "s|__APP_NAME__|$APP_NAME|g" \

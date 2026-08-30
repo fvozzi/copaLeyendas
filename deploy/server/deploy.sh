@@ -28,6 +28,8 @@ cd "$APP_DIR/app"
 
 cp "$APP_DIR/shared/backend/.env" "$APP_DIR/app/backend/.env"
 cp "$APP_DIR/shared/frontend/.env" "$APP_DIR/app/frontend/.env"
+chown "$APP_USER:$APP_GROUP" "$APP_DIR/app/backend/.env" "$APP_DIR/app/frontend/.env"
+chmod 640 "$APP_DIR/app/backend/.env" "$APP_DIR/app/frontend/.env"
 install -d -m 0755 -o "$APP_USER" -g "$APP_GROUP" "$APP_DIR/shared/payment-proofs"
 
 if [[ -n "$RELEASE_ARCHIVE" ]]; then
