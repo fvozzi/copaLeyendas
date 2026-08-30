@@ -1,0 +1,17 @@
+[Unit]
+Description=__APP_NAME__ backend
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=__APP_USER__
+WorkingDirectory=__APP_DIR__/app/backend
+Environment=NODE_ENV=production
+Environment=PORT=__API_PORT__
+ExecStart=/usr/bin/npm run start:prod
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

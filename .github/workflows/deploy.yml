@@ -1,0 +1,79 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      NODE_VERSION: 20
+      RELEASE_NAME: copa-leyendas-release.tgz
+      VITE_API_URL: ${{ vars.VITE_API_URL || '/api' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install backend dependencies
+        run: npm --prefix backend install
+
+      - name: Lint backend
+        run: npm --prefix backend run lint
+
+      - name: Test backend
+        run: npm --prefix backend run test
+
+      - name: Build backend
+        run: npm --prefix backend run build
+
+      - name: Prune backend dev dependencies
+        run: npm --prefix backend prune --omit=dev
+
+      - name: Install frontend dependencies
+        run: npm --prefix frontend install
+
+      - name: Lint frontend
+        run: npm --prefix frontend run lint
+
+      - name: Test frontend
+        run: npm --prefix frontend run test
+
+      - name: Build frontend
+        run: npm --prefix frontend run build
+        env:
+          VITE_API_URL: ${{ env.VITE_API_URL }}
+
+      - name: Create release archive
+        run: |
+          mkdir -p release/backend release/frontend release/deploy
+          cp backend/package.json release/backend/
+          if [ -f backend/package-lock.json ]; then cp backend/package-lock.json release/backend/; fi
+          cp -R backend/dist release/backend/dist
+          cp -R backend/node_modules release/backend/node_modules
+          cp -R frontend/dist release/frontend/dist
+          cp -R deploy/. release/deploy/
+          tar -czf "${RELEASE_NAME}" -C release .
+
+      - name: Start ssh-agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DROPLET_SSH_KEY }}
+
+      - name: Add droplet host key
+        run: ssh-keyscan -p "${{ secrets.DROPLET_PORT }}" -H "${{ secrets.DROPLET_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Upload release archive
+        run: scp -P "${{ secrets.DROPLET_PORT }}" "${RELEASE_NAME}" "${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/tmp/${RELEASE_NAME}"
+
+      - name: Deploy on droplet
+        run: |
+          ssh -p "${{ secrets.DROPLET_PORT }}" "${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}" \
+            "sudo RELEASE_ARCHIVE=/tmp/${RELEASE_NAME} bash /var/www/copa-leyendas/app/deploy/server/deploy.sh"

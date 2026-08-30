@@ -1,0 +1,14 @@
+{
+  "name": "copa-leyendas-workspace",
+  "private": true,
+  "scripts": {
+    "start": "npm run dev",
+    "setup": "npm --prefix backend install && npm --prefix frontend install",
+    "dev": "npx --yes concurrently@9.2.1 -n backend,frontend -c blue,green \"npm --prefix backend run start:dev\" \"npm --prefix frontend run dev\"",
+    "dev:backend": "npm --prefix backend run start:dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "test": "npm --prefix backend run test && npm --prefix frontend run test",
+    "db:migrate": "npm --prefix backend run migration:run",
+    "db:seed": "npm --prefix backend run seed"
+  }
+}

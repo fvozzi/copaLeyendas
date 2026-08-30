@@ -1,0 +1,39 @@
+import { NavLink, Outlet } from 'react-router-dom';
+import { sectionMeta, tournamentStory } from '../lib/content';
+
+export function SiteLayout() {
+  return (
+    <div className="site-shell">
+      <header className="site-header">
+        <NavLink to="/" className="brandmark">
+          <span className="brandmark-kicker">Copa</span>
+          <span className="brandmark-title">Leyendas</span>
+        </NavLink>
+        <nav className="site-nav">
+          {Object.entries(sectionMeta).map(([key, value]) => (
+            <NavLink key={key} to={`/secciones/${key}`} className="site-nav-link">
+              {value.label}
+            </NavLink>
+          ))}
+          <NavLink to="/inscripcion" className="site-nav-link site-nav-link-accent">
+            Inscripcion
+          </NavLink>
+        </nav>
+      </header>
+      <main>
+        <Outlet />
+      </main>
+      <footer className="site-footer">
+        <div>
+          <p className="footer-title">{tournamentStory.title}</p>
+          <p>{tournamentStory.place}</p>
+        </div>
+        <div>
+          <a href={tournamentStory.instagramUrl} target="_blank" rel="noreferrer">
+            Instagram oficial
+          </a>
+        </div>
+      </footer>
+    </div>
+  );
+}
