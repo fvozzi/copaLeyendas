@@ -72,6 +72,10 @@ img {
   min-height: 100vh;
 }
 
+.site-shell {
+  overflow-x: clip;
+}
+
 .site-header,
 .site-footer,
 .content-band,
@@ -174,12 +178,14 @@ img {
 .hero-content h1 {
   font-size: clamp(3rem, 7vw, 6rem);
   max-width: 10ch;
+  text-wrap: balance;
 }
 
 .hero-copy {
   margin: 1.25rem 0 0;
   max-width: 58ch;
   color: rgba(255, 255, 255, 0.86);
+  text-wrap: pretty;
 }
 
 .hero-meta,
@@ -356,6 +362,7 @@ img {
   font-size: clamp(2.2rem, 5vw, 4.5rem);
   line-height: 0.95;
   margin: 0;
+  text-wrap: balance;
 }
 
 .registration-form,
@@ -701,6 +708,10 @@ textarea {
     margin-top: 1rem;
   }
 
+  .site-nav {
+    justify-content: flex-start;
+  }
+
   .admin-sidebar {
     min-height: auto;
   }
@@ -732,6 +743,9 @@ textarea {
 
   .hero-band {
     min-height: 82vh;
+    align-items: flex-end;
+    background-position: 68% center;
+    padding: 1.25rem;
   }
 
   .hero-content h1,
@@ -742,5 +756,74 @@ textarea {
   .login-card h1,
   .panel-header h1 {
     line-height: 1;
+  }
+
+  .site-header,
+  .site-footer,
+  .content-band,
+  .info-band,
+  .registration-band,
+  .article-band {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .site-nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.65rem 0.9rem;
+    justify-content: stretch;
+  }
+
+  .site-nav-link {
+    text-align: left;
+    min-width: 0;
+  }
+
+  .site-nav-link-accent {
+    grid-column: 1 / -1;
+  }
+
+  .hero-content {
+    max-width: none;
+    padding-bottom: 0.5rem;
+  }
+
+  .hero-content h1 {
+    font-size: clamp(2.8rem, 14vw, 4.2rem);
+    max-width: 8ch;
+  }
+
+  .hero-copy {
+    font-size: 1rem;
+    max-width: 30ch;
+  }
+
+  .hero-meta {
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  .hero-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .hero-actions > * {
+    width: 100%;
+  }
+
+  .registration-copy h1 {
+    font-size: clamp(2rem, 11vw, 3rem);
+    max-width: 12ch;
+  }
+
+  .registration-copy p {
+    max-width: 32ch;
+  }
+
+  .field-label-row {
+    align-items: flex-start;
   }
 }
