@@ -127,6 +127,8 @@ Configurar estos secrets en GitHub:
 - `DROPLET_PORT=22`
 - `DROPLET_USER=root`
 - `DROPLET_SSH_KEY` con el contenido completo de `C:\Users\Facundo Vozzi\.ssh\id_ed25519_copa_actions_nopass`
+  - puede pegarse como clave multilinea completa (`-----BEGIN ...`)
+  - si GitHub te rompe el formato al pegarla, tambien funciona guardarla en base64
 
 Opcionales como repo variables de GitHub Actions:
 

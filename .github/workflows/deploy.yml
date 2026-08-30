@@ -71,18 +71,29 @@ jobs:
           cp -R deploy/. release/deploy/
           tar -czf "${RELEASE_NAME}" -C release .
 
-      - name: Start ssh-agent
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.DROPLET_SSH_KEY }}
+      - name: Prepare deploy SSH key
+        env:
+          DROPLET_SSH_KEY: ${{ secrets.DROPLET_SSH_KEY }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s' "${DROPLET_SSH_KEY}" | tr -d '\r' > ~/.ssh/deploy_key.raw
+
+          if grep -qE 'BEGIN (OPENSSH|RSA|EC|DSA|PRIVATE) PRIVATE KEY' ~/.ssh/deploy_key.raw; then
+            mv ~/.ssh/deploy_key.raw ~/.ssh/deploy_key
+          else
+            base64 -d ~/.ssh/deploy_key.raw > ~/.ssh/deploy_key
+            rm -f ~/.ssh/deploy_key.raw
+          fi
+
+          chmod 600 ~/.ssh/deploy_key
 
       - name: Add droplet host key
         run: ssh-keyscan -p "${{ secrets.DROPLET_PORT }}" -H "${{ secrets.DROPLET_HOST }}" >> ~/.ssh/known_hosts
 
       - name: Upload release archive
-        run: scp -P "${{ secrets.DROPLET_PORT }}" "${RELEASE_NAME}" "${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/tmp/${RELEASE_NAME}"
+        run: scp -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -P "${{ secrets.DROPLET_PORT }}" "${RELEASE_NAME}" "${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/tmp/${RELEASE_NAME}"
 
       - name: Deploy on droplet
         run: |
-          ssh -p "${{ secrets.DROPLET_PORT }}" "${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}" \
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -p "${{ secrets.DROPLET_PORT }}" "${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}" \
             "sudo RELEASE_ARCHIVE=/tmp/${RELEASE_NAME} bash /var/www/copa-leyendas/app/deploy/server/deploy.sh"
