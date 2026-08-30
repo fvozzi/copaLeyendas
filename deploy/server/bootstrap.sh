@@ -70,11 +70,11 @@ sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'"
   sudo -u postgres psql -c "CREATE DATABASE $DB_NAME OWNER $DB_USER;"
 
 if [[ ! -f "$APP_DIR/shared/backend/.env" ]]; then
-  cp "$APP_DIR/app/backend/.env.example" "$APP_DIR/shared/backend/.env"
+  install -m 0640 -o "$APP_USER" -g "$APP_GROUP" "$APP_DIR/app/backend/.env.example" "$APP_DIR/shared/backend/.env"
 fi
 
 if [[ ! -f "$APP_DIR/shared/frontend/.env" ]]; then
-  cp "$APP_DIR/app/frontend/.env.example" "$APP_DIR/shared/frontend/.env"
+  install -m 0640 -o "$APP_USER" -g "$APP_GROUP" "$APP_DIR/app/frontend/.env.example" "$APP_DIR/shared/frontend/.env"
 fi
 
 chown "$APP_USER:$APP_GROUP" "$APP_DIR/shared/backend/.env" "$APP_DIR/shared/frontend/.env"
