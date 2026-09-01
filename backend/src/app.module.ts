@@ -10,6 +10,7 @@ import { LocalitiesModule } from './localities/localities.module';
 import { PlayersModule } from './players/players.module';
 import { CategoriesModule } from './categories/categories.module';
 import { CourtsModule } from './courts/courts.module';
+import { TournamentsModule } from './tournaments/tournaments.module';
 import { RegistrationsModule } from './registrations/registrations.module';
 
 @Module({
@@ -27,6 +28,7 @@ import { RegistrationsModule } from './registrations/registrations.module';
     PlayersModule,
     CategoriesModule,
     CourtsModule,
+    TournamentsModule,
     RegistrationsModule,
     DashboardModule,
   ],
