@@ -16,7 +16,7 @@ import type {
   Player,
   PlayerPayload,
   Category, CategoryPayload, Court, CourtPayload,
-  Tournament, TournamentPayload, TournamentDetail, TournamentMatch,
+  Tournament, TournamentPayload, TournamentDetail, TournamentMatch, ZoneDetail,
 } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
@@ -261,6 +261,9 @@ export function createTournamentZone(payload: { tournamentCategoryId: number; co
 export function getZoneMatches(id: number) { return request<TournamentMatch[]>(`/tournaments/zones/${id}/matches`, {}, true); }
 export function generateZoneFixture(id: number) { return request<TournamentMatch[]>(`/tournaments/zones/${id}/fixture`, { method: 'POST' }, true); }
 export function saveMatchResult(id: number, homeScore: number, awayScore: number) { return request<TournamentMatch>(`/tournaments/matches/${id}/result`, { method: 'POST', body: JSON.stringify({ homeScore, awayScore }) }, true); }
+export function getZone(id: number) { return request<ZoneDetail>(`/tournaments/zones/${id}`, {}, true); }
+export function getAvailableZoneRegistrations(categoryId: number) { return request<PairRegistration[]>(`/tournaments/categories/${categoryId}/registrations`, {}, true); }
+export function addZoneEntry(zoneId: number, registrationId: number) { return request(`/tournaments/zones/${zoneId}/entries`, { method: 'POST', body: JSON.stringify({ registrationId }) }, true); }
 
 export function createLocality(payload: LocalityPayload) {
   return request<Locality>('/localities', { method: 'POST', body: JSON.stringify(payload) }, true);
