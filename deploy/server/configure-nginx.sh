@@ -21,10 +21,16 @@ fi
 NGINX_PATH="/etc/nginx/sites-available/${APP_NAME}.conf"
 
 if [[ "$ROOT_DOMAIN" != "_" && "$APP_DOMAIN" != "_" ]]; then
+  SERVER_NAMES="$APP_DOMAIN"
+  if [[ "$ROOT_DOMAIN" != "$APP_DOMAIN" ]]; then
+    SERVER_NAMES="$SERVER_NAMES $ROOT_DOMAIN"
+  fi
+  if [[ -n "$WWW_DOMAIN" && "$WWW_DOMAIN" != "$APP_DOMAIN" && "$WWW_DOMAIN" != "$ROOT_DOMAIN" ]]; then
+    SERVER_NAMES="$SERVER_NAMES $WWW_DOMAIN"
+  fi
+
   sed \
-    -e "s|__APP_DOMAIN__|$APP_DOMAIN|g" \
-    -e "s|__ROOT_DOMAIN__|$ROOT_DOMAIN|g" \
-    -e "s|__WWW_DOMAIN__|$WWW_DOMAIN|g" \
+    -e "s|__SERVER_NAMES__|$SERVER_NAMES|g" \
     -e "s|__APP_DIR__|$APP_DIR|g" \
     -e "s|__API_PORT__|$API_PORT|g" \
     "$APP_DIR/app/deploy/nginx/copa-leyendas-multi-domain.conf" >"$NGINX_PATH"
