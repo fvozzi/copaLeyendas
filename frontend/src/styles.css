@@ -741,6 +741,8 @@ textarea {
   padding: 0.45rem 0.75rem;
 }
 
+.grid-action-button { min-height: 34px; padding: 0.35rem 0.65rem; }
+
 .fullscreen-state {
   min-height: 100vh;
 }
