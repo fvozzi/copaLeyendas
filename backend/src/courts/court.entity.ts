@@ -1,0 +1,2 @@
+import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+@Entity('courts') export class Court { @PrimaryGeneratedColumn() id: number; @Column() name: string; @Column({ type: 'varchar', nullable: true }) address: string | null; @Column({ type: 'varchar', nullable: true }) city: string | null; @Column({ type: 'varchar', nullable: true }) provinceName: string | null; @Column({ type: 'boolean', default: true }) active: boolean; @CreateDateColumn() createdAt: Date; @UpdateDateColumn() updatedAt: Date; }

@@ -28,6 +28,8 @@ export function AdminLayout() {
           <NavLink to="/app/localidades" className="admin-nav-link">
             Localidades
           </NavLink>
+          <NavLink to="/app/categorias" className="admin-nav-link">Categorias</NavLink>
+          <NavLink to="/app/canchas" className="admin-nav-link">Canchas</NavLink>
           <NavLink to="/" className="admin-nav-link">
             Ver sitio
           </NavLink>

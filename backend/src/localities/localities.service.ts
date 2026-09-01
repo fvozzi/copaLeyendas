@@ -5,12 +5,15 @@ import { CreateLocalityDto } from './dto/create-locality.dto';
 import { QueryLocalitiesDto } from './dto/query-localities.dto';
 import { UpdateLocalityDto } from './dto/update-locality.dto';
 import { Locality } from './locality.entity';
+import { Category } from '../categories/category.entity';
 
 @Injectable()
 export class LocalitiesService {
   constructor(
     @InjectRepository(Locality)
     private readonly localitiesRepository: Repository<Locality>,
+    @InjectRepository(Category)
+    private readonly categoriesRepository: Repository<Category>,
   ) {}
 
   async list(query: QueryLocalitiesDto) {
@@ -27,23 +30,25 @@ export class LocalitiesService {
       );
     }
 
-    return qb.orderBy('locality.name', 'ASC').addOrderBy('locality.provinceName', 'ASC').getMany();
+    return qb.leftJoinAndSelect('locality.category', 'category').orderBy('locality.name', 'ASC').addOrderBy('locality.provinceName', 'ASC').getMany();
   }
 
   async getById(id: number) {
-    const locality = await this.localitiesRepository.findOne({ where: { id } });
+    const locality = await this.localitiesRepository.findOne({ where: { id }, relations: { category: true } });
     if (!locality) {
       throw new NotFoundException('Localidad no encontrada');
     }
     return locality;
   }
 
-  create(dto: CreateLocalityDto) {
+  async create(dto: CreateLocalityDto) {
+    const categoryId = await this.resolveCategory(dto.categoryId);
     return this.localitiesRepository.save(
       this.localitiesRepository.create({
         name: dto.name.trim(),
         provinceName: dto.provinceName.trim(),
         active: dto.active ?? true,
+        categoryId,
       }),
     );
   }
@@ -53,6 +58,7 @@ export class LocalitiesService {
     if (dto.name !== undefined) locality.name = dto.name.trim();
     if (dto.provinceName !== undefined) locality.provinceName = dto.provinceName.trim();
     if (dto.active !== undefined) locality.active = dto.active;
+    if (dto.categoryId !== undefined) locality.categoryId = await this.resolveCategory(dto.categoryId);
     return this.localitiesRepository.save(locality);
   }
 
@@ -60,5 +66,12 @@ export class LocalitiesService {
     const locality = await this.getById(id);
     await this.localitiesRepository.remove(locality);
     return { success: true };
+  }
+
+  private async resolveCategory(categoryId?: number | null) {
+    if (!categoryId) return null;
+    const category = await this.categoriesRepository.findOne({ where: { id: categoryId } });
+    if (!category) throw new NotFoundException('Categoria no encontrada');
+    return category.id;
   }
 }

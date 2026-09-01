@@ -195,6 +195,7 @@ export interface RegistrationStatusPayload {
 }
 
 export interface AccessGrantPayload {
+  localityId?: number;
   category: PairCategory;
   localityName: string;
   provinceName: string;
@@ -215,6 +216,8 @@ export interface Locality {
   name: string;
   provinceName: string;
   active: boolean;
+  categoryId: number | null;
+  category: Category | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -223,7 +226,13 @@ export interface LocalityPayload {
   name: string;
   provinceName: string;
   active?: boolean;
+  categoryId?: number | null;
 }
+
+export interface Category { id: number; code: PairCategory; name: string; active: boolean; sortOrder: number; }
+export interface CategoryPayload { code: PairCategory; name: string; active?: boolean; sortOrder?: number; }
+export interface Court { id: number; name: string; address: string | null; city: string | null; provinceName: string | null; active: boolean; }
+export interface CourtPayload { name: string; address?: string; city?: string; provinceName?: string; active?: boolean; }
 
 export interface Player {
   id: number;

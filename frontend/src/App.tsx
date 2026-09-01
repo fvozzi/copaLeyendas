@@ -10,6 +10,8 @@ import { AdminPostsPage } from './pages/AdminPostsPage';
 import { AdminRegistrationsPage } from './pages/AdminRegistrationsPage';
 import { AdminPlayersPage } from './pages/AdminPlayersPage';
 import { AdminLocalitiesPage } from './pages/AdminLocalitiesPage';
+import { AdminCategoriesPage } from './pages/AdminCategoriesPage';
+import { AdminCourtsPage } from './pages/AdminCourtsPage';
 import { HomePage } from './pages/HomePage';
 import { PostPage } from './pages/PostPage';
 import { RegistrationPage } from './pages/RegistrationPage';
@@ -36,6 +38,8 @@ export default function App() {
               <Route path="inscripciones" element={<AdminRegistrationsPage />} />
               <Route path="jugadoras" element={<AdminPlayersPage />} />
               <Route path="localidades" element={<AdminLocalitiesPage />} />
+              <Route path="categorias" element={<AdminCategoriesPage />} />
+              <Route path="canchas" element={<AdminCourtsPage />} />
             </Route>
           </Route>
         </Routes>

@@ -1,6 +1,7 @@
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsInt,
   IsEmail,
   IsEnum,
   IsOptional,
@@ -15,6 +16,10 @@ function toBoolean(value: unknown) {
 }
 
 export class CreateAccessGrantDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  localityId?: number;
   @IsEnum(PairCategory)
   category: PairCategory;
 

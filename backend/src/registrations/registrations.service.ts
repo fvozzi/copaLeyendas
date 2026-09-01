@@ -23,6 +23,7 @@ import {
 } from './registration.enums';
 import { PairRegistration } from './pair-registration.entity';
 import { RegistrationAccessGrant } from './registration-access-grant.entity';
+import { Locality } from '../localities/locality.entity';
 
 @Injectable()
 export class RegistrationsService {
@@ -31,16 +32,25 @@ export class RegistrationsService {
     private readonly registrationsRepository: Repository<PairRegistration>,
     @InjectRepository(RegistrationAccessGrant)
     private readonly accessGrantsRepository: Repository<RegistrationAccessGrant>,
+    @InjectRepository(Locality)
+    private readonly localitiesRepository: Repository<Locality>,
   ) {}
 
   async createAccessGrant(dto: CreateAccessGrantDto) {
     const token = await this.generateUniqueToken();
-    const localityName = dto.localityName.trim();
+    const locality = dto.localityId
+      ? await this.localitiesRepository.findOne({ where: { id: dto.localityId }, relations: { category: true } })
+      : null;
+    if (dto.localityId && !locality) throw new NotFoundException('Localidad no encontrada');
+    if (locality && (!locality.active || !locality.category || !locality.category.active)) {
+      throw new BadRequestException('La localidad debe tener una categoria activa para habilitarse');
+    }
+    const localityName = locality?.name ?? dto.localityName.trim();
     const grant = this.accessGrantsRepository.create({
       token,
-      category: dto.category,
+      category: locality?.category?.code ?? dto.category,
       localityName,
-      provinceName: dto.provinceName.trim(),
+      provinceName: locality?.provinceName ?? dto.provinceName.trim(),
       clubName: normalizeOptional(dto.clubName) ?? localityName,
       contactName: normalizeOptional(dto.contactName),
       contactEmail: normalizeOptional(dto.contactEmail),

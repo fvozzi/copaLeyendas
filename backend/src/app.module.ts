@@ -8,6 +8,8 @@ import { buildDataSourceOptions } from './database/typeorm.config';
 import { PostsModule } from './posts/posts.module';
 import { LocalitiesModule } from './localities/localities.module';
 import { PlayersModule } from './players/players.module';
+import { CategoriesModule } from './categories/categories.module';
+import { CourtsModule } from './courts/courts.module';
 import { RegistrationsModule } from './registrations/registrations.module';
 
 @Module({
@@ -23,6 +25,8 @@ import { RegistrationsModule } from './registrations/registrations.module';
     PostsModule,
     LocalitiesModule,
     PlayersModule,
+    CategoriesModule,
+    CourtsModule,
     RegistrationsModule,
     DashboardModule,
   ],

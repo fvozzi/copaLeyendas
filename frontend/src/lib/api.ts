@@ -15,6 +15,7 @@ import type {
   LocalityPayload,
   Player,
   PlayerPayload,
+  Category, CategoryPayload, Court, CourtPayload,
 } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
@@ -242,6 +243,15 @@ export function deletePost(id: number) {
 export function getLocalities(search?: string) {
   return request<Locality[]>(`/localities${buildQuery({ search })}`, {}, true);
 }
+
+export function getCategories() { return request<Category[]>('/categories', {}, true); }
+export function createCategory(payload: CategoryPayload) { return request<Category>('/categories', { method: 'POST', body: JSON.stringify(payload) }, true); }
+export function updateCategory(id: number, payload: Partial<CategoryPayload>) { return request<Category>(`/categories/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true); }
+export function deleteCategory(id: number) { return request<{ success: boolean }>(`/categories/${id}`, { method: 'DELETE' }, true); }
+export function getCourts(search?: string) { return request<Court[]>(`/courts${buildQuery({ search })}`, {}, true); }
+export function createCourt(payload: CourtPayload) { return request<Court>('/courts', { method: 'POST', body: JSON.stringify(payload) }, true); }
+export function updateCourt(id: number, payload: CourtPayload) { return request<Court>(`/courts/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true); }
+export function deleteCourt(id: number) { return request<{ success: boolean }>(`/courts/${id}`, { method: 'DELETE' }, true); }
 
 export function createLocality(payload: LocalityPayload) {
   return request<Locality>('/localities', { method: 'POST', body: JSON.stringify(payload) }, true);

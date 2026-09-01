@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   createAccessGrant,
   getAccessGrants,
+  getLocalities,
   getRegistrations,
   openRegistrationPaymentProof,
   updateAccessGrantStatus,
@@ -36,6 +37,7 @@ const initialGrantForm: AccessGrantPayload = {
 
 export function AdminRegistrationsPage() {
   const [grants, setGrants] = useState<RegistrationAccessGrant[]>([]);
+  const [localities, setLocalities] = useState<import('../types').Locality[]>([]);
   const [registrations, setRegistrations] = useState<PairRegistration[]>([]);
   const [registrationDrafts, setRegistrationDrafts] = useState<RegistrationDraftState>({});
   const [grantForm, setGrantForm] = useState<AccessGrantPayload>(initialGrantForm);
@@ -82,6 +84,10 @@ export function AdminRegistrationsPage() {
   useEffect(() => {
     loadAll();
   }, [category, status, grantStatus]);
+
+  useEffect(() => {
+    getLocalities().then(setLocalities).catch((reason: Error) => setError(reason.message));
+  }, []);
 
   const setGrantField = <K extends keyof AccessGrantPayload>(
     field: K,
@@ -151,6 +157,21 @@ export function AdminRegistrationsPage() {
         <section className="data-card">
           <h2>Nueva habilitacion</h2>
           <form className="editor-form compact-form" onSubmit={handleCreateGrant}>
+            <label className="span-2">
+              Localidad / equipo habilitado
+              <select
+                value={grantForm.localityId ?? ''}
+                onChange={(event) => setGrantField('localityId', Number(event.target.value))}
+                required
+              >
+                <option value="">Seleccionar equipo</option>
+                {localities.filter((locality) => locality.active && locality.category?.active).map((locality) => (
+                  <option key={locality.id} value={locality.id}>
+                    {locality.name}, {locality.provinceName} - {locality.category?.name}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label>
               Categoria
               <select
