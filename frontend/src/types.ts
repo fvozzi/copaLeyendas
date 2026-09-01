@@ -209,3 +209,42 @@ export interface AccessGrantPayload {
 export interface AccessGrantStatusPayload {
   status: AccessGrantStatus;
 }
+
+export interface Locality {
+  id: number;
+  name: string;
+  provinceName: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LocalityPayload {
+  name: string;
+  provinceName: string;
+  active?: boolean;
+}
+
+export interface Player {
+  id: number;
+  fullName: string;
+  dni: string;
+  birthDate: string | null;
+  phone: string | null;
+  instagram: string | null;
+  shirtSize: ShirtSize | null;
+  localityId: number | null;
+  locality: Locality | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PlayerPayload {
+  fullName: string;
+  dni: string;
+  birthDate?: string;
+  phone?: string;
+  instagram?: string;
+  shirtSize?: ShirtSize | '';
+  localityId?: number | null;
+}

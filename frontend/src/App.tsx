@@ -8,6 +8,8 @@ import { AdminLoginPage } from './pages/AdminLoginPage';
 import { AdminPostEditorPage } from './pages/AdminPostEditorPage';
 import { AdminPostsPage } from './pages/AdminPostsPage';
 import { AdminRegistrationsPage } from './pages/AdminRegistrationsPage';
+import { AdminPlayersPage } from './pages/AdminPlayersPage';
+import { AdminLocalitiesPage } from './pages/AdminLocalitiesPage';
 import { HomePage } from './pages/HomePage';
 import { PostPage } from './pages/PostPage';
 import { RegistrationPage } from './pages/RegistrationPage';
@@ -32,6 +34,8 @@ export default function App() {
               <Route path="contenidos/nuevo" element={<AdminPostEditorPage />} />
               <Route path="contenidos/:id" element={<AdminPostEditorPage />} />
               <Route path="inscripciones" element={<AdminRegistrationsPage />} />
+              <Route path="jugadoras" element={<AdminPlayersPage />} />
+              <Route path="localidades" element={<AdminLocalitiesPage />} />
             </Route>
           </Route>
         </Routes>

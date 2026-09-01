@@ -6,6 +6,8 @@ import { AuthModule } from './auth/auth.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { buildDataSourceOptions } from './database/typeorm.config';
 import { PostsModule } from './posts/posts.module';
+import { LocalitiesModule } from './localities/localities.module';
+import { PlayersModule } from './players/players.module';
 import { RegistrationsModule } from './registrations/registrations.module';
 
 @Module({
@@ -19,6 +21,8 @@ import { RegistrationsModule } from './registrations/registrations.module';
     }),
     AuthModule,
     PostsModule,
+    LocalitiesModule,
+    PlayersModule,
     RegistrationsModule,
     DashboardModule,
   ],

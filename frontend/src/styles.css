@@ -666,6 +666,81 @@ textarea {
   color: var(--forest);
 }
 
+.admin-data-grid-wrap {
+  overflow-x: auto;
+}
+
+.admin-data-grid {
+  width: 100%;
+  min-width: 700px;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.admin-data-grid th,
+.admin-data-grid td {
+  padding: 0.9rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.admin-data-grid th {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.admin-data-grid tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-data-grid-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.85rem;
+  white-space: nowrap;
+}
+
+.admin-dialog-backdrop {
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(12, 37, 34, 0.55);
+}
+
+.admin-dialog {
+  width: min(700px, 100%);
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  padding: 1.35rem;
+  border-radius: 8px;
+  background: var(--mist);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+}
+
+.admin-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.admin-dialog-header h2 {
+  margin: 0;
+  font-family: 'Newsreader', serif;
+  font-size: 2rem;
+}
+
+.dialog-close {
+  min-height: 38px;
+  padding: 0.45rem 0.75rem;
+}
+
 .fullscreen-state {
   min-height: 100vh;
 }
@@ -825,5 +900,50 @@ textarea {
 
   .field-label-row {
     align-items: flex-start;
+  }
+
+  .admin-data-grid {
+    min-width: 0;
+  }
+
+  .admin-data-grid thead {
+    display: none;
+  }
+
+  .admin-data-grid,
+  .admin-data-grid tbody,
+  .admin-data-grid tr,
+  .admin-data-grid td {
+    display: block;
+    width: 100%;
+  }
+
+  .admin-data-grid tr {
+    padding: 0.65rem 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .admin-data-grid tbody tr:last-child {
+    border-bottom: none;
+  }
+
+  .admin-data-grid td {
+    display: grid;
+    grid-template-columns: minmax(120px, 0.7fr) minmax(0, 1.3fr);
+    gap: 0.75rem;
+    padding: 0.45rem 0;
+    border: none;
+  }
+
+  .admin-data-grid td::before {
+    content: attr(data-label);
+    color: var(--ink-soft);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .admin-data-grid-actions {
+    justify-content: flex-start;
   }
 }

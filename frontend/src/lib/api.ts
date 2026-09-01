@@ -11,6 +11,10 @@ import type {
   RegistrationAccessGrant,
   RegistrationStatusPayload,
   ContentPost,
+  Locality,
+  LocalityPayload,
+  Player,
+  PlayerPayload,
 } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
@@ -233,6 +237,38 @@ export function updatePost(id: number, payload: PostPayload) {
 
 export function deletePost(id: number) {
   return request<{ success: boolean }>(`/posts/${id}`, { method: 'DELETE' }, true);
+}
+
+export function getLocalities(search?: string) {
+  return request<Locality[]>(`/localities${buildQuery({ search })}`, {}, true);
+}
+
+export function createLocality(payload: LocalityPayload) {
+  return request<Locality>('/localities', { method: 'POST', body: JSON.stringify(payload) }, true);
+}
+
+export function updateLocality(id: number, payload: LocalityPayload) {
+  return request<Locality>(`/localities/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true);
+}
+
+export function deleteLocality(id: number) {
+  return request<{ success: boolean }>(`/localities/${id}`, { method: 'DELETE' }, true);
+}
+
+export function getPlayers(search?: string) {
+  return request<Player[]>(`/players${buildQuery({ search })}`, {}, true);
+}
+
+export function createPlayer(payload: PlayerPayload) {
+  return request<Player>('/players', { method: 'POST', body: JSON.stringify(payload) }, true);
+}
+
+export function updatePlayer(id: number, payload: PlayerPayload) {
+  return request<Player>(`/players/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true);
+}
+
+export function deletePlayer(id: number) {
+  return request<{ success: boolean }>(`/players/${id}`, { method: 'DELETE' }, true);
 }
 
 export function getRegistrations(params?: {
