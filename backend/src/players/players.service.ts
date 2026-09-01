@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, Repository } from 'typeorm';
 import { Locality } from '../localities/locality.entity';
+import { PairRegistration } from '../registrations/pair-registration.entity';
 import { CreatePlayerDto } from './dto/create-player.dto';
 import { QueryPlayersDto } from './dto/query-players.dto';
 import { UpdatePlayerDto } from './dto/update-player.dto';
@@ -12,9 +13,12 @@ export class PlayersService {
   constructor(
     @InjectRepository(Player) private readonly playersRepository: Repository<Player>,
     @InjectRepository(Locality) private readonly localitiesRepository: Repository<Locality>,
+    @InjectRepository(PairRegistration)
+    private readonly registrationsRepository: Repository<PairRegistration>,
   ) {}
 
   async list(query: QueryPlayersDto) {
+    await this.importRegisteredPlayers();
     const qb = this.playersRepository.createQueryBuilder('player').leftJoinAndSelect('player.locality', 'locality');
     if (query.search?.trim()) {
       const term = `%${query.search.trim().toLowerCase()}%`;
@@ -64,6 +68,77 @@ export class PlayersService {
     const locality = await this.localitiesRepository.findOne({ where: { id: localityId } });
     if (!locality) throw new NotFoundException('Localidad no encontrada');
     return locality;
+  }
+
+  private async importRegisteredPlayers() {
+    const registrations = await this.registrationsRepository.find({
+      order: { createdAt: 'ASC' },
+    });
+
+    for (const registration of registrations) {
+      const locality = await this.findOrCreateLocality(
+        registration.localityName,
+        registration.provinceName,
+      );
+      const candidates = [
+        {
+          fullName: registration.playerOneName,
+          dni: registration.playerOneDni,
+          birthDate: registration.playerOneBirthDate,
+          phone: registration.playerOnePhone,
+          instagram: registration.playerOneInstagram,
+          shirtSize: registration.playerOneShirtSize,
+        },
+        {
+          fullName: registration.playerTwoName,
+          dni: registration.playerTwoDni,
+          birthDate: registration.playerTwoBirthDate,
+          phone: registration.playerTwoPhone,
+          instagram: registration.playerTwoInstagram,
+          shirtSize: registration.playerTwoShirtSize,
+        },
+        registration.playerThreeName && registration.playerThreeDni
+          ? {
+              fullName: registration.playerThreeName,
+              dni: registration.playerThreeDni,
+              birthDate: registration.playerThreeBirthDate,
+              phone: registration.playerThreePhone,
+              instagram: registration.playerThreeInstagram,
+              shirtSize: registration.playerThreeShirtSize,
+            }
+          : null,
+      ];
+
+      for (const candidate of candidates) {
+        if (!candidate) continue;
+        const dni = candidate.dni.trim();
+        const exists = await this.playersRepository.findOne({ where: { dni } });
+        if (exists) continue;
+
+        await this.playersRepository.save(
+          this.playersRepository.create({
+            fullName: candidate.fullName.trim(),
+            dni,
+            birthDate: candidate.birthDate,
+            phone: normalizeOptional(candidate.phone),
+            instagram: normalizeOptional(candidate.instagram),
+            shirtSize: candidate.shirtSize,
+            localityId: locality.id,
+          }),
+        );
+      }
+    }
+  }
+
+  private async findOrCreateLocality(name: string, provinceName: string) {
+    const existing = await this.localitiesRepository.findOne({
+      where: { name, provinceName },
+    });
+    if (existing) return existing;
+
+    return this.localitiesRepository.save(
+      this.localitiesRepository.create({ name, provinceName, active: true }),
+    );
   }
 }
 
