@@ -14,6 +14,7 @@ import { AdminCategoriesPage } from './pages/AdminCategoriesPage';
 import { AdminCourtsPage } from './pages/AdminCourtsPage';
 import { AdminTournamentsPage } from './pages/AdminTournamentsPage';
 import { AdminTournamentDetailPage } from './pages/AdminTournamentDetailPage';
+import { AdminZonePage } from './pages/AdminZonePage';
 import { HomePage } from './pages/HomePage';
 import { PostPage } from './pages/PostPage';
 import { RegistrationPage } from './pages/RegistrationPage';
@@ -44,6 +45,7 @@ export default function App() {
               <Route path="canchas" element={<AdminCourtsPage />} />
               <Route path="torneos" element={<AdminTournamentsPage />} />
               <Route path="torneos/:id" element={<AdminTournamentDetailPage />} />
+              <Route path="zonas/:id" element={<AdminZonePage />} />
             </Route>
           </Route>
         </Routes>

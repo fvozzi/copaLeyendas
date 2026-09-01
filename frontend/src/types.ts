@@ -239,6 +239,7 @@ export interface TournamentPayload { name: string; startsAt?: string; endsAt?: s
 export interface TournamentCategory { id: number; categoryId: number; pointsPerSet: number; setsToWin: number; zoneSize: number; category: Category; }
 export interface TournamentZone { id: number; name: string; capacity: number; court: Court; tournamentCategory: TournamentCategory; }
 export interface TournamentDetail extends Tournament { categories: TournamentCategory[]; zones: TournamentZone[]; }
+export interface TournamentMatch { id: number; matchOrder: number; status: string; homeRegistration: PairRegistration | null; awayRegistration: PairRegistration | null; homeScore: number | null; awayScore: number | null; }
 
 export interface Player {
   id: number;
