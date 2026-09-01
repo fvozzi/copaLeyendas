@@ -16,6 +16,7 @@ import type {
   Player,
   PlayerPayload,
   Category, CategoryPayload, Court, CourtPayload,
+  Tournament, TournamentPayload,
 } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
@@ -252,6 +253,8 @@ export function getCourts(search?: string) { return request<Court[]>(`/courts${b
 export function createCourt(payload: CourtPayload) { return request<Court>('/courts', { method: 'POST', body: JSON.stringify(payload) }, true); }
 export function updateCourt(id: number, payload: CourtPayload) { return request<Court>(`/courts/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true); }
 export function deleteCourt(id: number) { return request<{ success: boolean }>(`/courts/${id}`, { method: 'DELETE' }, true); }
+export function getTournaments() { return request<Tournament[]>('/tournaments', {}, true); }
+export function createTournament(payload: TournamentPayload) { return request<Tournament>('/tournaments', { method: 'POST', body: JSON.stringify(payload) }, true); }
 
 export function createLocality(payload: LocalityPayload) {
   return request<Locality>('/localities', { method: 'POST', body: JSON.stringify(payload) }, true);

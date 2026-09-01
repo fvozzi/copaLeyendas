@@ -234,6 +234,9 @@ export interface CategoryPayload { code: PairCategory; name: string; active?: bo
 export interface Court { id: number; name: string; address: string | null; city: string | null; provinceName: string | null; active: boolean; }
 export interface CourtPayload { name: string; address?: string; city?: string; provinceName?: string; active?: boolean; }
 
+export interface Tournament { id: number; name: string; startsAt: string | null; endsAt: string | null; city: string | null; status: 'DRAFT' | 'ACTIVE' | 'COMPLETED'; }
+export interface TournamentPayload { name: string; startsAt?: string; endsAt?: string; city?: string; }
+
 export interface Player {
   id: number;
   fullName: string;
