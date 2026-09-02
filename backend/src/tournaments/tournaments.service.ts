@@ -39,7 +39,24 @@ export class TournamentsService {
     return this.t.save(tournament);
   }
   async addCategory(tournamentId: number, dto: Partial<TournamentCategory>) { return this.tc.save(this.tc.create({ ...dto, tournamentId, pointsPerSet: dto.pointsPerSet ?? 25, setsToWin: dto.setsToWin ?? 1, zoneSize: dto.zoneSize ?? 4, registrationsOpen: dto.registrationsOpen ?? true })); }
+  async updateCategory(id: number, dto: { pointsPerSet?: number; setsToWin?: number; zoneSize?: number; registrationsOpen?: boolean }) {
+    const category = await this.tc.findOneBy({ id });
+    if (!category) throw new NotFoundException('Categoria de torneo no encontrada');
+    if (dto.pointsPerSet !== undefined) category.pointsPerSet = dto.pointsPerSet;
+    if (dto.setsToWin !== undefined) category.setsToWin = dto.setsToWin;
+    if (dto.zoneSize !== undefined) category.zoneSize = dto.zoneSize;
+    if (dto.registrationsOpen !== undefined) category.registrationsOpen = dto.registrationsOpen;
+    return this.tc.save(category);
+  }
   async createZone(dto: { tournamentCategoryId: number; courtId: number; name: string; capacity: number }) { if (!(await this.c.findOneBy({ id: dto.courtId }))) throw new NotFoundException('Cancha no encontrada'); return this.z.save(this.z.create(dto)); }
+  async updateZone(id: number, dto: { name?: string; courtId?: number; capacity?: number }) {
+    const zone = await this.z.findOneBy({ id });
+    if (!zone) throw new NotFoundException('Zona no encontrada');
+    if (dto.courtId !== undefined) { if (!(await this.c.findOneBy({ id: dto.courtId }))) throw new NotFoundException('Cancha no encontrada'); zone.courtId = dto.courtId; }
+    if (dto.capacity !== undefined) { if (dto.capacity < await this.e.countBy({ zoneId: id })) throw new BadRequestException('El cupo no puede ser menor a las parejas ya asignadas'); zone.capacity = dto.capacity; }
+    if (dto.name !== undefined) zone.name = dto.name.trim();
+    return this.z.save(zone);
+  }
   async addEntry(zoneId: number, registrationId: number) { const zone = await this.z.findOneBy({ id: zoneId }); if (!zone) throw new NotFoundException('Zona no encontrada'); if (await this.e.countBy({ zoneId }) >= zone.capacity) throw new BadRequestException('La zona alcanzo su cupo'); return this.e.save(this.e.create({ zoneId, registrationId })); }
 
   async fixture(zoneId: number) {

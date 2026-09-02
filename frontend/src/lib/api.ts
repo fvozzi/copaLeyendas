@@ -264,7 +264,9 @@ export function createTournament(payload: TournamentPayload) { return request<To
 export function updateTournament(id: number, payload: TournamentPayload) { return request<Tournament>(`/tournaments/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true); }
 export function getTournament(id: number) { return request<TournamentDetail>(`/tournaments/${id}`, {}, true); }
 export function addTournamentCategory(id: number, payload: { categoryId: number; pointsPerSet: number; setsToWin: number; zoneSize: number }) { return request(`/tournaments/${id}/categories`, { method: 'POST', body: JSON.stringify(payload) }, true); }
+export function updateTournamentCategory(id: number, payload: { pointsPerSet: number; setsToWin: number; zoneSize: number }) { return request(`/tournaments/categories/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true); }
 export function createTournamentZone(payload: { tournamentCategoryId: number; courtId: number; name: string; capacity: number }) { return request('/tournaments/zones', { method: 'POST', body: JSON.stringify(payload) }, true); }
+export function updateTournamentZone(id: number, payload: { name: string; courtId: number; capacity: number }) { return request(`/tournaments/zones/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true); }
 export function getZoneMatches(id: number) { return request<TournamentMatch[]>(`/tournaments/zones/${id}/matches`, {}, true); }
 export function generateZoneFixture(id: number) { return request<TournamentMatch[]>(`/tournaments/zones/${id}/fixture`, { method: 'POST' }, true); }
 export function saveMatchResult(id: number, homeScore: number, awayScore: number) { return request<TournamentMatch>(`/tournaments/matches/${id}/result`, { method: 'POST', body: JSON.stringify({ homeScore, awayScore }) }, true); }
