@@ -1,12 +1,13 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { DirectorGuard } from '../auth/director.guard';
 import { CreateLocalityDto } from './dto/create-locality.dto';
 import { QueryLocalitiesDto } from './dto/query-localities.dto';
 import { UpdateLocalityDto } from './dto/update-locality.dto';
 import { LocalitiesService } from './localities.service';
 
 @Controller('localities')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, DirectorGuard)
 export class LocalitiesController {
   constructor(private readonly localitiesService: LocalitiesService) {}
 

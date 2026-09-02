@@ -130,6 +130,14 @@ Un Director puede corregir un resultado. Si ya existen partidos dependientes jug
 
 El sistema calcula por zona: jugados, ganados, perdidos, tantos a favor, tantos en contra y diferencia. La regla de desempate configurable por defecto es: ganados, diferencia de tantos, tantos a favor.
 
+### CU-13 Asignar asistentes a una cancha
+
+El Director asigna uno o mas usuarios con rol Encargado / Asistente a cada cancha. La asignacion es independiente por cancha, por lo que una persona puede operar varias canchas y una cancha puede tener varios asistentes.
+
+### CU-14 Operar una cancha asignada
+
+El Encargado / Asistente puede consultar las zonas de sus canchas asignadas, definir o mover el horario de sus partidos y cargar resultados. No puede crear torneos, categorias, zonas, asignar parejas ni generar fixtures. El backend rechaza esas operaciones y tambien rechaza cualquier intento de modificar una cancha no asignada.
+
 ## Reglas Copa Leyendas Femme
 
 - Categorias iniciales: Damas A, Damas B, Damas Nucleo A y Damas Nucleo B.
@@ -149,3 +157,5 @@ El sistema calcula por zona: jugados, ganados, perdidos, tantos a favor, tantos 
 | Metodo de zona de 3 | Categoria del torneo | Triangular |
 | Desempate | Categoria del torneo | Ganados, diferencia, tantos a favor |
 | Cupo | Zona | Definido por el Director |
+| Asistentes asignados | Cancha | Definido por el Director |
+| Horario | Partido | Definido por Director o asistente de su cancha |

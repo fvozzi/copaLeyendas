@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { DirectorGuard } from '../auth/director.guard';
 import { CreateAccessGrantDto } from './dto/create-access-grant.dto';
 import { QueryAccessGrantsDto } from './dto/query-access-grants.dto';
 import { UpdateAccessGrantStatusDto } from './dto/update-access-grant-status.dto';
@@ -20,7 +21,7 @@ import { UpdateRegistrationStatusDto } from './dto/update-registration-status.dt
 import { RegistrationsService } from './registrations.service';
 
 @Controller('registrations')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, DirectorGuard)
 export class RegistrationsController {
   constructor(private readonly registrationsService: RegistrationsService) {}
 

@@ -3,6 +3,7 @@ import { useAuth } from '../lib/auth';
 
 export function AdminLayout() {
   const { user, logout } = useAuth();
+  const isDirector = user?.role === 'DIRECTOR';
 
   return (
     <div className="admin-shell">
@@ -16,22 +17,22 @@ export function AdminLayout() {
           <NavLink to="/app" end className="admin-nav-link">
             Resumen
           </NavLink>
-          <NavLink to="/app/contenidos" className="admin-nav-link">
+          {isDirector && <NavLink to="/app/contenidos" className="admin-nav-link">
             Contenidos
-          </NavLink>
-          <NavLink to="/app/inscripciones" className="admin-nav-link">
+          </NavLink>}
+          {isDirector && <NavLink to="/app/inscripciones" className="admin-nav-link">
             Inscripciones
-          </NavLink>
-          <NavLink to="/app/jugadoras" className="admin-nav-link">
+          </NavLink>}
+          {isDirector && <NavLink to="/app/jugadoras" className="admin-nav-link">
             Jugadores/as
-          </NavLink>
-          <NavLink to="/app/localidades" className="admin-nav-link">
+          </NavLink>}
+          {isDirector && <NavLink to="/app/localidades" className="admin-nav-link">
             Localidades
-          </NavLink>
-          <NavLink to="/app/categorias" className="admin-nav-link">Categorias</NavLink>
-          <NavLink to="/app/canchas" className="admin-nav-link">Canchas</NavLink>
+          </NavLink>}
+          {isDirector && <NavLink to="/app/categorias" className="admin-nav-link">Categorias</NavLink>}
+          {isDirector && <NavLink to="/app/canchas" className="admin-nav-link">Canchas</NavLink>}
           <NavLink to="/app/torneos" className="admin-nav-link">Torneos</NavLink>
-          {user?.role === 'DIRECTOR' && <NavLink to="/app/usuarios" className="admin-nav-link">Usuarios</NavLink>}
+          {isDirector && <NavLink to="/app/usuarios" className="admin-nav-link">Usuarios</NavLink>}
           <NavLink to="/" className="admin-nav-link">
             Ver sitio
           </NavLink>

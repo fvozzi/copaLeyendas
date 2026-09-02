@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getDashboardSummary } from '../lib/api';
+import { useAuth } from '../lib/auth';
 import {
   accessGrantStatusLabels,
   categoryLabels,
@@ -9,14 +10,20 @@ import {
 import type { DashboardSummary } from '../types';
 
 export function AdminDashboardPage() {
+  const { user } = useAuth();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (user?.role !== 'DIRECTOR') return;
     getDashboardSummary()
       .then(setSummary)
       .catch((reason: Error) => setError(reason.message));
-  }, []);
+  }, [user?.role]);
+
+  if (user?.role !== 'DIRECTOR') {
+    return <div className="admin-panel"><div className="panel-header"><div><p className="eyebrow">Operacion de cancha</p><h1>Partidos asignados</h1><p>Ingresa a Torneos y abre una zona de tu cancha para actualizar horarios y resultados.</p></div></div></div>;
+  }
 
   if (error) {
     return <div className="admin-panel inline-state">{error}</div>;
