@@ -28,6 +28,16 @@ export class TournamentsService {
 
   list() { return this.t.find({ order: { startsAt: 'DESC', id: 'DESC' } }); }
   create(dto: Partial<Tournament>) { return this.t.save(this.t.create(dto)); }
+  async update(id: number, dto: Partial<Tournament>) {
+    const tournament = await this.t.findOneBy({ id });
+    if (!tournament) throw new NotFoundException('Torneo no encontrado');
+    if (dto.name !== undefined) tournament.name = dto.name.trim();
+    if (dto.startsAt !== undefined) tournament.startsAt = dto.startsAt || null;
+    if (dto.endsAt !== undefined) tournament.endsAt = dto.endsAt || null;
+    if (dto.city !== undefined) tournament.city = dto.city?.trim() || null;
+    if (dto.status !== undefined) tournament.status = dto.status;
+    return this.t.save(tournament);
+  }
   async addCategory(tournamentId: number, dto: Partial<TournamentCategory>) { return this.tc.save(this.tc.create({ ...dto, tournamentId, pointsPerSet: dto.pointsPerSet ?? 25, setsToWin: dto.setsToWin ?? 1, zoneSize: dto.zoneSize ?? 4, registrationsOpen: dto.registrationsOpen ?? true })); }
   async createZone(dto: { tournamentCategoryId: number; courtId: number; name: string; capacity: number }) { if (!(await this.c.findOneBy({ id: dto.courtId }))) throw new NotFoundException('Cancha no encontrada'); return this.z.save(this.z.create(dto)); }
   async addEntry(zoneId: number, registrationId: number) { const zone = await this.z.findOneBy({ id: zoneId }); if (!zone) throw new NotFoundException('Zona no encontrada'); if (await this.e.countBy({ zoneId }) >= zone.capacity) throw new BadRequestException('La zona alcanzo su cupo'); return this.e.save(this.e.create({ zoneId, registrationId })); }

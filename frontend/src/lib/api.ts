@@ -261,6 +261,7 @@ export function updateCourtAssistants(id: number, userIds: number[]) { return re
 export function deleteCourt(id: number) { return request<{ success: boolean }>(`/courts/${id}`, { method: 'DELETE' }, true); }
 export function getTournaments() { return request<Tournament[]>('/tournaments', {}, true); }
 export function createTournament(payload: TournamentPayload) { return request<Tournament>('/tournaments', { method: 'POST', body: JSON.stringify(payload) }, true); }
+export function updateTournament(id: number, payload: TournamentPayload) { return request<Tournament>(`/tournaments/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true); }
 export function getTournament(id: number) { return request<TournamentDetail>(`/tournaments/${id}`, {}, true); }
 export function addTournamentCategory(id: number, payload: { categoryId: number; pointsPerSet: number; setsToWin: number; zoneSize: number }) { return request(`/tournaments/${id}/categories`, { method: 'POST', body: JSON.stringify(payload) }, true); }
 export function createTournamentZone(payload: { tournamentCategoryId: number; courtId: number; name: string; capacity: number }) { return request('/tournaments/zones', { method: 'POST', body: JSON.stringify(payload) }, true); }

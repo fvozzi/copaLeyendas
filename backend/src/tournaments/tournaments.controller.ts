@@ -4,6 +4,7 @@ import { CurrentUser, type AuthenticatedUser } from '../auth/current-user.decora
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UserRole } from '../auth/user.entity';
 import { TournamentQueryService } from './tournament-query.service';
+import { TournamentStatus } from './tournament.enums';
 import { TournamentsService } from './tournaments.service';
 
 class ScheduleMatchDto { @IsDateString() scheduledAt: string; }
@@ -19,6 +20,7 @@ export class TournamentsController {
   @Get('zones/:id/matches') async matches(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { await this.s.assertZoneAccess(user, id); return this.s.matches(id); }
   @Get(':id') detail(@Param('id', ParseIntPipe) id: number) { return this.q.detail(id); }
   @Post() create(@CurrentUser() user: AuthenticatedUser, @Body() dto: { name: string; startsAt?: string; endsAt?: string; city?: string }) { this.assertDirector(user); return this.s.create(dto); }
+  @Patch(':id') update(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: { name?: string; startsAt?: string; endsAt?: string; city?: string; status?: TournamentStatus }) { this.assertDirector(user); return this.s.update(id, dto); }
   @Post(':id/categories') category(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: { categoryId: number; pointsPerSet?: number; setsToWin?: number; zoneSize?: number }) { this.assertDirector(user); return this.s.addCategory(id, dto); }
   @Post('zones') createZone(@CurrentUser() user: AuthenticatedUser, @Body() dto: { tournamentCategoryId: number; courtId: number; name: string; capacity: number }) { this.assertDirector(user); return this.s.createZone(dto); }
   @Post('zones/:id/entries') entry(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: { registrationId: number }) { this.assertDirector(user); return this.s.addEntry(id, dto.registrationId); }

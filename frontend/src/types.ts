@@ -252,7 +252,7 @@ export interface Court { id: number; name: string; address: string | null; city:
 export interface CourtPayload { name: string; address?: string; city?: string; provinceName?: string; active?: boolean; }
 
 export interface Tournament { id: number; name: string; startsAt: string | null; endsAt: string | null; city: string | null; status: 'DRAFT' | 'ACTIVE' | 'COMPLETED'; }
-export interface TournamentPayload { name: string; startsAt?: string; endsAt?: string; city?: string; }
+export interface TournamentPayload { name: string; startsAt?: string; endsAt?: string; city?: string; status?: 'DRAFT' | 'ACTIVE' | 'COMPLETED'; }
 export interface TournamentCategory { id: number; categoryId: number; pointsPerSet: number; setsToWin: number; zoneSize: number; category: Category; }
 export interface TournamentZone { id: number; name: string; capacity: number; tournamentCategoryId: number; court: Court; tournamentCategory: TournamentCategory; }
 export interface TournamentDetail extends Tournament { categories: TournamentCategory[]; zones: TournamentZone[]; }
