@@ -31,6 +31,7 @@ export function AdminLayout() {
           <NavLink to="/app/categorias" className="admin-nav-link">Categorias</NavLink>
           <NavLink to="/app/canchas" className="admin-nav-link">Canchas</NavLink>
           <NavLink to="/app/torneos" className="admin-nav-link">Torneos</NavLink>
+          {user?.role === 'DIRECTOR' && <NavLink to="/app/usuarios" className="admin-nav-link">Usuarios</NavLink>}
           <NavLink to="/" className="admin-nav-link">
             Ver sitio
           </NavLink>

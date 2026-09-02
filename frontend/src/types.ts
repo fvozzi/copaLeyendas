@@ -19,13 +19,29 @@ export type HeardAboutSource = 'INSTAGRAM' | 'FRIEND' | 'CLUB' | 'OTHER';
 
 export type ShirtSize = 'S' | 'M' | 'L' | 'XL' | 'XXL' | 'XXXL' | 'XXXXL' | 'XXXXXL';
 
-export type UserRole = 'DIRECTOR' | 'EDITOR';
+export type UserRole = 'DIRECTOR' | 'ASSISTANT' | 'EDITOR';
 
 export interface AuthUser {
   id: number;
   email: string;
   name: string;
   role: UserRole;
+}
+
+export interface AdminUser {
+  id: number;
+  email: string;
+  name: string;
+  role: UserRole;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminUserPayload {
+  name: string;
+  email: string;
+  password?: string;
+  role: 'DIRECTOR' | 'ASSISTANT';
 }
 
 export interface LoginResponse {

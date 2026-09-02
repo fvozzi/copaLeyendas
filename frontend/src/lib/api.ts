@@ -16,7 +16,7 @@ import type {
   Player,
   PlayerPayload,
   Category, CategoryPayload, Court, CourtPayload,
-  Tournament, TournamentPayload, TournamentDetail, TournamentMatch, ZoneDetail,
+  Tournament, TournamentPayload, TournamentDetail, TournamentMatch, ZoneDetail, AdminUser, AdminUserPayload,
 } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
@@ -117,6 +117,11 @@ export function login(email: string, password: string) {
 export function getCurrentUser() {
   return request<LoginResponse['user']>('/auth/me', {}, true);
 }
+
+export function getUsers() { return request<AdminUser[]>('/users', {}, true); }
+export function createUser(payload: AdminUserPayload) { return request<AdminUser>('/users', { method: 'POST', body: JSON.stringify(payload) }, true); }
+export function updateUser(id: number, payload: AdminUserPayload) { return request<AdminUser>(`/users/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true); }
+export function deleteUser(id: number) { return request<{ success: boolean }>(`/users/${id}`, { method: 'DELETE' }, true); }
 
 export function getPublicPosts(params?: { section?: string; featured?: boolean }) {
   return request<ContentPost[]>(

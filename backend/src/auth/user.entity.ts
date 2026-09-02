@@ -8,6 +8,8 @@ import {
 
 export enum UserRole {
   DIRECTOR = 'DIRECTOR',
+  ASSISTANT = 'ASSISTANT',
+  // Kept while existing installations migrate old editor accounts.
   EDITOR = 'EDITOR',
 }
 
