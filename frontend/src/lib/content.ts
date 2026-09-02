@@ -74,7 +74,7 @@ export const tournamentStory = {
   subtitle:
     'Un torneo federal que cruza memoria, competencia y comunidad en una sola plataforma.',
   description:
-    'La edicion actual concentra el circuito de Damas y deja lista una base digital para crecer luego hacia el torneo general con nuevas categorias, archivo historico y difusion anual.',
+    'Copa Leyendas Femme Edición "Silvina Cimadamore".',
   schedule: 'Noviembre 2026',
   place: 'Ciudad de Buenos Aires',
   instagramUrl: 'https://www.instagram.com/copa.leyendas.pelotapaleta/',
