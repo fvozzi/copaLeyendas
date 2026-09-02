@@ -153,8 +153,10 @@ img {
   min-height: calc(100vh - 85px);
   display: flex;
   align-items: flex-end;
-  background-size: cover;
-  background-position: center;
+  background-color: #071215;
+  background-size: 100% 100%, 100% auto;
+  background-position: center, top center;
+  background-repeat: no-repeat;
   padding: clamp(1.5rem, 4vw, 4rem);
 }
 
@@ -842,10 +844,11 @@ textarea {
   }
 
   .hero-band {
-    min-height: 82vh;
-    align-items: flex-end;
-    background-position: 68% center;
-    padding: 1.25rem;
+    min-height: 0;
+    align-items: flex-start;
+    background-size: 100% 100%, 100% auto;
+    background-position: center, top center;
+    padding: calc(33.333vw + 1.25rem) 1.25rem 1.5rem;
   }
 
   .hero-content h1,
