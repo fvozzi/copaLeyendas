@@ -135,6 +135,25 @@ img {
   justify-content: flex-end;
 }
 
+.mobile-menu-toggle {
+  display: none;
+  width: 44px;
+  height: 44px;
+  padding: 0.65rem;
+  border: 1px solid var(--forest);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--forest);
+}
+
+.mobile-menu-toggle span {
+  display: block;
+  width: 100%;
+  height: 2px;
+  margin: 4px 0;
+  background: currentColor;
+}
+
 .site-nav-link {
   color: var(--ink-soft);
 }
@@ -797,6 +816,16 @@ textarea {
     display: block;
   }
 
+  .site-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .mobile-menu-toggle {
+    display: inline-block;
+    align-self: center;
+  }
+
   .token-card,
   .grant-card {
     display: grid;
@@ -811,7 +840,16 @@ textarea {
   }
 
   .site-nav {
+    display: none;
+    grid-column: 1 / -1;
+    grid-template-columns: 1fr;
+    width: 100%;
+    padding-top: 0.25rem;
     justify-content: flex-start;
+  }
+
+  .site-nav.is-open {
+    display: grid;
   }
 
   .admin-sidebar {
@@ -871,20 +909,13 @@ textarea {
     padding-right: 1rem;
   }
 
-  .site-nav {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.65rem 0.9rem;
-    justify-content: stretch;
-  }
-
   .site-nav-link {
     text-align: left;
     min-width: 0;
   }
 
   .site-nav-link-accent {
-    grid-column: 1 / -1;
+    grid-column: auto;
   }
 
   .hero-content {
