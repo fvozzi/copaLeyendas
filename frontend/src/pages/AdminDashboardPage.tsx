@@ -112,6 +112,17 @@ export function AdminDashboardPage() {
             ))}
           </ul>
         </section>
+        <section className="data-card">
+          <h2>Camisetas por talle</h2>
+          <ul className="data-list">
+            {['S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'XXXXL', 'XXXXXL'].map((size) => (
+              <li key={size}>
+                <span>{size}</span>
+                <strong>{summary.registrations.shirtSizes[size] ?? 0}</strong>
+              </li>
+            ))}
+          </ul>
+        </section>
       </div>
     </div>
   );

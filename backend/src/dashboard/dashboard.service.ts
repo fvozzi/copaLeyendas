@@ -34,6 +34,7 @@ export class DashboardService {
         total: registrations.length,
         byCategory: countBy(registrations, 'category'),
         byStatus: countBy(registrations, 'status'),
+        shirtSizes: countShirtSizes(registrations),
       },
       accessGrants: {
         total: accessGrants.length,
@@ -42,6 +43,15 @@ export class DashboardService {
       },
     };
   }
+}
+
+function countShirtSizes(registrations: PairRegistration[]) {
+  return registrations.reduce<Record<string, number>>((accumulator, registration) => {
+    [registration.playerOneShirtSize, registration.playerTwoShirtSize, registration.playerThreeShirtSize]
+      .filter((size): size is NonNullable<typeof size> => Boolean(size))
+      .forEach((size) => { accumulator[size] = (accumulator[size] ?? 0) + 1; });
+    return accumulator;
+  }, {});
 }
 
 function countBy<T>(items: T[], key: keyof T & string) {

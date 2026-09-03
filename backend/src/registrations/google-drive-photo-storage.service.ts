@@ -13,17 +13,27 @@ export class GoogleDrivePhotoStorageService {
   private readonly logger = new Logger(GoogleDrivePhotoStorageService.name);
   private accessToken: string | null = null;
   private expiresAt = 0;
-  private photosFolderId: string | null = null;
+  private readonly photosFolderIds = new Map<string, string>();
 
   constructor(private readonly config: ConfigService) {}
 
   enabled() {
-    return Boolean(this.config.get<string>('GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON')?.trim() && this.config.get<string>('GOOGLE_DRIVE_TOURNAMENT_FOLDER_ID')?.trim());
+    return Boolean(this.config.get<string>('GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON')?.trim() && this.config.get<string>('GOOGLE_DRIVE_ROOT_FOLDER_ID')?.trim());
   }
 
-  async upload(file: Express.Multer.File, playerName: string) {
+  async ensureTournamentFolder(name: string, existingFolderId: string | null) {
+    if (existingFolderId) return existingFolderId;
+    const rootId = this.config.getOrThrow<string>('GOOGLE_DRIVE_ROOT_FOLDER_ID').trim();
+    const query = encodeURIComponent(`name = '${escapeQuery(name)}' and '${rootId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`);
+    const existing = await this.drive<{ files: { id: string }[] }>(`https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id)`);
+    if (existing.files[0]) return existing.files[0].id;
+    const created = await this.drive<{ id: string }>('https://www.googleapis.com/drive/v3/files', { method: 'POST', body: JSON.stringify({ name, mimeType: 'application/vnd.google-apps.folder', parents: [rootId] }) });
+    return created.id;
+  }
+
+  async upload(file: Express.Multer.File, playerName: string, tournamentFolderId: string) {
     if (!this.enabled()) return null;
-    const folderId = await this.getPhotosFolderId();
+    const folderId = await this.getPhotosFolderId(tournamentFolderId);
     const extension = file.originalname.includes('.') ? file.originalname.slice(file.originalname.lastIndexOf('.')) : '';
     const metadata = { name: `${sanitize(playerName)}-${Date.now()}${extension}`, parents: [folderId] };
     const boundary = `copa-${Date.now()}`;
@@ -46,14 +56,15 @@ export class GoogleDrivePhotoStorageService {
     if (!response.ok && response.status !== 404) this.logger.warn(`No se pudo eliminar foto de Drive: ${response.status}`);
   }
 
-  private async getPhotosFolderId() {
-    if (this.photosFolderId) return this.photosFolderId;
-    const parent = this.config.getOrThrow<string>('GOOGLE_DRIVE_TOURNAMENT_FOLDER_ID').trim();
+  private async getPhotosFolderId(parent: string) {
+    const cached = this.photosFolderIds.get(parent);
+    if (cached) return cached;
     const query = encodeURIComponent(`name = 'Fotos Jugadores' and '${parent}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`);
     const existing = await this.drive<{ files: { id: string }[] }>(`https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id)`);
-    if (existing.files[0]) return this.photosFolderId = existing.files[0].id;
+    if (existing.files[0]) { this.photosFolderIds.set(parent, existing.files[0].id); return existing.files[0].id; }
     const created = await this.drive<{ id: string }>('https://www.googleapis.com/drive/v3/files', { method: 'POST', body: JSON.stringify({ name: 'Fotos Jugadores', mimeType: 'application/vnd.google-apps.folder', parents: [parent] }) });
-    return this.photosFolderId = created.id;
+    this.photosFolderIds.set(parent, created.id);
+    return created.id;
   }
 
   private async drive<T>(url: string, init: RequestInit = {}) {
@@ -84,3 +95,4 @@ export class GoogleDrivePhotoStorageService {
 
 function base64Url(value: string) { return Buffer.from(value).toString('base64url'); }
 function sanitize(value: string) { return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-|-$/g, '') || 'jugadora'; }
+function escapeQuery(value: string) { return value.replace(/'/g, "\\'"); }

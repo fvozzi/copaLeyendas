@@ -26,6 +26,8 @@ import { RegistrationAccessGrant } from './registration-access-grant.entity';
 import { Locality } from '../localities/locality.entity';
 import { PlayersService } from '../players/players.service';
 import { GoogleDrivePhotoStorageService } from './google-drive-photo-storage.service';
+import { Tournament } from '../tournaments/tournament.entity';
+import { TournamentStatus } from '../tournaments/tournament.enums';
 
 interface RegistrationFiles {
   paymentProof?: Express.Multer.File;
@@ -43,6 +45,8 @@ export class RegistrationsService {
     private readonly accessGrantsRepository: Repository<RegistrationAccessGrant>,
     @InjectRepository(Locality)
     private readonly localitiesRepository: Repository<Locality>,
+    @InjectRepository(Tournament)
+    private readonly tournamentsRepository: Repository<Tournament>,
     private readonly playersService: PlayersService,
     private readonly googleDrivePhotos: GoogleDrivePhotoStorageService,
   ) {}
@@ -420,10 +424,16 @@ export class RegistrationsService {
   private async uploadPlayerPhotos(files: RegistrationFiles, dto: CreatePublicRegistrationDto) {
     if (!this.googleDrivePhotos.enabled()) return {};
     try {
+      const tournament = await this.tournamentsRepository.findOne({ where: { status: TournamentStatus.ACTIVE }, order: { startsAt: 'ASC', id: 'ASC' } });
+      if (!tournament) throw new BadRequestException('No hay un torneo activo para asignar las fotos en Google Drive');
+      const folderName = `${tournament.name}${tournament.startsAt ? ` - ${tournament.startsAt}` : ''}`;
+      const tournamentFolderId = await this.googleDrivePhotos.ensureTournamentFolder(folderName, tournament.driveFolderId);
+      tournament.driveFolderId = tournamentFolderId;
+      await this.tournamentsRepository.save(tournament);
       const [playerOne, playerTwo, playerThree] = await Promise.all([
-        files.playerOnePhoto ? this.googleDrivePhotos.upload(files.playerOnePhoto, dto.playerOneName) : null,
-        files.playerTwoPhoto ? this.googleDrivePhotos.upload(files.playerTwoPhoto, dto.playerTwoName) : null,
-        files.playerThreePhoto && dto.playerThreeName ? this.googleDrivePhotos.upload(files.playerThreePhoto, dto.playerThreeName) : null,
+        files.playerOnePhoto ? this.googleDrivePhotos.upload(files.playerOnePhoto, dto.playerOneName, tournamentFolderId) : null,
+        files.playerTwoPhoto ? this.googleDrivePhotos.upload(files.playerTwoPhoto, dto.playerTwoName, tournamentFolderId) : null,
+        files.playerThreePhoto && dto.playerThreeName ? this.googleDrivePhotos.upload(files.playerThreePhoto, dto.playerThreeName, tournamentFolderId) : null,
       ]);
       [files.playerOnePhoto, files.playerTwoPhoto, files.playerThreePhoto].forEach((file) => { if (file?.path) { try { unlinkSync(file.path); } catch { return; } } });
       return { playerOne, playerTwo, playerThree };

@@ -8,9 +8,10 @@ import { RegistrationsService } from './registrations.service';
 import { Locality } from '../localities/locality.entity';
 import { PlayersModule } from '../players/players.module';
 import { GoogleDrivePhotoStorageService } from './google-drive-photo-storage.service';
+import { Tournament } from '../tournaments/tournament.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([PairRegistration, RegistrationAccessGrant, Locality]), PlayersModule],
+  imports: [TypeOrmModule.forFeature([PairRegistration, RegistrationAccessGrant, Locality, Tournament]), PlayersModule],
   controllers: [RegistrationsController, PublicRegistrationsController],
   providers: [RegistrationsService, GoogleDrivePhotoStorageService],
   exports: [RegistrationsService, TypeOrmModule],

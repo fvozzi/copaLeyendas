@@ -76,6 +76,7 @@ export interface DashboardSummary {
     total: number;
     byCategory: Record<string, number>;
     byStatus: Record<string, number>;
+    shirtSizes: Record<string, number>;
   };
   accessGrants: {
     total: number;
