@@ -8,6 +8,7 @@ import type {
   PublicAccessGrant,
   PublicRegistrationPayload,
   PublicRegistrationResponse,
+  PublicCurrentTournament,
   RegistrationAccessGrant,
   RegistrationStatusPayload,
   ContentPost,
@@ -138,6 +139,10 @@ export function getPublicPostBySlug(slug: string) {
 
 export function getPublicRegistrationAccess(token: string) {
   return request<PublicAccessGrant>(`/public/registrations/access/${encodeURIComponent(token)}`);
+}
+
+export function getPublicCurrentTournament() {
+  return request<PublicCurrentTournament>('/public/tournaments/current');
 }
 
 export function createPublicRegistration(payload: PublicRegistrationPayload) {

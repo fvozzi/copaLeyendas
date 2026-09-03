@@ -259,6 +259,10 @@ export interface TournamentDetail extends Tournament { categories: TournamentCat
 export interface TournamentMatch { id: number; matchOrder: number; status: string; homeRegistration: PairRegistration | null; awayRegistration: PairRegistration | null; homeScore: number | null; awayScore: number | null; scheduledAt: string | null; }
 export interface ZoneEntry { id: number; registration: PairRegistration; }
 export interface ZoneDetail extends TournamentZone { entries: ZoneEntry[]; }
+export interface PublicStanding { registration: PairRegistration; played: number; wins: number; losses: number; pointsFor: number; pointsAgainst: number; tablePoints: number; }
+export interface PublicTournamentZone { id: number; name: string; category: string; court: Court; standings: PublicStanding[]; matches: TournamentMatch[]; }
+export interface PublicTournament extends Tournament { zones: PublicTournamentZone[]; }
+export interface PublicCurrentTournament { tournament: PublicTournament | null; courts: Court[]; }
 
 export interface Player {
   id: number;
