@@ -473,9 +473,9 @@ function PlayerFields(props: {
       </div>
       {shouldRequire ? <label className="checkbox-row">
         <input type="checkbox" checked={props.hasCommercialAgreement} onChange={(event) => props.onCommercialAgreementChange(event.target.checked, props.commercialAgreementDetails)} />
-        Tenes acuerdo comercial con una o mas marcas
+        Tenés acuerdo con alguna marca de Paleta
       </label> : null}
-      {shouldRequire && props.hasCommercialAgreement ? <label>Con que marca o marcas tenes acuerdo comercial<textarea rows={3} value={props.commercialAgreementDetails} onChange={(event) => props.onCommercialAgreementChange(true, event.target.value)} required /></label> : null}
+      {shouldRequire && props.hasCommercialAgreement ? <label>Marca de Paleta<select value={props.commercialAgreementDetails} onChange={(event) => props.onCommercialAgreementChange(true, event.target.value)} required><option value="">Seleccionar marca</option><option value="Guastavino">Guastavino</option><option value="Dabber">Dabber</option><option value="Otra">Otra</option></select></label> : null}
     </div>
   );
 }
