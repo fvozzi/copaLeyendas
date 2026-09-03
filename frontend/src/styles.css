@@ -759,6 +759,19 @@ textarea {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.inline-form {
+  display: flex;
+  align-items: end;
+  gap: 1rem;
+}
+
+.inline-form label {
+  display: grid;
+  gap: 0.45rem;
+  min-width: min(100%, 280px);
+  font-weight: 700;
+}
+
 .stat-card strong {
   font-size: 2.5rem;
   font-family: 'Newsreader', serif;
@@ -1046,6 +1059,11 @@ textarea {
   .editor-form,
   .player-grid {
     grid-template-columns: 1fr;
+  }
+
+  .inline-form {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .tournament-zone-grid,

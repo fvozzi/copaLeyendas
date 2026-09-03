@@ -65,4 +65,9 @@ export class CreateAccessGrantDto {
   @Transform(({ value }) => toBoolean(value))
   @IsBoolean()
   feeWaived?: boolean;
+
+  @IsOptional()
+  @Transform(({ value }) => toBoolean(value))
+  @IsBoolean()
+  paymentDeferredUntilConfirmed?: boolean;
 }

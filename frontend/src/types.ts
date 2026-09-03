@@ -96,6 +96,7 @@ export interface RegistrationAccessGrant {
   contactPhone: string | null;
   notes: string | null;
   feeWaived: boolean;
+  paymentDeferredUntilConfirmed: boolean;
   status: AccessGrantStatus;
   consumedAt: string | null;
   createdAt: string;
@@ -114,6 +115,7 @@ export interface PublicAccessGrant {
   contactPhone: string | null;
   notes: string | null;
   feeWaived: boolean;
+  paymentDeferredUntilConfirmed: boolean;
   status: AccessGrantStatus;
   enabled: boolean;
 }
@@ -131,6 +133,7 @@ export interface PairRegistration {
   representingText: string;
   contactEmail: string | null;
   feeWaived: boolean;
+  paymentDeferredUntilConfirmed: boolean;
   playerOneName: string;
   playerOneDni: string;
   playerOneBirthDate: string;
@@ -236,6 +239,7 @@ export interface AccessGrantPayload {
   contactPhone?: string;
   notes?: string;
   feeWaived?: boolean;
+  paymentDeferredUntilConfirmed?: boolean;
 }
 
 export interface AccessGrantStatusPayload {
@@ -301,4 +305,30 @@ export interface PlayerPayload {
   instagram?: string;
   shirtSize?: ShirtSize | '';
   localityId?: number | null;
+}
+
+export interface CashIncome {
+  id: number;
+  team: string;
+  players: number;
+  amount: number;
+  paidAt: string;
+}
+
+export interface CashExpense {
+  id: number;
+  reason: string;
+  quantity: number;
+  unitPrice: number;
+  amount: number;
+  createdAt: string;
+}
+
+export interface CashSummary {
+  feePerPlayer: number;
+  incomes: CashIncome[];
+  expenses: CashExpense[];
+  totalIncome: number;
+  totalExpense: number;
+  balance: number;
 }

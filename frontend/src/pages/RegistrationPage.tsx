@@ -196,6 +196,7 @@ export function RegistrationPage() {
                 {categoryLabels[access.category]} - {access.provinceName}
               </p>
               {access.feeWaived ? <p>Inscripcion bonificada por la organizacion.</p> : null}
+              {access.paymentDeferredUntilConfirmed ? <p>Ingreso a lista de espera: no hace falta comprobante ahora. El pago se solicitara si la inscripcion es confirmada.</p> : null}
             </div>
             <button type="button" className="secondary-button" onClick={resetForm}>
               Cambiar token
@@ -339,6 +340,10 @@ export function RegistrationPage() {
                 <div className="inline-state inline-state-success">
                   Esta inscripcion fue bonificada por la organizacion. No hace falta adjuntar
                   comprobante.
+                </div>
+              ) : access.paymentDeferredUntilConfirmed ? (
+                <div className="inline-state inline-state-success">
+                  Esta inscripcion ingresa a lista de espera. El pago se solicitara al confirmarla.
                 </div>
               ) : (
                 <>

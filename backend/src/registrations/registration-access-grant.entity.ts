@@ -48,6 +48,9 @@ export class RegistrationAccessGrant {
   @Column({ type: 'boolean', default: false })
   feeWaived: boolean;
 
+  @Column({ type: 'boolean', default: false })
+  paymentDeferredUntilConfirmed: boolean;
+
   @Column({
     type: 'enum',
     enum: RegistrationAccessGrantStatus,

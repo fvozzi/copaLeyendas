@@ -8,8 +8,8 @@ export interface AdminGridColumn<Row> {
 interface AdminDataGridProps<Row extends { id: number }> {
   columns: AdminGridColumn<Row>[];
   rows: Row[];
-  onEdit: (row: Row) => void;
-  onDelete: (row: Row) => void;
+  onEdit?: (row: Row) => void;
+  onDelete?: (row: Row) => void;
   renderActions?: (row: Row) => ReactNode;
   emptyMessage: string;
 }
@@ -20,10 +20,10 @@ export function AdminDataGrid<Row extends { id: number }>({ columns, rows, onEdi
   return (
     <div className="admin-data-grid-wrap">
       <table className="admin-data-grid">
-        <thead><tr>{columns.map((column) => <th key={column.label}>{column.label}</th>)}<th aria-label="Acciones" /></tr></thead>
+        <thead><tr>{columns.map((column) => <th key={column.label}>{column.label}</th>)}{(renderActions || onEdit || onDelete) && <th aria-label="Acciones" />}</tr></thead>
         <tbody>{rows.map((row) => <tr key={row.id}>
           {columns.map((column) => <td key={column.label} data-label={column.label}>{column.render(row)}</td>)}
-          <td className="admin-data-grid-actions" data-label="Acciones">{renderActions ? renderActions(row) : <><button type="button" className="inline-link" onClick={() => onEdit(row)}>Editar</button><button type="button" className="danger-link" onClick={() => onDelete(row)}>Eliminar</button></>}</td>
+          {(renderActions || onEdit || onDelete) && <td className="admin-data-grid-actions" data-label="Acciones">{renderActions ? renderActions(row) : <>{onEdit && <button type="button" className="inline-link" onClick={() => onEdit(row)}>Editar</button>}{onDelete && <button type="button" className="danger-link" onClick={() => onDelete(row)}>Eliminar</button>}</>}</td>}
         </tr>)}</tbody>
       </table>
     </div>

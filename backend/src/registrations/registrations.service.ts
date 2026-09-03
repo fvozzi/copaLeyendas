@@ -66,6 +66,7 @@ export class RegistrationsService {
       contactPhone: normalizeOptional(dto.contactPhone),
       notes: normalizeOptional(dto.notes),
       feeWaived: dto.feeWaived ?? false,
+      paymentDeferredUntilConfirmed: dto.paymentDeferredUntilConfirmed ?? false,
       status: RegistrationAccessGrantStatus.ACTIVE,
       consumedAt: null,
     });
@@ -151,6 +152,7 @@ export class RegistrationsService {
       contactPhone: grant.contactPhone,
       notes: grant.notes,
       feeWaived: grant.feeWaived,
+      paymentDeferredUntilConfirmed: grant.paymentDeferredUntilConfirmed,
       status: grant.status,
       enabled: grant.status === RegistrationAccessGrantStatus.ACTIVE,
     };
@@ -185,7 +187,7 @@ export class RegistrationsService {
       throw new BadRequestException('Debe indicar como se entero del evento');
     }
 
-    if (!grant.feeWaived && !paymentProof) {
+    if (!grant.feeWaived && !grant.paymentDeferredUntilConfirmed && !paymentProof) {
       this.cleanupUploadedFiles(files);
       throw new BadRequestException('Debe adjuntar el comprobante de pago');
     }
@@ -202,6 +204,7 @@ export class RegistrationsService {
       representingText: dto.representingText.trim(),
       contactEmail: normalizeOptional(dto.contactEmail),
       feeWaived: grant.feeWaived,
+      paymentDeferredUntilConfirmed: grant.paymentDeferredUntilConfirmed,
       playerOneName: dto.playerOneName.trim(),
       playerOneDni: dto.playerOneDni.trim(),
       playerOneBirthDate: dto.playerOneBirthDate,
@@ -242,7 +245,7 @@ export class RegistrationsService {
       paymentProofOriginalName: paymentProof?.originalname ?? null,
       paymentProofMimeType: paymentProof?.mimetype ?? null,
       paymentProofSizeBytes: paymentProof?.size ?? null,
-      status: RegistrationStatus.RECEIVED,
+      status: grant.paymentDeferredUntilConfirmed ? RegistrationStatus.WAITLIST : RegistrationStatus.RECEIVED,
       adminNotes: null,
     });
 
@@ -350,6 +353,9 @@ export class RegistrationsService {
       !registration.paymentProofOriginalName ||
       !registration.paymentProofMimeType
     ) {
+      if (registration.paymentDeferredUntilConfirmed) {
+        throw new NotFoundException('Esta inscripcion esta en lista de espera. El comprobante se solicitara al confirmarla.');
+      }
       throw new NotFoundException('Esta inscripcion no tiene comprobante porque fue bonificada');
     }
     const storedName = registration.paymentProofStoredName;

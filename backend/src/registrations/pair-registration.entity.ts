@@ -67,6 +67,9 @@ export class PairRegistration {
   @Column({ type: 'boolean', default: false })
   feeWaived: boolean;
 
+  @Column({ type: 'boolean', default: false })
+  paymentDeferredUntilConfirmed: boolean;
+
   @Column()
   playerOneName: string;
 

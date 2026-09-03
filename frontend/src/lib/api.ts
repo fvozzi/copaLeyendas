@@ -17,7 +17,7 @@ import type {
   Player,
   PlayerPayload,
   Category, CategoryPayload, Court, CourtPayload,
-  Tournament, TournamentPayload, TournamentDetail, TournamentMatch, ZoneDetail, AdminUser, AdminUserPayload,
+  Tournament, TournamentPayload, TournamentDetail, TournamentMatch, ZoneDetail, AdminUser, AdminUserPayload, CashExpense, CashSummary,
 } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
@@ -215,6 +215,11 @@ export function createPublicRegistration(payload: PublicRegistrationPayload) {
 export function getDashboardSummary() {
   return request<DashboardSummary>('/dashboard/summary', {}, true);
 }
+
+export function getCash() { return request<CashSummary>('/cash', {}, true); }
+export function updateCashFee(feePerPlayer: number) { return request<{ id: number; feePerPlayer: number }>('/cash/fee', { method: 'PATCH', body: JSON.stringify({ feePerPlayer }) }, true); }
+export function createCashExpense(payload: { reason: string; quantity: number; unitPrice: number }) { return request<CashExpense>('/cash/expenses', { method: 'POST', body: JSON.stringify(payload) }, true); }
+export function deleteCashExpense(id: number) { return request<{ success: boolean }>(`/cash/expenses/${id}`, { method: 'DELETE' }, true); }
 
 export function getAdminPosts(params?: {
   section?: string;

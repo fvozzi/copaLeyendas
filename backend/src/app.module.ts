@@ -12,6 +12,7 @@ import { CategoriesModule } from './categories/categories.module';
 import { CourtsModule } from './courts/courts.module';
 import { TournamentsModule } from './tournaments/tournaments.module';
 import { RegistrationsModule } from './registrations/registrations.module';
+import { CashModule } from './cash/cash.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { RegistrationsModule } from './registrations/registrations.module';
     TournamentsModule,
     RegistrationsModule,
     DashboardModule,
+    CashModule,
   ],
   controllers: [AppController],
 })

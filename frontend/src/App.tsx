@@ -16,6 +16,7 @@ import { AdminTournamentsPage } from './pages/AdminTournamentsPage';
 import { AdminTournamentDetailPage } from './pages/AdminTournamentDetailPage';
 import { AdminZonePage } from './pages/AdminZonePage';
 import { AdminUsersPage } from './pages/AdminUsersPage';
+import { AdminCashPage } from './pages/AdminCashPage';
 import { HomePage } from './pages/HomePage';
 import { PostPage } from './pages/PostPage';
 import { RegistrationPage } from './pages/RegistrationPage';
@@ -40,6 +41,7 @@ export default function App() {
               <Route path="contenidos/nuevo" element={<AdminPostEditorPage />} />
               <Route path="contenidos/:id" element={<AdminPostEditorPage />} />
               <Route path="inscripciones" element={<AdminRegistrationsPage />} />
+              <Route path="caja" element={<AdminCashPage />} />
               <Route path="jugadoras" element={<AdminPlayersPage />} />
               <Route path="localidades" element={<AdminLocalitiesPage />} />
               <Route path="categorias" element={<AdminCategoriesPage />} />

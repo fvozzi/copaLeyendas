@@ -23,6 +23,9 @@ export function AdminLayout() {
           {isDirector && <NavLink to="/app/inscripciones" className="admin-nav-link">
             Inscripciones
           </NavLink>}
+          {isDirector && <NavLink to="/app/caja" className="admin-nav-link">
+            Caja
+          </NavLink>}
           {isDirector && <NavLink to="/app/jugadoras" className="admin-nav-link">
             Jugadores/as
           </NavLink>}
