@@ -9,6 +9,7 @@ export function SectionPage() {
   const [posts, setPosts] = useState<ContentPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentTournament, setCurrentTournament] = useState<PublicCurrentTournament | null>(null);
+  const [tournamentError, setTournamentError] = useState<string | null>(null);
 
   if (!section || !(section in sectionMeta)) {
     return <Navigate to="/" replace />;
@@ -18,7 +19,13 @@ export function SectionPage() {
     getPublicPosts({ section })
       .then(setPosts)
       .finally(() => setLoading(false));
-    if (section === 'torneos') getPublicCurrentTournament().then(setCurrentTournament);
+    if (section === 'torneos') {
+      setCurrentTournament(null);
+      setTournamentError(null);
+      getPublicCurrentTournament()
+        .then(setCurrentTournament)
+        .catch(() => setTournamentError('No se pudo cargar el torneo actual.'));
+    }
   }, [section]);
 
   return (
@@ -28,6 +35,8 @@ export function SectionPage() {
         <h1>{sectionMeta[section].intro}</h1>
       </div>
       {section === 'torneos' && currentTournament?.tournament ? <CurrentTournament tournament={currentTournament} /> : null}
+      {section === 'torneos' && currentTournament && !currentTournament.tournament ? <div className="inline-state public-tournament-state">No hay un torneo activo para mostrar. Direccion debe marcar el torneo actual como “Activo”.</div> : null}
+      {section === 'torneos' && tournamentError ? <div className="inline-state public-tournament-state">{tournamentError}</div> : null}
       {loading ? (
         <div className="inline-state">Cargando publicaciones...</div>
       ) : posts.length === 0 ? (
