@@ -16,26 +16,30 @@ const initialForm: PublicRegistrationPayload = {
   tournamentAvailabilityConfirmed: true,
   representingText: '',
   contactEmail: '',
-  hasCommercialAgreement: false,
-  commercialAgreementDetails: '',
   playerOneName: '',
   playerOneDni: '',
   playerOneBirthDate: '',
   playerOnePhone: '',
   playerOneInstagram: '',
   playerOneShirtSize: 'M',
+  playerOneHasCommercialAgreement: false,
+  playerOneCommercialAgreementDetails: '',
   playerTwoName: '',
   playerTwoDni: '',
   playerTwoBirthDate: '',
   playerTwoPhone: '',
   playerTwoInstagram: '',
   playerTwoShirtSize: 'M',
+  playerTwoHasCommercialAgreement: false,
+  playerTwoCommercialAgreementDetails: '',
   playerThreeName: '',
   playerThreeDni: '',
   playerThreeBirthDate: '',
   playerThreePhone: '',
   playerThreeInstagram: '',
   playerThreeShirtSize: 'M',
+  playerThreeHasCommercialAgreement: false,
+  playerThreeCommercialAgreementDetails: '',
 };
 
 type PlayerFieldPrefix = 'playerOne' | 'playerTwo' | 'playerThree';
@@ -111,7 +115,7 @@ export function RegistrationPage() {
         paymentProof: paymentProof ?? undefined,
         playerOnePhoto: playerPhotos.playerOne ?? undefined,
         playerTwoPhoto: playerPhotos.playerTwo ?? undefined,
-        playerThreePhoto: playerPhotos.playerThree ?? undefined,
+        playerThreePhoto: form.playerThreeName?.trim() ? playerPhotos.playerThree ?? undefined : undefined,
         heardAboutOtherText: form.heardAboutOtherText?.trim() || undefined,
         contactEmail: form.contactEmail?.trim() || undefined,
         playerOneInstagram: form.playerOneInstagram?.trim() || undefined,
@@ -121,7 +125,9 @@ export function RegistrationPage() {
         playerThreeBirthDate: form.playerThreeBirthDate?.trim() || undefined,
         playerThreePhone: form.playerThreePhone?.trim() || undefined,
         playerThreeInstagram: form.playerThreeInstagram?.trim() || undefined,
-        commercialAgreementDetails: form.commercialAgreementDetails?.trim() || undefined,
+        playerOneCommercialAgreementDetails: form.playerOneCommercialAgreementDetails?.trim() || undefined,
+        playerTwoCommercialAgreementDetails: form.playerTwoCommercialAgreementDetails?.trim() || undefined,
+        playerThreeCommercialAgreementDetails: form.playerThreeCommercialAgreementDetails?.trim() || undefined,
       });
 
       setSuccessMessage(`${result.message}. Codigo interno #${result.id}.`);
@@ -232,11 +238,6 @@ export function RegistrationPage() {
                   onChange={(event) => updateField('contactEmail', event.target.value)}
                 />
               </label>
-              <label className="checkbox-row span-2">
-                <input type="checkbox" checked={form.hasCommercialAgreement} onChange={(event) => updateField('hasCommercialAgreement', event.target.checked)} />
-                Tenes acuerdo comercial con una o mas marcas
-              </label>
-              {form.hasCommercialAgreement ? <label className="span-2">Con que marca o marcas tenes acuerdo comercial<textarea rows={3} value={form.commercialAgreementDetails ?? ''} onChange={(event) => updateField('commercialAgreementDetails', event.target.value)} required /></label> : null}
             </div>
 
             <PlayerFields
@@ -251,6 +252,9 @@ export function RegistrationPage() {
               required
               photo={playerPhotos.playerOne}
               onPhotoChange={(file) => setPlayerPhotos((current) => ({ ...current, playerOne: file }))}
+              hasCommercialAgreement={form.playerOneHasCommercialAgreement}
+              commercialAgreementDetails={form.playerOneCommercialAgreementDetails ?? ''}
+              onCommercialAgreementChange={(hasAgreement, details) => setForm((current) => ({ ...current, playerOneHasCommercialAgreement: hasAgreement, playerOneCommercialAgreementDetails: details }))}
               onChange={(field, value) => updateField(field, value)}
             />
 
@@ -266,6 +270,9 @@ export function RegistrationPage() {
               required
               photo={playerPhotos.playerTwo}
               onPhotoChange={(file) => setPlayerPhotos((current) => ({ ...current, playerTwo: file }))}
+              hasCommercialAgreement={form.playerTwoHasCommercialAgreement}
+              commercialAgreementDetails={form.playerTwoCommercialAgreementDetails ?? ''}
+              onCommercialAgreementChange={(hasAgreement, details) => setForm((current) => ({ ...current, playerTwoHasCommercialAgreement: hasAgreement, playerTwoCommercialAgreementDetails: details }))}
               onChange={(field, value) => updateField(field, value)}
             />
 
@@ -281,6 +288,9 @@ export function RegistrationPage() {
               shirtSize={(form.playerThreeShirtSize ?? 'M') as ShirtSize}
               photo={playerPhotos.playerThree}
               onPhotoChange={(file) => setPlayerPhotos((current) => ({ ...current, playerThree: file }))}
+              hasCommercialAgreement={form.playerThreeHasCommercialAgreement ?? false}
+              commercialAgreementDetails={form.playerThreeCommercialAgreementDetails ?? ''}
+              onCommercialAgreementChange={(hasAgreement, details) => setForm((current) => ({ ...current, playerThreeHasCommercialAgreement: hasAgreement, playerThreeCommercialAgreementDetails: details }))}
               onChange={(field, value) => updateField(field, value)}
             />
 
@@ -346,9 +356,12 @@ function PlayerFields(props: {
   instagram: string;
   shirtSize: ShirtSize;
   photo: File | null;
+  hasCommercialAgreement: boolean;
+  commercialAgreementDetails: string;
   required?: boolean;
   fieldPrefix: PlayerFieldPrefix;
   onPhotoChange: (file: File | null) => void;
+  onCommercialAgreementChange: (hasAgreement: boolean, details: string) => void;
   onChange: (field: keyof PublicRegistrationPayload, value: string) => void;
 }) {
   const isOptional = !props.required;
@@ -454,9 +467,14 @@ function PlayerFields(props: {
         <label>
           Foto de la jugadora
           <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => props.onPhotoChange(event.target.files?.[0] ?? null)} required={Boolean(shouldRequire)} />
-          <small className="field-hint">Foto con ropa deportiva y, si corresponde, sponsor de marca visible. JPG, PNG o WebP, maximo 10 MB.</small>
+          <small className="field-hint">Foto con ropa deportiva dentro de una cancha y, si corresponde, sponsor de marca visible. JPG, PNG o WebP, maximo 10 MB.</small>
         </label>
       </div>
+      {shouldRequire ? <label className="checkbox-row">
+        <input type="checkbox" checked={props.hasCommercialAgreement} onChange={(event) => props.onCommercialAgreementChange(event.target.checked, props.commercialAgreementDetails)} />
+        Tenes acuerdo comercial con una o mas marcas
+      </label> : null}
+      {shouldRequire && props.hasCommercialAgreement ? <label>Con que marca o marcas tenes acuerdo comercial<textarea rows={3} value={props.commercialAgreementDetails} onChange={(event) => props.onCommercialAgreementChange(true, event.target.value)} required /></label> : null}
     </div>
   );
 }

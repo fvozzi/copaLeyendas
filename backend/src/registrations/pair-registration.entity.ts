@@ -65,12 +65,6 @@ export class PairRegistration {
   contactEmail: string | null;
 
   @Column({ type: 'boolean', default: false })
-  hasCommercialAgreement: boolean;
-
-  @Column({ type: 'text', nullable: true })
-  commercialAgreementDetails: string | null;
-
-  @Column({ type: 'boolean', default: false })
   feeWaived: boolean;
 
   @Column()
@@ -94,6 +88,12 @@ export class PairRegistration {
     enumName: 'shirt_size',
   })
   playerOneShirtSize: ShirtSize;
+
+  @Column({ type: 'boolean', default: false })
+  playerOneHasCommercialAgreement: boolean;
+
+  @Column({ type: 'text', nullable: true })
+  playerOneCommercialAgreementDetails: string | null;
 
   @Column({ type: 'varchar', nullable: true })
   playerOnePhotoStoredName: string | null;
@@ -129,6 +129,12 @@ export class PairRegistration {
   })
   playerTwoShirtSize: ShirtSize;
 
+  @Column({ type: 'boolean', default: false })
+  playerTwoHasCommercialAgreement: boolean;
+
+  @Column({ type: 'text', nullable: true })
+  playerTwoCommercialAgreementDetails: string | null;
+
   @Column({ type: 'varchar', nullable: true })
   playerTwoPhotoStoredName: string | null;
 
@@ -163,6 +169,12 @@ export class PairRegistration {
     nullable: true,
   })
   playerThreeShirtSize: ShirtSize | null;
+
+  @Column({ type: 'boolean', default: false })
+  playerThreeHasCommercialAgreement: boolean;
+
+  @Column({ type: 'text', nullable: true })
+  playerThreeCommercialAgreementDetails: string | null;
 
   @Column({ type: 'varchar', nullable: true })
   playerThreePhotoStoredName: string | null;

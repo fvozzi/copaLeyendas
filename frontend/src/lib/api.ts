@@ -154,10 +154,6 @@ export function createPublicRegistration(payload: PublicRegistrationPayload) {
   }
   formData.set('tournamentAvailabilityConfirmed', String(payload.tournamentAvailabilityConfirmed));
   formData.set('representingText', payload.representingText);
-  formData.set('hasCommercialAgreement', String(payload.hasCommercialAgreement));
-  if (payload.commercialAgreementDetails) {
-    formData.set('commercialAgreementDetails', payload.commercialAgreementDetails);
-  }
   if (payload.contactEmail) {
     formData.set('contactEmail', payload.contactEmail);
   }
@@ -169,6 +165,8 @@ export function createPublicRegistration(payload: PublicRegistrationPayload) {
     formData.set('playerOneInstagram', payload.playerOneInstagram);
   }
   formData.set('playerOneShirtSize', payload.playerOneShirtSize);
+  formData.set('playerOneHasCommercialAgreement', String(payload.playerOneHasCommercialAgreement));
+  if (payload.playerOneCommercialAgreementDetails) formData.set('playerOneCommercialAgreementDetails', payload.playerOneCommercialAgreementDetails);
   formData.set('playerTwoName', payload.playerTwoName);
   formData.set('playerTwoDni', payload.playerTwoDni);
   formData.set('playerTwoBirthDate', payload.playerTwoBirthDate);
@@ -177,6 +175,8 @@ export function createPublicRegistration(payload: PublicRegistrationPayload) {
     formData.set('playerTwoInstagram', payload.playerTwoInstagram);
   }
   formData.set('playerTwoShirtSize', payload.playerTwoShirtSize);
+  formData.set('playerTwoHasCommercialAgreement', String(payload.playerTwoHasCommercialAgreement));
+  if (payload.playerTwoCommercialAgreementDetails) formData.set('playerTwoCommercialAgreementDetails', payload.playerTwoCommercialAgreementDetails);
   if (payload.playerThreeName) {
     formData.set('playerThreeName', payload.playerThreeName);
   }
@@ -194,6 +194,10 @@ export function createPublicRegistration(payload: PublicRegistrationPayload) {
   }
   if (payload.playerThreeShirtSize) {
     formData.set('playerThreeShirtSize', payload.playerThreeShirtSize);
+  }
+  if (payload.playerThreeName) {
+    formData.set('playerThreeHasCommercialAgreement', String(payload.playerThreeHasCommercialAgreement ?? false));
+    if (payload.playerThreeCommercialAgreementDetails) formData.set('playerThreeCommercialAgreementDetails', payload.playerThreeCommercialAgreementDetails);
   }
   if (payload.paymentProof) {
     formData.set('paymentProof', payload.paymentProof);

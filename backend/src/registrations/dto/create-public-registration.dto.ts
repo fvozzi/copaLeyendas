@@ -44,16 +44,6 @@ export class CreatePublicRegistrationDto {
   @IsEmail()
   contactEmail?: string;
 
-  @Transform(({ value }) => toBoolean(value))
-  @IsBoolean()
-  hasCommercialAgreement: boolean;
-
-  @ValidateIf((dto) => dto.hasCommercialAgreement)
-  @IsString()
-  @MinLength(2)
-  @MaxLength(500)
-  commercialAgreementDetails?: string;
-
   @IsString()
   @MinLength(4)
   @MaxLength(140)
@@ -80,6 +70,16 @@ export class CreatePublicRegistrationDto {
   @IsEnum(ShirtSize)
   playerOneShirtSize: ShirtSize;
 
+  @Transform(({ value }) => toBoolean(value))
+  @IsBoolean()
+  playerOneHasCommercialAgreement: boolean;
+
+  @ValidateIf((dto) => dto.playerOneHasCommercialAgreement)
+  @IsString()
+  @MinLength(2)
+  @MaxLength(500)
+  playerOneCommercialAgreementDetails?: string;
+
   @IsString()
   @MinLength(4)
   @MaxLength(140)
@@ -105,6 +105,16 @@ export class CreatePublicRegistrationDto {
 
   @IsEnum(ShirtSize)
   playerTwoShirtSize: ShirtSize;
+
+  @Transform(({ value }) => toBoolean(value))
+  @IsBoolean()
+  playerTwoHasCommercialAgreement: boolean;
+
+  @ValidateIf((dto) => dto.playerTwoHasCommercialAgreement)
+  @IsString()
+  @MinLength(2)
+  @MaxLength(500)
+  playerTwoCommercialAgreementDetails?: string;
 
   @IsOptional()
   @IsString()
@@ -135,4 +145,15 @@ export class CreatePublicRegistrationDto {
   @ValidateIf((dto) => Boolean(dto.playerThreeName?.trim()))
   @IsEnum(ShirtSize)
   playerThreeShirtSize?: ShirtSize;
+
+  @ValidateIf((dto) => Boolean(dto.playerThreeName?.trim()))
+  @Transform(({ value }) => toBoolean(value))
+  @IsBoolean()
+  playerThreeHasCommercialAgreement?: boolean;
+
+  @ValidateIf((dto) => Boolean(dto.playerThreeName?.trim()) && dto.playerThreeHasCommercialAgreement)
+  @IsString()
+  @MinLength(2)
+  @MaxLength(500)
+  playerThreeCommercialAgreementDetails?: string;
 }
