@@ -74,7 +74,7 @@ export class CreatePublicRegistrationDto {
   @IsBoolean()
   playerOneHasCommercialAgreement: boolean;
 
-  @ValidateIf((dto) => dto.playerOneHasCommercialAgreement)
+  @ValidateIf((dto) => dto.playerOneHasCommercialAgreement && dto.playerOneCommercialAgreementDetails !== undefined)
   @IsString()
   @MinLength(2)
   @MaxLength(500)
@@ -110,7 +110,7 @@ export class CreatePublicRegistrationDto {
   @IsBoolean()
   playerTwoHasCommercialAgreement: boolean;
 
-  @ValidateIf((dto) => dto.playerTwoHasCommercialAgreement)
+  @ValidateIf((dto) => dto.playerTwoHasCommercialAgreement && dto.playerTwoCommercialAgreementDetails !== undefined)
   @IsString()
   @MinLength(2)
   @MaxLength(500)
@@ -151,7 +151,7 @@ export class CreatePublicRegistrationDto {
   @IsBoolean()
   playerThreeHasCommercialAgreement?: boolean;
 
-  @ValidateIf((dto) => Boolean(dto.playerThreeName?.trim()) && dto.playerThreeHasCommercialAgreement)
+  @ValidateIf((dto) => Boolean(dto.playerThreeName?.trim()) && dto.playerThreeHasCommercialAgreement && dto.playerThreeCommercialAgreementDetails !== undefined)
   @IsString()
   @MinLength(2)
   @MaxLength(500)

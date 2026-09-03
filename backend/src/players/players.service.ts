@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, Repository } from 'typeorm';
 import { Locality } from '../localities/locality.entity';
@@ -61,6 +61,23 @@ export class PlayersService {
   async remove(id: number) {
     await this.playersRepository.remove(await this.getById(id));
     return { success: true };
+  }
+
+  async export(kind: string) {
+    const players = await this.list({});
+    if (kind === 'insurance') {
+      return {
+        filename: 'jugadoras-seguro.csv',
+        content: toCsv(['Nombre completo', 'Fecha nacimiento', 'DNI'], players.map((player) => [player.fullName, player.birthDate ?? '', player.dni])),
+      };
+    }
+    if (kind === 'full') {
+      return {
+        filename: 'jugadoras-completo.csv',
+        content: toCsv(['ID', 'Nombre completo', 'DNI', 'Fecha nacimiento', 'Celular', 'Instagram', 'Talle camiseta', 'Localidad / equipo', 'Provincia', 'Fecha de alta', 'Ultima actualizacion'], players.map((player) => [player.id, player.fullName, player.dni, player.birthDate ?? '', player.phone ?? '', player.instagram ?? '', player.shirtSize ?? '', player.locality?.name ?? '', player.locality?.provinceName ?? '', player.createdAt.toISOString(), player.updatedAt.toISOString()])),
+      };
+    }
+    throw new BadRequestException('Tipo de exportacion invalido');
   }
 
   private async resolveLocality(localityId?: number | null) {
@@ -149,4 +166,8 @@ export class PlayersService {
 function normalizeOptional(value?: string | null) {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
+}
+
+function toCsv(headers: string[], rows: (string | number)[][]) {
+  return [headers, ...rows].map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(';')).join('\r\n');
 }

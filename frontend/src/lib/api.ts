@@ -307,6 +307,18 @@ export function getPlayers(search?: string) {
   return request<Player[]>(`/players${buildQuery({ search })}`, {}, true);
 }
 
+export async function downloadPlayersExport(kind: 'full' | 'insurance') {
+  const token = getToken();
+  const response = await fetch(`${API_URL}/players/export/${kind}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!response.ok) throw new Error(await readError(response));
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = kind === 'insurance' ? 'jugadoras-seguro.csv' : 'jugadoras-completo.csv';
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export function createPlayer(payload: PlayerPayload) {
   return request<Player>('/players', { method: 'POST', body: JSON.stringify(payload) }, true);
 }

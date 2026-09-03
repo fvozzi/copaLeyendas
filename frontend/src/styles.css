@@ -693,6 +693,13 @@ textarea {
   color: #a63d23;
 }
 
+.field-error {
+  display: block;
+  margin-top: 0.35rem;
+  color: #a63d23;
+  font-weight: 600;
+}
+
 .form-success {
   color: var(--forest);
 }

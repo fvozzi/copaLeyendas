@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AdminDataGrid } from '../components/AdminDataGrid';
 import { AdminDialog } from '../components/AdminDialog';
-import { createPlayer, deletePlayer, getLocalities, getPlayers, updatePlayer } from '../lib/api';
+import { createPlayer, deletePlayer, downloadPlayersExport, getLocalities, getPlayers, updatePlayer } from '../lib/api';
 import { shirtSizeLabels } from '../lib/content';
 import type { Locality, Player, PlayerPayload } from '../types';
 
@@ -23,9 +23,10 @@ export function AdminPlayersPage() {
   const toPayload = (): PlayerPayload => ({ ...form, birthDate: form.birthDate || undefined, phone: form.phone || undefined, instagram: form.instagram || undefined, shirtSize: form.shirtSize || undefined });
   const save = async (event: React.FormEvent<HTMLFormElement>) => { event.preventDefault(); setError(null); try { if (editing) await updatePlayer(editing.id, toPayload()); else await createPlayer(toPayload()); closeDialog(); load(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo guardar la jugadora.'); } };
   const remove = async (player: Player) => { if (!window.confirm(`Se eliminara la ficha de ${player.fullName}.`)) return; try { await deletePlayer(player.id); load(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo eliminar la jugadora.'); } };
+  const exportPlayers = async (kind: 'full' | 'insurance') => { try { await downloadPlayersExport(kind); } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo descargar el archivo.'); } };
 
   return <div className="admin-panel">
-    <div className="panel-header"><div><p className="eyebrow">ABM</p><h1>Jugadores y jugadoras</h1></div><button type="button" className="primary-button" onClick={openCreate}>Agregar jugadora</button></div>
+    <div className="panel-header"><div><p className="eyebrow">ABM</p><h1>Jugadores y jugadoras</h1></div><div className="list-actions"><button type="button" className="secondary-button" onClick={() => exportPlayers('insurance')}>Excel para seguro</button><button type="button" className="secondary-button" onClick={() => exportPlayers('full')}>Excel completo</button><button type="button" className="primary-button" onClick={openCreate}>Agregar jugadora</button></div></div>
     <div className="toolbar"><input placeholder="Buscar por nombre, DNI o localidad" value={search} onChange={(event) => setSearch(event.target.value)} /><button type="button" className="secondary-button" onClick={load}>Buscar</button></div>
     {error ? <div className="inline-state">{error}</div> : null}
     <section className="data-card"><AdminDataGrid columns={[

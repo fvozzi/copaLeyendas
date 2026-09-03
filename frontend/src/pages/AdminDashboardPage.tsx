@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { getDashboardSummary } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import {
@@ -87,6 +88,7 @@ export function AdminDashboardPage() {
               </li>
             ))}
           </ul>
+          <Link to="/app/inscripciones" className="inline-link">Ver inscripciones</Link>
         </section>
         <section className="data-card">
           <h2>Estado de seguimiento</h2>
