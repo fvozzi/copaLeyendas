@@ -62,11 +62,12 @@ function CurrentTournament({ tournament: current }: { tournament: PublicCurrentT
   const [tab, setTab] = useState<'results' | 'standings' | 'courts'>('results');
   const tournament = current.tournament;
   if (!tournament) return null;
+  const tournamentState = getTournamentState(tournament.startsAt, tournament.endsAt);
 
   return <section className="public-tournament">
     <div className="public-tournament-heading">
-      <div><p className="eyebrow">Torneo en curso</p><h2>{tournament.name}</h2><p>{formatDates(tournament.startsAt, tournament.endsAt)}{tournament.city ? ` · ${tournament.city}` : ''}</p></div>
-      <span className="status-chip status-live">En juego</span>
+      <div><p className="eyebrow">{tournamentState.heading}</p><h2>{tournament.name}</h2><p className={tournamentState.live ? 'tournament-date is-live' : 'tournament-date'}>{tournamentState.live ? <span className="live-dot" aria-label="Torneo en juego" /> : null}{formatDates(tournament.startsAt, tournament.endsAt)}{tournament.city ? ` · ${tournament.city}` : ''}</p></div>
+      <span className={`status-chip ${tournamentState.live ? 'status-live tournament-live-chip' : 'status-review'}`}>{tournamentState.label}</span>
     </div>
     <div className="public-tournament-tabs" role="tablist" aria-label="Informacion del torneo">
       <button type="button" className={tab === 'results' ? 'is-selected' : ''} onClick={() => setTab('results')}>Resultados</button>
@@ -83,3 +84,12 @@ function teamName(registration: { playerOneName: string; playerTwoName: string; 
 function formatDates(startsAt: string | null, endsAt: string | null) { if (!startsAt) return 'Fechas a confirmar'; return endsAt && endsAt !== startsAt ? `${startsAt} al ${endsAt}` : startsAt; }
 function formatMatchDate(value: string | null) { return value ? new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)) : ''; }
 function googleMapsLink(court: { name: string; address: string | null; city: string | null; provinceName: string | null }) { return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([court.name, court.address, court.city, court.provinceName].filter(Boolean).join(', '))}`; }
+function getTournamentState(startsAt: string | null, endsAt: string | null) {
+  if (!startsAt) return { heading: 'Proximo torneo', label: 'Proximamente', live: false };
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const start = new Date(`${startsAt}T00:00:00`);
+  const end = new Date(`${endsAt ?? startsAt}T23:59:59`);
+  if (today < start) return { heading: 'Proximo torneo', label: 'Proximamente', live: false };
+  if (today <= end) return { heading: 'Torneo en curso', label: 'En juego', live: true };
+  return { heading: 'Torneo finalizado', label: 'Finalizado', live: false };
+}
