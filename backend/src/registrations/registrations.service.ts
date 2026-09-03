@@ -25,6 +25,7 @@ import { PairRegistration } from './pair-registration.entity';
 import { RegistrationAccessGrant } from './registration-access-grant.entity';
 import { Locality } from '../localities/locality.entity';
 import { PlayersService } from '../players/players.service';
+import { GoogleDrivePhotoStorageService } from './google-drive-photo-storage.service';
 
 interface RegistrationFiles {
   paymentProof?: Express.Multer.File;
@@ -43,6 +44,7 @@ export class RegistrationsService {
     @InjectRepository(Locality)
     private readonly localitiesRepository: Repository<Locality>,
     private readonly playersService: PlayersService,
+    private readonly googleDrivePhotos: GoogleDrivePhotoStorageService,
   ) {}
 
   async createAccessGrant(dto: CreateAccessGrantDto) {
@@ -192,6 +194,7 @@ export class RegistrationsService {
       throw new BadRequestException('Debe adjuntar el comprobante de pago');
     }
 
+    const drivePhotos = await this.uploadPlayerPhotos(files, dto);
     const registration = this.registrationsRepository.create({
       accessGrantId: grant.id,
       category: grant.category,
@@ -213,7 +216,7 @@ export class RegistrationsService {
       playerOneShirtSize: dto.playerOneShirtSize,
       playerOneHasCommercialAgreement: dto.playerOneHasCommercialAgreement,
       playerOneCommercialAgreementDetails: normalizeOptional(dto.playerOneCommercialAgreementDetails),
-      playerOnePhotoStoredName: playerOnePhoto?.filename ?? null,
+      playerOnePhotoStoredName: drivePhotos.playerOne ?? playerOnePhoto?.filename ?? null,
       playerOnePhotoOriginalName: playerOnePhoto?.originalname ?? null,
       playerOnePhotoMimeType: playerOnePhoto?.mimetype ?? null,
       playerOnePhotoSizeBytes: playerOnePhoto?.size ?? null,
@@ -225,7 +228,7 @@ export class RegistrationsService {
       playerTwoShirtSize: dto.playerTwoShirtSize,
       playerTwoHasCommercialAgreement: dto.playerTwoHasCommercialAgreement,
       playerTwoCommercialAgreementDetails: normalizeOptional(dto.playerTwoCommercialAgreementDetails),
-      playerTwoPhotoStoredName: playerTwoPhoto?.filename ?? null,
+      playerTwoPhotoStoredName: drivePhotos.playerTwo ?? playerTwoPhoto?.filename ?? null,
       playerTwoPhotoOriginalName: playerTwoPhoto?.originalname ?? null,
       playerTwoPhotoMimeType: playerTwoPhoto?.mimetype ?? null,
       playerTwoPhotoSizeBytes: playerTwoPhoto?.size ?? null,
@@ -237,7 +240,7 @@ export class RegistrationsService {
       playerThreeShirtSize: dto.playerThreeShirtSize ?? null,
       playerThreeHasCommercialAgreement: dto.playerThreeHasCommercialAgreement ?? false,
       playerThreeCommercialAgreementDetails: normalizeOptional(dto.playerThreeCommercialAgreementDetails),
-      playerThreePhotoStoredName: playerThreePhoto?.filename ?? null,
+      playerThreePhotoStoredName: drivePhotos.playerThree ?? playerThreePhoto?.filename ?? null,
       playerThreePhotoOriginalName: playerThreePhoto?.originalname ?? null,
       playerThreePhotoMimeType: playerThreePhoto?.mimetype ?? null,
       playerThreePhotoSizeBytes: playerThreePhoto?.size ?? null,
@@ -406,10 +409,27 @@ export class RegistrationsService {
   }
 
   private cleanupStoredPaymentProof(storedName: string) {
+    if (storedName.startsWith('drive:')) { void this.googleDrivePhotos.remove(storedName); return; }
     try {
       unlinkSync(join(ensurePaymentProofDir(), storedName));
     } catch {
       return;
+    }
+  }
+
+  private async uploadPlayerPhotos(files: RegistrationFiles, dto: CreatePublicRegistrationDto) {
+    if (!this.googleDrivePhotos.enabled()) return {};
+    try {
+      const [playerOne, playerTwo, playerThree] = await Promise.all([
+        files.playerOnePhoto ? this.googleDrivePhotos.upload(files.playerOnePhoto, dto.playerOneName) : null,
+        files.playerTwoPhoto ? this.googleDrivePhotos.upload(files.playerTwoPhoto, dto.playerTwoName) : null,
+        files.playerThreePhoto && dto.playerThreeName ? this.googleDrivePhotos.upload(files.playerThreePhoto, dto.playerThreeName) : null,
+      ]);
+      [files.playerOnePhoto, files.playerTwoPhoto, files.playerThreePhoto].forEach((file) => { if (file?.path) { try { unlinkSync(file.path); } catch { return; } } });
+      return { playerOne, playerTwo, playerThree };
+    } catch (error) {
+      this.cleanupUploadedFiles(files);
+      throw new BadRequestException(error instanceof Error ? `No se pudieron guardar las fotos: ${error.message}` : 'No se pudieron guardar las fotos en Google Drive');
     }
   }
 }

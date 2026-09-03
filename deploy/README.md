@@ -66,7 +66,25 @@ SEED_ADMIN_EMAIL=admin@copaleyendas.local
 SEED_ADMIN_PASSWORD=cambia-esto
 SEED_ADMIN_NAME=Direccion Copa Leyendas
 PAYMENT_PROOF_STORAGE_DIR=/var/www/copa-leyendas/shared/payment-proofs
+# Carpeta de la edicion en Drive. La aplicacion crea dentro "Fotos Jugadores".
+GOOGLE_DRIVE_TOURNAMENT_FOLDER_ID=ID_DE_CARPETA
+# JSON de cuenta de servicio en una linea, preferentemente codificado base64.
+GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON=JSON_O_BASE64
 ```
+
+### Fotos de jugadoras en Google Drive
+
+1. En Google Cloud, crear un proyecto y habilitar **Google Drive API**.
+2. Crear una cuenta de servicio y generar una clave JSON.
+3. En Drive, dentro de `copaleyendaspaleta@gmail.com`, crear o seleccionar la carpeta de la edicion y compartirla como **Editora** con el email de la cuenta de servicio.
+4. Copiar el identificador de esa carpeta desde su URL a `GOOGLE_DRIVE_TOURNAMENT_FOLDER_ID`.
+5. Codificar el JSON en base64 y definirlo en `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON`:
+
+```bash
+base64 -w 0 cuenta-servicio.json
+```
+
+Al recibir una inscripcion, el backend crea o reutiliza la subcarpeta `Fotos Jugadores` y guarda ahi las imagenes. Si las dos variables no estan definidas, mantiene el almacenamiento local actual.
 
 Frontend recomendado:
 

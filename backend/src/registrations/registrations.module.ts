@@ -7,11 +7,12 @@ import { RegistrationsController } from './registrations.controller';
 import { RegistrationsService } from './registrations.service';
 import { Locality } from '../localities/locality.entity';
 import { PlayersModule } from '../players/players.module';
+import { GoogleDrivePhotoStorageService } from './google-drive-photo-storage.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([PairRegistration, RegistrationAccessGrant, Locality]), PlayersModule],
   controllers: [RegistrationsController, PublicRegistrationsController],
-  providers: [RegistrationsService],
+  providers: [RegistrationsService, GoogleDrivePhotoStorageService],
   exports: [RegistrationsService, TypeOrmModule],
 })
 export class RegistrationsModule {}

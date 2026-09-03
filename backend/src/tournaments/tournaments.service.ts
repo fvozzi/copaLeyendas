@@ -6,9 +6,11 @@ import { UserRole } from '../auth/user.entity';
 import { CourtAssistantAssignment } from '../courts/court-assistant-assignment.entity';
 import { Court } from '../courts/court.entity';
 import { PairRegistration } from '../registrations/pair-registration.entity';
+import { RegistrationStatus } from '../registrations/registration.enums';
 import { MatchStatus, ParticipantSource } from './tournament.enums';
 import { TournamentCategory } from './tournament-category.entity';
 import { TournamentMatch } from './tournament-match.entity';
+import { TournamentScheduleSlot } from './tournament-schedule-slot.entity';
 import { Tournament } from './tournament.entity';
 import { ZoneEntry } from './zone-entry.entity';
 import { Zone } from './zone.entity';
@@ -21,6 +23,7 @@ export class TournamentsService {
     @InjectRepository(Zone) private z: Repository<Zone>,
     @InjectRepository(ZoneEntry) private e: Repository<ZoneEntry>,
     @InjectRepository(TournamentMatch) private m: Repository<TournamentMatch>,
+    @InjectRepository(TournamentScheduleSlot) private slots: Repository<TournamentScheduleSlot>,
     @InjectRepository(Court) private c: Repository<Court>,
     @InjectRepository(CourtAssistantAssignment) private assignments: Repository<CourtAssistantAssignment>,
     @InjectRepository(PairRegistration) private r: Repository<PairRegistration>,
@@ -59,16 +62,64 @@ export class TournamentsService {
   }
   async addEntry(zoneId: number, registrationId: number) { const zone = await this.z.findOneBy({ id: zoneId }); if (!zone) throw new NotFoundException('Zona no encontrada'); if (await this.e.countBy({ zoneId }) >= zone.capacity) throw new BadRequestException('La zona alcanzo su cupo'); return this.e.save(this.e.create({ zoneId, registrationId })); }
 
+  async divideZones(tournamentCategoryId: number) {
+    const category = await this.tc.findOne({ where: { id: tournamentCategoryId }, relations: { category: true } });
+    if (!category) throw new NotFoundException('Categoria de torneo no encontrada');
+    const existing = await this.z.find({ where: { tournamentCategoryId } });
+    if (existing.length && await this.e.count({ where: existing.map((zone) => ({ zoneId: zone.id })) })) throw new BadRequestException('No se pueden redistribuir zonas que ya tienen parejas asignadas.');
+    if (existing.length) await this.z.remove(existing);
+    const registrations = await this.r.find({ where: { category: category.category.code, status: RegistrationStatus.CONFIRMED }, order: { localityName: 'ASC', id: 'ASC' } });
+    const count = Math.max(1, Math.ceil(registrations.length / category.zoneSize));
+    const courts = await this.c.find({ where: { active: true }, order: { name: 'ASC' } });
+    if (!courts.length) throw new BadRequestException('Debes habilitar al menos una cancha antes de dividir las zonas.');
+    const zones = await this.z.save(Array.from({ length: count }, (_, index) => this.z.create({ tournamentCategoryId, courtId: courts[index % courts.length].id, name: `Zona ${String.fromCharCode(65 + index)}`, capacity: category.zoneSize })));
+    const assignments = zones.map((zone) => ({ zone, entries: [] as PairRegistration[] }));
+    for (const registration of registrations) {
+      const eligible = assignments.filter((item) => item.entries.length < category.zoneSize && !item.entries.some((entry) => entry.localityName.trim().toLowerCase() === registration.localityName.trim().toLowerCase()));
+      const target = (eligible.length ? eligible : assignments.filter((item) => item.entries.length < category.zoneSize)).sort((a, b) => a.entries.length - b.entries.length)[0];
+      target.entries.push(registration);
+      await this.e.save(this.e.create({ zoneId: target.zone.id, registrationId: registration.id, seed: target.entries.length }));
+    }
+    return this.z.find({ where: { tournamentCategoryId }, order: { name: 'ASC' } });
+  }
+
+  async scheduleGrid(tournamentId: number) {
+    const categories = await this.tc.find({ where: { tournamentId }, relations: { category: true }, order: { id: 'ASC' } });
+    let sequence = (await this.slots.maximum('sequence', { tournamentId })) ?? 0;
+    for (const category of categories) {
+      if (await this.slots.exist({ where: { tournamentCategoryId: category.id } })) continue;
+      for (let matchOrder = 1; matchOrder <= 4; matchOrder += 1) for (let zone = 0; zone < 4; zone += 1) {
+        sequence += 1;
+        await this.slots.save(this.slots.create({ tournamentId, tournamentCategoryId: category.id, zoneName: `Zona ${String.fromCharCode(65 + zone)}`, matchOrder, sequence, scheduledAt: null }));
+      }
+    }
+    const [slots, zones] = await Promise.all([this.slots.find({ where: { tournamentId }, relations: { tournamentCategory: { category: true } }, order: { sequence: 'ASC' } }), this.z.find({ where: { tournamentCategory: { tournamentId } }, relations: { court: true } })]);
+    return slots.map((slot) => ({ ...slot, court: zones.find((zone) => zone.tournamentCategoryId === slot.tournamentCategoryId && zone.name === slot.zoneName)?.court ?? null }));
+  }
+
+  async updateScheduleSlot(id: number, dto: { scheduledAt?: string | null }) {
+    const slot = await this.slots.findOneBy({ id }); if (!slot) throw new NotFoundException('Turno no encontrado');
+    if (dto.scheduledAt !== undefined) slot.scheduledAt = dto.scheduledAt ? new Date(dto.scheduledAt) : null;
+    await this.slots.save(slot);
+    const zone = await this.z.findOneBy({ tournamentCategoryId: slot.tournamentCategoryId, name: slot.zoneName });
+    if (zone) await this.m.update({ zoneId: zone.id, matchOrder: slot.matchOrder }, { scheduledAt: slot.scheduledAt });
+    return slot;
+  }
+
   async fixture(zoneId: number) {
-    const entries = await this.e.find({ where: { zoneId }, order: { seed: 'ASC', id: 'ASC' } });
+    const [entries, zone] = await Promise.all([this.e.find({ where: { zoneId }, order: { seed: 'ASC', id: 'ASC' } }), this.z.findOneBy({ id: zoneId })]);
+    if (!zone) throw new NotFoundException('Zona no encontrada');
     if (![3, 4].includes(entries.length)) throw new BadRequestException('La zona debe tener 3 o 4 parejas');
     await this.m.delete({ zoneId });
-    const direct = (a: number, b: number, order: number) => this.m.save(this.m.create({ zoneId, matchOrder: order, homeRegistrationId: a, awayRegistrationId: b, status: MatchStatus.READY }));
+    const planned = await this.slots.find({ where: { tournamentCategoryId: zone.tournamentCategoryId, zoneName: zone.name } });
+    const direct = (a: number, b: number, order: number) => { const slot = planned.find((item) => item.matchOrder === order); return this.m.save(this.m.create({ zoneId, matchOrder: order, homeRegistrationId: a, awayRegistrationId: b, scheduledAt: slot?.scheduledAt ?? null, status: MatchStatus.READY })); };
     const p1 = await direct(entries[0].registrationId, entries[1].registrationId, 1);
     if (entries.length === 3) { await direct(entries[0].registrationId, entries[2].registrationId, 2); await direct(entries[1].registrationId, entries[2].registrationId, 3); return this.matches(zoneId); }
     const p2 = await direct(entries[2].registrationId, entries[3].registrationId, 2);
-    await this.m.save(this.m.create({ zoneId, matchOrder: 3, homeSource: ParticipantSource.WINNER, homeSourceMatchId: p1.id, awaySource: ParticipantSource.LOSER, awaySourceMatchId: p2.id, status: MatchStatus.PENDING }));
-    await this.m.save(this.m.create({ zoneId, matchOrder: 4, homeSource: ParticipantSource.WINNER, homeSourceMatchId: p2.id, awaySource: ParticipantSource.LOSER, awaySourceMatchId: p1.id, status: MatchStatus.PENDING }));
+    const thirdSlot = planned.find((item) => item.matchOrder === 3);
+    const fourthSlot = planned.find((item) => item.matchOrder === 4);
+    await this.m.save(this.m.create({ zoneId, matchOrder: 3, scheduledAt: thirdSlot?.scheduledAt ?? null, homeSource: ParticipantSource.WINNER, homeSourceMatchId: p1.id, awaySource: ParticipantSource.LOSER, awaySourceMatchId: p2.id, status: MatchStatus.PENDING }));
+    await this.m.save(this.m.create({ zoneId, matchOrder: 4, scheduledAt: fourthSlot?.scheduledAt ?? null, homeSource: ParticipantSource.WINNER, homeSourceMatchId: p2.id, awaySource: ParticipantSource.LOSER, awaySourceMatchId: p1.id, status: MatchStatus.PENDING }));
     return this.matches(zoneId);
   }
 

@@ -275,13 +275,14 @@ export interface TournamentPayload { name: string; startsAt?: string; endsAt?: s
 export interface TournamentCategory { id: number; categoryId: number; pointsPerSet: number; setsToWin: number; zoneSize: number; category: Category; }
 export interface TournamentZone { id: number; name: string; capacity: number; tournamentCategoryId: number; court: Court; tournamentCategory: TournamentCategory; }
 export interface TournamentDetail extends Tournament { categories: TournamentCategory[]; zones: TournamentZone[]; }
-export interface TournamentMatch { id: number; matchOrder: number; status: string; homeRegistration: PairRegistration | null; awayRegistration: PairRegistration | null; homeScore: number | null; awayScore: number | null; scheduledAt: string | null; }
+export interface TournamentMatch { id: number; matchOrder: number; status: string; court?: Court | null; homeRegistration: PairRegistration | null; awayRegistration: PairRegistration | null; homeScore: number | null; awayScore: number | null; scheduledAt: string | null; }
 export interface ZoneEntry { id: number; registration: PairRegistration; }
 export interface ZoneDetail extends TournamentZone { entries: ZoneEntry[]; }
 export interface PublicStanding { registration: PairRegistration; played: number; wins: number; losses: number; pointsFor: number; pointsAgainst: number; tablePoints: number; }
 export interface PublicTournamentZone { id: number; name: string; category: string; court: Court; standings: PublicStanding[]; matches: TournamentMatch[]; }
 export interface PublicTournament extends Tournament { zones: PublicTournamentZone[]; }
 export interface PublicCurrentTournament { tournament: PublicTournament | null; courts: Court[]; }
+export interface TournamentScheduleSlot { id: number; tournamentId: number; tournamentCategoryId: number; zoneName: string; matchOrder: number; sequence: number; courtId: number | null; court: Court | null; scheduledAt: string | null; tournamentCategory: TournamentCategory; }
 
 export interface Player {
   id: number;
