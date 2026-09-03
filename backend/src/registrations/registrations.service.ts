@@ -24,6 +24,7 @@ import {
 import { PairRegistration } from './pair-registration.entity';
 import { RegistrationAccessGrant } from './registration-access-grant.entity';
 import { Locality } from '../localities/locality.entity';
+import { PlayersService } from '../players/players.service';
 
 @Injectable()
 export class RegistrationsService {
@@ -34,6 +35,7 @@ export class RegistrationsService {
     private readonly accessGrantsRepository: Repository<RegistrationAccessGrant>,
     @InjectRepository(Locality)
     private readonly localitiesRepository: Repository<Locality>,
+    private readonly playersService: PlayersService,
   ) {}
 
   async createAccessGrant(dto: CreateAccessGrantDto) {
@@ -45,12 +47,12 @@ export class RegistrationsService {
     if (locality && (!locality.active || !locality.category || !locality.category.active)) {
       throw new BadRequestException('La localidad debe tener una categoria activa para habilitarse');
     }
-    const localityName = locality?.name ?? dto.localityName.trim();
+    const localityName = locality?.name ?? dto.localityName?.trim() ?? '';
     const grant = this.accessGrantsRepository.create({
       token,
       category: locality?.category?.code ?? dto.category,
       localityName,
-      provinceName: locality?.provinceName ?? dto.provinceName.trim(),
+      provinceName: locality?.provinceName ?? dto.provinceName?.trim() ?? '',
       clubName: normalizeOptional(dto.clubName) ?? localityName,
       contactName: normalizeOptional(dto.contactName),
       contactEmail: normalizeOptional(dto.contactEmail),
@@ -106,6 +108,25 @@ export class RegistrationsService {
 
     grant.status = dto.status;
     return this.accessGrantsRepository.save(grant);
+  }
+
+  async removeAccessGrant(id: number) {
+    const grant = await this.accessGrantsRepository.findOne({ where: { id } });
+
+    if (!grant) {
+      throw new NotFoundException('Equipo habilitado no encontrado');
+    }
+
+    const registrationsCount = await this.registrationsRepository.count({
+      where: { accessGrantId: id },
+    });
+
+    if (registrationsCount > 0) {
+      throw new BadRequestException('Primero debe eliminar el registro asociado a este equipo');
+    }
+
+    await this.accessGrantsRepository.remove(grant);
+    return { success: true };
   }
 
   async getPublicAccessGrant(token: string) {
@@ -199,6 +220,7 @@ export class RegistrationsService {
     });
 
     const saved = await this.registrationsRepository.save(registration);
+    await this.playersService.syncRegistrationPlayers(saved);
     grant.status = RegistrationAccessGrantStatus.USED;
     grant.consumedAt = new Date();
     await this.accessGrantsRepository.save(grant);
@@ -263,6 +285,37 @@ export class RegistrationsService {
     return this.registrationsRepository.save(registration);
   }
 
+  async remove(id: number) {
+    const registration = await this.getById(id);
+
+    try {
+      await this.registrationsRepository.manager.transaction(async (manager) => {
+        await manager.remove(PairRegistration, registration);
+        await manager.update(
+          RegistrationAccessGrant,
+          { id: registration.accessGrantId },
+          {
+            status: RegistrationAccessGrantStatus.ACTIVE,
+            consumedAt: null,
+          },
+        );
+      });
+    } catch (error) {
+      if (isForeignKeyViolation(error)) {
+        throw new BadRequestException(
+          'No se puede eliminar un registro asignado a una zona o a partidos',
+        );
+      }
+      throw error;
+    }
+
+    if (registration.paymentProofStoredName) {
+      this.cleanupStoredPaymentProof(registration.paymentProofStoredName);
+    }
+
+    return { success: true };
+  }
+
   async getPaymentProof(id: number) {
     const registration = await this.getById(id);
     if (
@@ -323,6 +376,14 @@ export class RegistrationsService {
       return;
     }
   }
+
+  private cleanupStoredPaymentProof(storedName: string) {
+    try {
+      unlinkSync(join(ensurePaymentProofDir(), storedName));
+    } catch {
+      return;
+    }
+  }
 }
 
 function normalizeOptional(value?: string | null) {
@@ -340,4 +401,8 @@ function buildToken() {
   }
 
   return `COPA-${compact}`;
+}
+
+function isForeignKeyViolation(error: unknown) {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === '23503';
 }

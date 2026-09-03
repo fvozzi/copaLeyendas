@@ -10,5 +10,6 @@ import { PlayersService } from './players.service';
   imports: [TypeOrmModule.forFeature([Player, Locality, PairRegistration])],
   controllers: [PlayersController],
   providers: [PlayersService],
+  exports: [PlayersService],
 })
 export class PlayersModule {}

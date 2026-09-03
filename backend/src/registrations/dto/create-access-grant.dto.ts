@@ -8,6 +8,7 @@ import {
   IsString,
   MaxLength,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 import { PairCategory } from '../registration.enums';
 
@@ -23,15 +24,17 @@ export class CreateAccessGrantDto {
   @IsEnum(PairCategory)
   category: PairCategory;
 
+  @ValidateIf((dto: CreateAccessGrantDto) => !dto.localityId)
   @IsString()
   @MinLength(2)
   @MaxLength(120)
-  localityName: string;
+  localityName?: string;
 
+  @ValidateIf((dto: CreateAccessGrantDto) => !dto.localityId)
   @IsString()
   @MinLength(2)
   @MaxLength(120)
-  provinceName: string;
+  provinceName?: string;
 
   @IsOptional()
   @IsString()

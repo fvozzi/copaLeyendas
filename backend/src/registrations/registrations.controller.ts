@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseIntPipe,
@@ -43,6 +44,11 @@ export class RegistrationsController {
     return this.registrationsService.updateAccessGrantStatus(id, dto);
   }
 
+  @Delete('access-grants/:id')
+  removeAccessGrant(@Param('id', ParseIntPipe) id: number) {
+    return this.registrationsService.removeAccessGrant(id);
+  }
+
   @Get()
   list(@Query() query: QueryRegistrationsDto) {
     return this.registrationsService.list(query);
@@ -59,6 +65,11 @@ export class RegistrationsController {
     @Body() dto: UpdateRegistrationStatusDto,
   ) {
     return this.registrationsService.updateStatus(id, dto);
+  }
+
+  @Delete(':id')
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.registrationsService.remove(id);
   }
 
   @Get(':id/payment-proof')

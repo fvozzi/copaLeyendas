@@ -76,57 +76,61 @@ export class PlayersService {
     });
 
     for (const registration of registrations) {
-      const locality = await this.findOrCreateLocality(
-        registration.localityName,
-        registration.provinceName,
+      await this.syncRegistrationPlayers(registration);
+    }
+  }
+
+  async syncRegistrationPlayers(registration: PairRegistration) {
+    const locality = await this.findOrCreateLocality(
+      registration.localityName,
+      registration.provinceName,
+    );
+    const candidates = [
+      {
+        fullName: registration.playerOneName,
+        dni: registration.playerOneDni,
+        birthDate: registration.playerOneBirthDate,
+        phone: registration.playerOnePhone,
+        instagram: registration.playerOneInstagram,
+        shirtSize: registration.playerOneShirtSize,
+      },
+      {
+        fullName: registration.playerTwoName,
+        dni: registration.playerTwoDni,
+        birthDate: registration.playerTwoBirthDate,
+        phone: registration.playerTwoPhone,
+        instagram: registration.playerTwoInstagram,
+        shirtSize: registration.playerTwoShirtSize,
+      },
+      registration.playerThreeName && registration.playerThreeDni
+        ? {
+            fullName: registration.playerThreeName,
+            dni: registration.playerThreeDni,
+            birthDate: registration.playerThreeBirthDate,
+            phone: registration.playerThreePhone,
+            instagram: registration.playerThreeInstagram,
+            shirtSize: registration.playerThreeShirtSize,
+          }
+        : null,
+    ];
+
+    for (const candidate of candidates) {
+      if (!candidate) continue;
+      const dni = candidate.dni.trim();
+      const exists = await this.playersRepository.findOne({ where: { dni } });
+      if (exists) continue;
+
+      await this.playersRepository.save(
+        this.playersRepository.create({
+          fullName: candidate.fullName.trim(),
+          dni,
+          birthDate: candidate.birthDate,
+          phone: normalizeOptional(candidate.phone),
+          instagram: normalizeOptional(candidate.instagram),
+          shirtSize: candidate.shirtSize,
+          localityId: locality.id,
+        }),
       );
-      const candidates = [
-        {
-          fullName: registration.playerOneName,
-          dni: registration.playerOneDni,
-          birthDate: registration.playerOneBirthDate,
-          phone: registration.playerOnePhone,
-          instagram: registration.playerOneInstagram,
-          shirtSize: registration.playerOneShirtSize,
-        },
-        {
-          fullName: registration.playerTwoName,
-          dni: registration.playerTwoDni,
-          birthDate: registration.playerTwoBirthDate,
-          phone: registration.playerTwoPhone,
-          instagram: registration.playerTwoInstagram,
-          shirtSize: registration.playerTwoShirtSize,
-        },
-        registration.playerThreeName && registration.playerThreeDni
-          ? {
-              fullName: registration.playerThreeName,
-              dni: registration.playerThreeDni,
-              birthDate: registration.playerThreeBirthDate,
-              phone: registration.playerThreePhone,
-              instagram: registration.playerThreeInstagram,
-              shirtSize: registration.playerThreeShirtSize,
-            }
-          : null,
-      ];
-
-      for (const candidate of candidates) {
-        if (!candidate) continue;
-        const dni = candidate.dni.trim();
-        const exists = await this.playersRepository.findOne({ where: { dni } });
-        if (exists) continue;
-
-        await this.playersRepository.save(
-          this.playersRepository.create({
-            fullName: candidate.fullName.trim(),
-            dni,
-            birthDate: candidate.birthDate,
-            phone: normalizeOptional(candidate.phone),
-            instagram: normalizeOptional(candidate.instagram),
-            shirtSize: candidate.shirtSize,
-            localityId: locality.id,
-          }),
-        );
-      }
     }
   }
 

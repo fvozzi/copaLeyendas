@@ -330,6 +330,10 @@ export function updateRegistrationStatus(id: number, payload: RegistrationStatus
   );
 }
 
+export function deleteRegistration(id: number) {
+  return request<{ success: boolean }>(`/registrations/${id}`, { method: 'DELETE' }, true);
+}
+
 export function getAccessGrants(params?: {
   category?: string;
   status?: string;
@@ -366,6 +370,10 @@ export function updateAccessGrantStatus(id: number, payload: AccessGrantStatusPa
     },
     true,
   );
+}
+
+export function deleteAccessGrant(id: number) {
+  return request<{ success: boolean }>(`/registrations/access-grants/${id}`, { method: 'DELETE' }, true);
 }
 
 export function getPaymentProofUrl(id: number) {
