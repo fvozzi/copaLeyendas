@@ -190,16 +190,6 @@ export class RegistrationsService {
       throw new BadRequestException('Debe adjuntar el comprobante de pago');
     }
 
-    if (!playerOnePhoto || !playerTwoPhoto) {
-      this.cleanupUploadedFiles(files);
-      throw new BadRequestException('Debe adjuntar una foto de la jugadora 1 y de la jugadora 2');
-    }
-
-    if (dto.playerThreeName?.trim() && !playerThreePhoto) {
-      this.cleanupUploadedFiles(files);
-      throw new BadRequestException('Debe adjuntar una foto de la jugadora 3');
-    }
-
     const registration = this.registrationsRepository.create({
       accessGrantId: grant.id,
       category: grant.category,
@@ -220,10 +210,10 @@ export class RegistrationsService {
       playerOneShirtSize: dto.playerOneShirtSize,
       playerOneHasCommercialAgreement: dto.playerOneHasCommercialAgreement,
       playerOneCommercialAgreementDetails: normalizeOptional(dto.playerOneCommercialAgreementDetails),
-      playerOnePhotoStoredName: playerOnePhoto.filename,
-      playerOnePhotoOriginalName: playerOnePhoto.originalname,
-      playerOnePhotoMimeType: playerOnePhoto.mimetype,
-      playerOnePhotoSizeBytes: playerOnePhoto.size,
+      playerOnePhotoStoredName: playerOnePhoto?.filename ?? null,
+      playerOnePhotoOriginalName: playerOnePhoto?.originalname ?? null,
+      playerOnePhotoMimeType: playerOnePhoto?.mimetype ?? null,
+      playerOnePhotoSizeBytes: playerOnePhoto?.size ?? null,
       playerTwoName: dto.playerTwoName.trim(),
       playerTwoDni: dto.playerTwoDni.trim(),
       playerTwoBirthDate: dto.playerTwoBirthDate,
@@ -232,10 +222,10 @@ export class RegistrationsService {
       playerTwoShirtSize: dto.playerTwoShirtSize,
       playerTwoHasCommercialAgreement: dto.playerTwoHasCommercialAgreement,
       playerTwoCommercialAgreementDetails: normalizeOptional(dto.playerTwoCommercialAgreementDetails),
-      playerTwoPhotoStoredName: playerTwoPhoto.filename,
-      playerTwoPhotoOriginalName: playerTwoPhoto.originalname,
-      playerTwoPhotoMimeType: playerTwoPhoto.mimetype,
-      playerTwoPhotoSizeBytes: playerTwoPhoto.size,
+      playerTwoPhotoStoredName: playerTwoPhoto?.filename ?? null,
+      playerTwoPhotoOriginalName: playerTwoPhoto?.originalname ?? null,
+      playerTwoPhotoMimeType: playerTwoPhoto?.mimetype ?? null,
+      playerTwoPhotoSizeBytes: playerTwoPhoto?.size ?? null,
       playerThreeName: normalizeOptional(dto.playerThreeName),
       playerThreeDni: normalizeOptional(dto.playerThreeDni),
       playerThreeBirthDate: normalizeOptional(dto.playerThreeBirthDate),

@@ -144,10 +144,11 @@ export function RegistrationPage() {
       <div className="registration-copy">
         <p className="eyebrow">Inscripcion con token</p>
         <h1>Solo se registran localidades habilitadas por Direccion del Torneo</h1>
-        <p>
-          Primero ingresas el token entregado por la organizacion. Si el token esta activo, se
-          abre el formulario para cargar hasta 3 jugadoras y completar la inscripcion.
-        </p>
+          <p>
+            Primero ingresas el token entregado por la organizacion. Si el token esta activo, se
+            abre el formulario para cargar hasta 3 jugadoras y completar la inscripcion.
+          </p>
+          <p><strong>Consultas y asesoramiento con respecto al formulario</strong><br />Mel: (011) 37768403 / Sonia: (011) 69338065</p>
       </div>
 
       <form className="token-card" onSubmit={handleTokenSubmit}>
@@ -466,8 +467,8 @@ function PlayerFields(props: {
         </label>
         <label>
           Foto de la jugadora
-          <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => props.onPhotoChange(event.target.files?.[0] ?? null)} required={Boolean(shouldRequire)} />
-          <small className="field-hint">Foto con ropa deportiva dentro de una cancha y, si corresponde, sponsor de marca visible. JPG, PNG o WebP, maximo 10 MB.</small>
+          <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => props.onPhotoChange(event.target.files?.[0] ?? null)} />
+          <small className="field-hint">Sube una imagen para que te presentemos en redes como pelotari</small>
         </label>
       </div>
       {shouldRequire ? <label className="checkbox-row">
