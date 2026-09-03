@@ -44,8 +44,10 @@ const initialForm: PublicRegistrationPayload = {
 
 type PlayerFieldPrefix = 'playerOne' | 'playerTwo' | 'playerThree';
 type PlayerPhotos = Record<PlayerFieldPrefix, File | null>;
+type PhotoMessages = Record<PlayerFieldPrefix, string | null>;
 type FieldErrors = Record<string, string | undefined>;
 const initialPlayerPhotos: PlayerPhotos = { playerOne: null, playerTwo: null, playerThree: null };
+const initialPhotoMessages: PhotoMessages = { playerOne: null, playerTwo: null, playerThree: null };
 
 export function RegistrationPage() {
   const [tokenInput, setTokenInput] = useState('');
@@ -54,6 +56,7 @@ export function RegistrationPage() {
   const [form, setForm] = useState(initialForm);
   const [paymentProof, setPaymentProof] = useState<File | null>(null);
   const [playerPhotos, setPlayerPhotos] = useState<PlayerPhotos>(initialPlayerPhotos);
+  const [photoMessages, setPhotoMessages] = useState<PhotoMessages>(initialPhotoMessages);
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -76,8 +79,31 @@ export function RegistrationPage() {
     setForm(initialForm);
     setPaymentProof(null);
     setPlayerPhotos(initialPlayerPhotos);
+    setPhotoMessages(initialPhotoMessages);
     setError(null);
     setFieldErrors({});
+  };
+
+  const handlePlayerPhoto = async (player: PlayerFieldPrefix, file: File | null) => {
+    if (!file) {
+      setPlayerPhotos((current) => ({ ...current, [player]: null }));
+      setPhotoMessages((current) => ({ ...current, [player]: null }));
+      return;
+    }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setPlayerPhotos((current) => ({ ...current, [player]: null }));
+      setPhotoMessages((current) => ({ ...current, [player]: 'La foto debe estar en formato JPG, PNG o WebP. Convertí las fotos HEIC antes de seleccionarlas.' }));
+      return;
+    }
+    try {
+      setPhotoMessages((current) => ({ ...current, [player]: 'Optimizando foto...' }));
+      const optimized = await optimizePhoto(file);
+      setPlayerPhotos((current) => ({ ...current, [player]: optimized }));
+      setPhotoMessages((current) => ({ ...current, [player]: `Foto optimizada: ${formatFileSize(optimized.size)}` }));
+    } catch {
+      setPlayerPhotos((current) => ({ ...current, [player]: file }));
+      setPhotoMessages((current) => ({ ...current, [player]: `No se pudo optimizar. Se usara el archivo original (${formatFileSize(file.size)}).` }));
+    }
   };
 
   const handleTokenSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -141,7 +167,7 @@ export function RegistrationPage() {
         playerThreeCommercialAgreementDetails: form.playerThreeCommercialAgreementDetails?.trim() || undefined,
       });
 
-      setSuccessMessage(`${result.message}. Codigo interno #${result.id}.`);
+      setSuccessMessage('Inscripción realizada con éxito.');
       resetForm();
     } catch (reason) {
       const message = reason instanceof Error ? reason.message : 'No se pudo enviar la inscripcion.';
@@ -184,7 +210,7 @@ export function RegistrationPage() {
       </form>
 
       {error ? <p className="form-error">{error}</p> : null}
-      {successMessage ? <p className="form-success">{successMessage}</p> : null}
+      {successMessage ? <div className="registration-success" role="status"><p className="eyebrow">Registro confirmado</p><h2>{successMessage}</h2><p>Recibimos los datos del equipo. La organización se comunicará si necesita información adicional.</p></div> : null}
 
       {access ? (
         <>
@@ -273,7 +299,8 @@ export function RegistrationPage() {
               shirtSize={form.playerOneShirtSize}
               required
               photo={playerPhotos.playerOne}
-              onPhotoChange={(file) => setPlayerPhotos((current) => ({ ...current, playerOne: file }))}
+              photoMessage={photoMessages.playerOne}
+              onPhotoChange={(file) => handlePlayerPhoto('playerOne', file)}
               hasCommercialAgreement={form.playerOneHasCommercialAgreement}
               commercialAgreementDetails={form.playerOneCommercialAgreementDetails ?? ''}
               onCommercialAgreementChange={(hasAgreement, details) => setForm((current) => ({ ...current, playerOneHasCommercialAgreement: hasAgreement, playerOneCommercialAgreementDetails: details }))}
@@ -292,7 +319,8 @@ export function RegistrationPage() {
               shirtSize={form.playerTwoShirtSize}
               required
               photo={playerPhotos.playerTwo}
-              onPhotoChange={(file) => setPlayerPhotos((current) => ({ ...current, playerTwo: file }))}
+              photoMessage={photoMessages.playerTwo}
+              onPhotoChange={(file) => handlePlayerPhoto('playerTwo', file)}
               hasCommercialAgreement={form.playerTwoHasCommercialAgreement}
               commercialAgreementDetails={form.playerTwoCommercialAgreementDetails ?? ''}
               onCommercialAgreementChange={(hasAgreement, details) => setForm((current) => ({ ...current, playerTwoHasCommercialAgreement: hasAgreement, playerTwoCommercialAgreementDetails: details }))}
@@ -311,7 +339,8 @@ export function RegistrationPage() {
               instagram={form.playerThreeInstagram ?? ''}
               shirtSize={(form.playerThreeShirtSize ?? 'M') as ShirtSize}
               photo={playerPhotos.playerThree}
-              onPhotoChange={(file) => setPlayerPhotos((current) => ({ ...current, playerThree: file }))}
+              photoMessage={photoMessages.playerThree}
+              onPhotoChange={(file) => handlePlayerPhoto('playerThree', file)}
               hasCommercialAgreement={form.playerThreeHasCommercialAgreement ?? false}
               commercialAgreementDetails={form.playerThreeCommercialAgreementDetails ?? ''}
               onCommercialAgreementChange={(hasAgreement, details) => setForm((current) => ({ ...current, playerThreeHasCommercialAgreement: hasAgreement, playerThreeCommercialAgreementDetails: details }))}
@@ -385,11 +414,12 @@ function PlayerFields(props: {
   instagram: string;
   shirtSize: ShirtSize;
   photo: File | null;
+  photoMessage: string | null;
   hasCommercialAgreement: boolean;
   commercialAgreementDetails: string;
   required?: boolean;
   fieldPrefix: PlayerFieldPrefix;
-  onPhotoChange: (file: File | null) => void;
+  onPhotoChange: (file: File | null) => void | Promise<void>;
   onCommercialAgreementChange: (hasAgreement: boolean, details: string) => void;
   errors: FieldErrors;
   onChange: (field: keyof PublicRegistrationPayload, value: string) => void;
@@ -498,8 +528,9 @@ function PlayerFields(props: {
         </label>
         <label>
           Foto de la jugadora
-          <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => props.onPhotoChange(event.target.files?.[0] ?? null)} />
-          <small className="field-hint">Sube una imagen para que te presentemos en redes como pelotari</small>
+          <input type="file" accept="image/*" capture="environment" onChange={(event) => { void props.onPhotoChange(event.target.files?.[0] ?? null); }} />
+          <small className="field-hint">Sube una imagen para que te presentemos en redes como pelotari. La optimizamos automaticamente antes de enviarla.</small>
+          {props.photoMessage ? <small className="field-hint">{props.photoMessage}</small> : null}
           <FieldError message={fieldError('Photo')} />
         </label>
       </div>
@@ -514,6 +545,39 @@ function PlayerFields(props: {
 }
 
 function FieldError({ message }: { message?: string }) { return message ? <small className="field-error">{message}</small> : null; }
+
+async function optimizePhoto(file: File) {
+  const image = await loadImage(file);
+  let maxSide = 1600;
+  for (const quality of [0.84, 0.74, 0.64]) {
+    const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(image.width * scale));
+    canvas.height = Math.max(1, Math.round(image.height * scale));
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('No se pudo crear la imagen optimizada');
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/webp', quality));
+    if (!blob) throw new Error('No se pudo comprimir la imagen');
+    if (blob.size <= 8 * 1024 * 1024 || quality === 0.64) return new File([blob], `${file.name.replace(/\.[^.]+$/, '')}.webp`, { type: 'image/webp' });
+    maxSide = 1280;
+  }
+  return file;
+}
+
+async function loadImage(file: File) {
+  const url = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.src = url;
+    await image.decode();
+    return image;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function formatFileSize(bytes: number) { return `${(bytes / 1024 / 1024).toFixed(bytes < 1024 * 1024 ? 2 : 1)} MB`; }
 
 function validateRegistration(form: PublicRegistrationPayload, paymentProof: File | null, feeWaived: boolean): FieldErrors {
   const errors: FieldErrors = {};
