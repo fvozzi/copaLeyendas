@@ -154,6 +154,10 @@ export function createPublicRegistration(payload: PublicRegistrationPayload) {
   }
   formData.set('tournamentAvailabilityConfirmed', String(payload.tournamentAvailabilityConfirmed));
   formData.set('representingText', payload.representingText);
+  formData.set('hasCommercialAgreement', String(payload.hasCommercialAgreement));
+  if (payload.commercialAgreementDetails) {
+    formData.set('commercialAgreementDetails', payload.commercialAgreementDetails);
+  }
   if (payload.contactEmail) {
     formData.set('contactEmail', payload.contactEmail);
   }
@@ -194,6 +198,9 @@ export function createPublicRegistration(payload: PublicRegistrationPayload) {
   if (payload.paymentProof) {
     formData.set('paymentProof', payload.paymentProof);
   }
+  if (payload.playerOnePhoto) formData.set('playerOnePhoto', payload.playerOnePhoto);
+  if (payload.playerTwoPhoto) formData.set('playerTwoPhoto', payload.playerTwoPhoto);
+  if (payload.playerThreePhoto) formData.set('playerThreePhoto', payload.playerThreePhoto);
 
   return request<PublicRegistrationResponse>('/public/registrations', {
     method: 'POST',

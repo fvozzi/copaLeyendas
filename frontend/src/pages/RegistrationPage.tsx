@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import shirtSizeGuideImage from '../assets/shirt-size-guide.svg';
+import shirtSizeGuideImage from '../assets/shirt-size-guide.png';
 import { createPublicRegistration, getPublicRegistrationAccess } from '../lib/api';
 import { categoryLabels, heardAboutLabels, shirtSizeLabels } from '../lib/content';
 import type {
@@ -16,6 +16,8 @@ const initialForm: PublicRegistrationPayload = {
   tournamentAvailabilityConfirmed: true,
   representingText: '',
   contactEmail: '',
+  hasCommercialAgreement: false,
+  commercialAgreementDetails: '',
   playerOneName: '',
   playerOneDni: '',
   playerOneBirthDate: '',
@@ -37,6 +39,8 @@ const initialForm: PublicRegistrationPayload = {
 };
 
 type PlayerFieldPrefix = 'playerOne' | 'playerTwo' | 'playerThree';
+type PlayerPhotos = Record<PlayerFieldPrefix, File | null>;
+const initialPlayerPhotos: PlayerPhotos = { playerOne: null, playerTwo: null, playerThree: null };
 
 export function RegistrationPage() {
   const [tokenInput, setTokenInput] = useState('');
@@ -44,6 +48,7 @@ export function RegistrationPage() {
   const [loadingAccess, setLoadingAccess] = useState(false);
   const [form, setForm] = useState(initialForm);
   const [paymentProof, setPaymentProof] = useState<File | null>(null);
+  const [playerPhotos, setPlayerPhotos] = useState<PlayerPhotos>(initialPlayerPhotos);
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -63,6 +68,7 @@ export function RegistrationPage() {
     setTokenInput('');
     setForm(initialForm);
     setPaymentProof(null);
+    setPlayerPhotos(initialPlayerPhotos);
     setError(null);
   };
 
@@ -103,6 +109,9 @@ export function RegistrationPage() {
       const result = await createPublicRegistration({
         ...form,
         paymentProof: paymentProof ?? undefined,
+        playerOnePhoto: playerPhotos.playerOne ?? undefined,
+        playerTwoPhoto: playerPhotos.playerTwo ?? undefined,
+        playerThreePhoto: playerPhotos.playerThree ?? undefined,
         heardAboutOtherText: form.heardAboutOtherText?.trim() || undefined,
         contactEmail: form.contactEmail?.trim() || undefined,
         playerOneInstagram: form.playerOneInstagram?.trim() || undefined,
@@ -112,6 +121,7 @@ export function RegistrationPage() {
         playerThreeBirthDate: form.playerThreeBirthDate?.trim() || undefined,
         playerThreePhone: form.playerThreePhone?.trim() || undefined,
         playerThreeInstagram: form.playerThreeInstagram?.trim() || undefined,
+        commercialAgreementDetails: form.commercialAgreementDetails?.trim() || undefined,
       });
 
       setSuccessMessage(`${result.message}. Codigo interno #${result.id}.`);
@@ -222,6 +232,11 @@ export function RegistrationPage() {
                   onChange={(event) => updateField('contactEmail', event.target.value)}
                 />
               </label>
+              <label className="checkbox-row span-2">
+                <input type="checkbox" checked={form.hasCommercialAgreement} onChange={(event) => updateField('hasCommercialAgreement', event.target.checked)} />
+                Tenes acuerdo comercial con una o mas marcas
+              </label>
+              {form.hasCommercialAgreement ? <label className="span-2">Con que marca o marcas tenes acuerdo comercial<textarea rows={3} value={form.commercialAgreementDetails ?? ''} onChange={(event) => updateField('commercialAgreementDetails', event.target.value)} required /></label> : null}
             </div>
 
             <PlayerFields
@@ -234,6 +249,8 @@ export function RegistrationPage() {
               instagram={form.playerOneInstagram ?? ''}
               shirtSize={form.playerOneShirtSize}
               required
+              photo={playerPhotos.playerOne}
+              onPhotoChange={(file) => setPlayerPhotos((current) => ({ ...current, playerOne: file }))}
               onChange={(field, value) => updateField(field, value)}
             />
 
@@ -247,6 +264,8 @@ export function RegistrationPage() {
               instagram={form.playerTwoInstagram ?? ''}
               shirtSize={form.playerTwoShirtSize}
               required
+              photo={playerPhotos.playerTwo}
+              onPhotoChange={(file) => setPlayerPhotos((current) => ({ ...current, playerTwo: file }))}
               onChange={(field, value) => updateField(field, value)}
             />
 
@@ -260,6 +279,8 @@ export function RegistrationPage() {
               phone={form.playerThreePhone ?? ''}
               instagram={form.playerThreeInstagram ?? ''}
               shirtSize={(form.playerThreeShirtSize ?? 'M') as ShirtSize}
+              photo={playerPhotos.playerThree}
+              onPhotoChange={(file) => setPlayerPhotos((current) => ({ ...current, playerThree: file }))}
               onChange={(field, value) => updateField(field, value)}
             />
 
@@ -324,8 +345,10 @@ function PlayerFields(props: {
   phone: string;
   instagram: string;
   shirtSize: ShirtSize;
+  photo: File | null;
   required?: boolean;
   fieldPrefix: PlayerFieldPrefix;
+  onPhotoChange: (file: File | null) => void;
   onChange: (field: keyof PublicRegistrationPayload, value: string) => void;
 }) {
   const isOptional = !props.required;
@@ -427,6 +450,11 @@ function PlayerFields(props: {
               </option>
             ))}
           </select>
+        </label>
+        <label>
+          Foto de la jugadora
+          <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => props.onPhotoChange(event.target.files?.[0] ?? null)} required={Boolean(shouldRequire)} />
+          <small className="field-hint">Foto con ropa deportiva y, si corresponde, sponsor de marca visible. JPG, PNG o WebP, maximo 10 MB.</small>
         </label>
       </div>
     </div>

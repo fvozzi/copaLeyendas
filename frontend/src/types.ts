@@ -149,6 +149,8 @@ export interface PairRegistration {
   playerThreePhone: string | null;
   playerThreeInstagram: string | null;
   playerThreeShirtSize: ShirtSize | null;
+  hasCommercialAgreement: boolean;
+  commercialAgreementDetails: string | null;
   paymentProofStoredName: string | null;
   paymentProofOriginalName: string | null;
   paymentProofMimeType: string | null;
@@ -184,7 +186,12 @@ export interface PublicRegistrationPayload {
   playerThreePhone?: string;
   playerThreeInstagram?: string;
   playerThreeShirtSize?: ShirtSize;
+  hasCommercialAgreement: boolean;
+  commercialAgreementDetails?: string;
   paymentProof?: File;
+  playerOnePhoto?: File;
+  playerTwoPhoto?: File;
+  playerThreePhoto?: File;
 }
 
 export interface PublicRegistrationResponse {

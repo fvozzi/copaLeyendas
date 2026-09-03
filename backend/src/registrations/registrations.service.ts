@@ -26,6 +26,13 @@ import { RegistrationAccessGrant } from './registration-access-grant.entity';
 import { Locality } from '../localities/locality.entity';
 import { PlayersService } from '../players/players.service';
 
+interface RegistrationFiles {
+  paymentProof?: Express.Multer.File;
+  playerOnePhoto?: Express.Multer.File;
+  playerTwoPhoto?: Express.Multer.File;
+  playerThreePhoto?: Express.Multer.File;
+}
+
 @Injectable()
 export class RegistrationsService {
   constructor(
@@ -149,12 +156,13 @@ export class RegistrationsService {
     };
   }
 
-  async createPublic(dto: CreatePublicRegistrationDto, paymentProof?: Express.Multer.File) {
+  async createPublic(dto: CreatePublicRegistrationDto, files: RegistrationFiles = {}) {
     ensurePaymentProofDir();
+    const { paymentProof, playerOnePhoto, playerTwoPhoto, playerThreePhoto } = files;
     const grant = await this.findAccessGrantByToken(dto.accessToken);
 
     if (grant.status !== RegistrationAccessGrantStatus.ACTIVE) {
-      this.cleanupUploadedFile(paymentProof);
+      this.cleanupUploadedFiles(files);
       throw new BadRequestException('Token no disponible para nuevas inscripciones');
     }
 
@@ -163,22 +171,33 @@ export class RegistrationsService {
     });
 
     if (existingCount > 0) {
-      this.cleanupUploadedFile(paymentProof);
+      this.cleanupUploadedFiles(files);
       throw new BadRequestException('Este token ya fue utilizado');
     }
 
     if (!dto.tournamentAvailabilityConfirmed) {
-      this.cleanupUploadedFile(paymentProof);
+      this.cleanupUploadedFiles(files);
       throw new BadRequestException('Debe confirmar disponibilidad para las fechas del torneo');
     }
 
     if (dto.heardAboutSource === HeardAboutSource.OTHER && !dto.heardAboutOtherText?.trim()) {
-      this.cleanupUploadedFile(paymentProof);
+      this.cleanupUploadedFiles(files);
       throw new BadRequestException('Debe indicar como se entero del evento');
     }
 
     if (!grant.feeWaived && !paymentProof) {
+      this.cleanupUploadedFiles(files);
       throw new BadRequestException('Debe adjuntar el comprobante de pago');
+    }
+
+    if (!playerOnePhoto || !playerTwoPhoto) {
+      this.cleanupUploadedFiles(files);
+      throw new BadRequestException('Debe adjuntar una foto de la jugadora 1 y de la jugadora 2');
+    }
+
+    if (dto.playerThreeName?.trim() && !playerThreePhoto) {
+      this.cleanupUploadedFiles(files);
+      throw new BadRequestException('Debe adjuntar una foto de la jugadora 3');
     }
 
     const registration = this.registrationsRepository.create({
@@ -192,6 +211,8 @@ export class RegistrationsService {
       tournamentAvailabilityConfirmed: dto.tournamentAvailabilityConfirmed,
       representingText: dto.representingText.trim(),
       contactEmail: normalizeOptional(dto.contactEmail),
+      hasCommercialAgreement: dto.hasCommercialAgreement,
+      commercialAgreementDetails: normalizeOptional(dto.commercialAgreementDetails),
       feeWaived: grant.feeWaived,
       playerOneName: dto.playerOneName.trim(),
       playerOneDni: dto.playerOneDni.trim(),
@@ -199,18 +220,30 @@ export class RegistrationsService {
       playerOnePhone: dto.playerOnePhone.trim(),
       playerOneInstagram: normalizeOptional(dto.playerOneInstagram),
       playerOneShirtSize: dto.playerOneShirtSize,
+      playerOnePhotoStoredName: playerOnePhoto.filename,
+      playerOnePhotoOriginalName: playerOnePhoto.originalname,
+      playerOnePhotoMimeType: playerOnePhoto.mimetype,
+      playerOnePhotoSizeBytes: playerOnePhoto.size,
       playerTwoName: dto.playerTwoName.trim(),
       playerTwoDni: dto.playerTwoDni.trim(),
       playerTwoBirthDate: dto.playerTwoBirthDate,
       playerTwoPhone: dto.playerTwoPhone.trim(),
       playerTwoInstagram: normalizeOptional(dto.playerTwoInstagram),
       playerTwoShirtSize: dto.playerTwoShirtSize,
+      playerTwoPhotoStoredName: playerTwoPhoto.filename,
+      playerTwoPhotoOriginalName: playerTwoPhoto.originalname,
+      playerTwoPhotoMimeType: playerTwoPhoto.mimetype,
+      playerTwoPhotoSizeBytes: playerTwoPhoto.size,
       playerThreeName: normalizeOptional(dto.playerThreeName),
       playerThreeDni: normalizeOptional(dto.playerThreeDni),
       playerThreeBirthDate: normalizeOptional(dto.playerThreeBirthDate),
       playerThreePhone: normalizeOptional(dto.playerThreePhone),
       playerThreeInstagram: normalizeOptional(dto.playerThreeInstagram),
       playerThreeShirtSize: dto.playerThreeShirtSize ?? null,
+      playerThreePhotoStoredName: playerThreePhoto?.filename ?? null,
+      playerThreePhotoOriginalName: playerThreePhoto?.originalname ?? null,
+      playerThreePhotoMimeType: playerThreePhoto?.mimetype ?? null,
+      playerThreePhotoSizeBytes: playerThreePhoto?.size ?? null,
       paymentProofStoredName: paymentProof?.filename ?? null,
       paymentProofOriginalName: paymentProof?.originalname ?? null,
       paymentProofMimeType: paymentProof?.mimetype ?? null,
@@ -309,9 +342,9 @@ export class RegistrationsService {
       throw error;
     }
 
-    if (registration.paymentProofStoredName) {
-      this.cleanupStoredPaymentProof(registration.paymentProofStoredName);
-    }
+    [registration.paymentProofStoredName, registration.playerOnePhotoStoredName, registration.playerTwoPhotoStoredName, registration.playerThreePhotoStoredName].forEach((storedName) => {
+      if (storedName) this.cleanupStoredPaymentProof(storedName);
+    });
 
     return { success: true };
   }
@@ -365,16 +398,11 @@ export class RegistrationsService {
     }
   }
 
-  private cleanupUploadedFile(paymentProof?: Express.Multer.File) {
-    if (!paymentProof?.path) {
-      return;
-    }
-
-    try {
-      unlinkSync(paymentProof.path);
-    } catch {
-      return;
-    }
+  private cleanupUploadedFiles(files: RegistrationFiles) {
+    Object.values(files).forEach((file) => {
+      if (!file?.path) return;
+      try { unlinkSync(file.path); } catch { return; }
+    });
   }
 
   private cleanupStoredPaymentProof(storedName: string) {

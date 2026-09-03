@@ -44,6 +44,16 @@ export class CreatePublicRegistrationDto {
   @IsEmail()
   contactEmail?: string;
 
+  @Transform(({ value }) => toBoolean(value))
+  @IsBoolean()
+  hasCommercialAgreement: boolean;
+
+  @ValidateIf((dto) => dto.hasCommercialAgreement)
+  @IsString()
+  @MinLength(2)
+  @MaxLength(500)
+  commercialAgreementDetails?: string;
+
   @IsString()
   @MinLength(4)
   @MaxLength(140)

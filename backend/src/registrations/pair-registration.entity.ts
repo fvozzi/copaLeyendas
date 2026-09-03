@@ -65,6 +65,12 @@ export class PairRegistration {
   contactEmail: string | null;
 
   @Column({ type: 'boolean', default: false })
+  hasCommercialAgreement: boolean;
+
+  @Column({ type: 'text', nullable: true })
+  commercialAgreementDetails: string | null;
+
+  @Column({ type: 'boolean', default: false })
   feeWaived: boolean;
 
   @Column()
@@ -89,6 +95,18 @@ export class PairRegistration {
   })
   playerOneShirtSize: ShirtSize;
 
+  @Column({ type: 'varchar', nullable: true })
+  playerOnePhotoStoredName: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  playerOnePhotoOriginalName: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  playerOnePhotoMimeType: string | null;
+
+  @Column({ type: 'integer', nullable: true })
+  playerOnePhotoSizeBytes: number | null;
+
   @Column()
   playerTwoName: string;
 
@@ -112,6 +130,18 @@ export class PairRegistration {
   playerTwoShirtSize: ShirtSize;
 
   @Column({ type: 'varchar', nullable: true })
+  playerTwoPhotoStoredName: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  playerTwoPhotoOriginalName: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  playerTwoPhotoMimeType: string | null;
+
+  @Column({ type: 'integer', nullable: true })
+  playerTwoPhotoSizeBytes: number | null;
+
+  @Column({ type: 'varchar', nullable: true })
   playerThreeName: string | null;
 
   @Column({ type: 'varchar', nullable: true })
@@ -133,6 +163,18 @@ export class PairRegistration {
     nullable: true,
   })
   playerThreeShirtSize: ShirtSize | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  playerThreePhotoStoredName: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  playerThreePhotoOriginalName: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  playerThreePhotoMimeType: string | null;
+
+  @Column({ type: 'integer', nullable: true })
+  playerThreePhotoSizeBytes: number | null;
 
   @Column({ type: 'varchar', nullable: true })
   substituteName: string | null;
