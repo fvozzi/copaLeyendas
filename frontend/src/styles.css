@@ -357,6 +357,23 @@ img {
   background: linear-gradient(135deg, rgba(23, 63, 57, 0.1), rgba(255, 255, 255, 0.78));
 }
 
+.tournament-regulations {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.42fr) minmax(0, 1fr);
+  gap: 1.5rem;
+  margin: 1.5rem 0 3rem;
+  padding: 1.5rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(215, 200, 168, 0.25), rgba(255, 255, 255, 0.85));
+}
+
+.tournament-regulations h2 { margin: 0; font-size: clamp(2rem, 4vw, 3.1rem); }
+.tournament-regulations ol { margin: 0; padding: 0; list-style: none; counter-reset: regulation; display: grid; gap: 0.6rem; }
+.tournament-regulations li { display: grid; grid-template-columns: 2rem 1fr; gap: 0.55rem; align-items: start; padding: 0.65rem 0; border-bottom: 1px solid rgba(23, 63, 57, 0.14); }
+.tournament-regulations li::before { counter-increment: regulation; content: counter(regulation); display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border: 2px solid var(--white); border-radius: 50%; background: var(--forest); color: var(--white); font-weight: 800; font-size: 0.85rem; }
+.tournament-regulations li:last-child { border-bottom: 0; }
+
 .public-tournament-heading {
   display: flex;
   align-items: start;
@@ -751,6 +768,14 @@ textarea {
   gap: 2rem;
 }
 
+.admin-sidebar-header {
+  display: contents;
+}
+
+.admin-menu-toggle {
+  display: none;
+}
+
 .sidebar-user {
   color: rgba(255, 255, 255, 0.74);
 }
@@ -1057,6 +1082,60 @@ textarea {
 
   .admin-sidebar {
     min-height: auto;
+    padding: 1rem 1.25rem;
+    gap: 0;
+  }
+
+  .admin-sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .admin-sidebar h1 {
+    margin: 0;
+    font-size: 2rem;
+  }
+
+  .admin-sidebar .sidebar-kicker,
+  .admin-sidebar .sidebar-user {
+    display: none;
+  }
+
+  .admin-menu-toggle {
+    display: grid;
+    width: 46px;
+    height: 46px;
+    padding: 0.65rem;
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    border-radius: 8px;
+    background: transparent;
+    gap: 0.3rem;
+  }
+
+  .admin-menu-toggle span {
+    display: block;
+    height: 2px;
+    background: var(--white);
+  }
+
+  .admin-nav,
+  .admin-logout {
+    display: none;
+  }
+
+  .admin-sidebar.is-open .admin-nav {
+    display: grid;
+    margin-top: 1.25rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .admin-sidebar.is-open .admin-logout {
+    display: inline-flex;
+    align-self: flex-start;
+    margin-top: 1.25rem;
   }
 
   .admin-content {
@@ -1087,6 +1166,11 @@ textarea {
   .tournament-zone-grid,
   .court-public-grid {
     grid-template-columns: 1fr;
+  }
+
+  .tournament-regulations {
+    grid-template-columns: 1fr;
+    padding: 1.2rem;
   }
 
   .public-tournament-heading,

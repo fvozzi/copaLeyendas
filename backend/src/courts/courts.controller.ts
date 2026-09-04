@@ -5,7 +5,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UserRole } from '../auth/user.entity';
 import { CourtsService } from './courts.service';
 
-class CourtDto { @IsString() @MinLength(2) @MaxLength(120) name: string; @IsOptional() @IsString() address?: string; @IsOptional() @IsString() city?: string; @IsOptional() @IsString() provinceName?: string; @IsOptional() @IsBoolean() active?: boolean; }
+class CourtDto { @IsString() @MinLength(2) @MaxLength(120) name: string; @IsInt() venueId: number; @IsOptional() @IsBoolean() active?: boolean; }
+class VenueDto { @IsString() @MinLength(2) name: string; @IsOptional() @IsString() address?: string; @IsOptional() @IsString() city?: string; @IsOptional() @IsString() provinceName?: string; @IsOptional() @IsString() startsAt?: string; @IsOptional() @IsInt() matchDurationMinutes?: number; @IsOptional() @IsInt() matchesPerDay?: number; @IsOptional() @IsBoolean() active?: boolean; }
 class CourtAssistantsDto { @IsArray() @IsInt({ each: true }) userIds: number[]; }
 
 @Controller('courts')
@@ -13,6 +14,10 @@ class CourtAssistantsDto { @IsArray() @IsInt({ each: true }) userIds: number[]; 
 export class CourtsController {
   constructor(private readonly service: CourtsService) {}
   @Get() list(@Query('search') search?: string) { return this.service.list(search); }
+  @Get('venues') venues() { return this.service.listVenues(); }
+  @Post('venues') createVenue(@CurrentUser() user: AuthenticatedUser, @Body() dto: VenueDto) { this.assertDirector(user); return this.service.createVenue(dto); }
+  @Patch('venues/:id') updateVenue(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: Partial<VenueDto>) { this.assertDirector(user); return this.service.updateVenue(id, dto); }
+  @Delete('venues/:id') removeVenue(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { this.assertDirector(user); return this.service.removeVenue(id); }
   @Post() create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CourtDto) { this.assertDirector(user); return this.service.create(dto); }
   @Patch(':id') update(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: Partial<CourtDto>) { this.assertDirector(user); return this.service.update(id, dto); }
   @Put(':id/assistants') setAssistants(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: CourtAssistantsDto) { this.assertDirector(user); return this.service.setAssistants(id, dto.userIds); }

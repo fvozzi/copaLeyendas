@@ -1,0 +1,2 @@
+import { MigrationInterface, QueryRunner } from 'typeorm';
+export class AddPlayingCourtsToVenues1789257600000 implements MigrationInterface { async up(q: QueryRunner): Promise<void> { await q.query("ALTER TABLE \"courts\" ADD \"playingCourts\" text[] NOT NULL DEFAULT ARRAY['Cancha 1']"); } async down(q: QueryRunner): Promise<void> { await q.query('ALTER TABLE "courts" DROP COLUMN "playingCourts"'); } }

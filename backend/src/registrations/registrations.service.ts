@@ -199,6 +199,7 @@ export class RegistrationsService {
     }
 
     const drivePhotos = await this.uploadPlayerPhotos(files, dto);
+    const activeTournament = await this.tournamentsRepository.findOne({ where: { status: TournamentStatus.ACTIVE }, order: { startsAt: 'ASC', id: 'ASC' } });
     const registration = this.registrationsRepository.create({
       accessGrantId: grant.id,
       category: grant.category,
@@ -211,6 +212,7 @@ export class RegistrationsService {
       representingText: dto.representingText.trim(),
       contactEmail: normalizeOptional(dto.contactEmail),
       feeWaived: grant.feeWaived,
+      feePerPlayer: activeTournament?.feePerPlayer ?? 15000,
       paymentDeferredUntilConfirmed: grant.paymentDeferredUntilConfirmed,
       playerOneName: dto.playerOneName.trim(),
       playerOneDni: dto.playerOneDni.trim(),

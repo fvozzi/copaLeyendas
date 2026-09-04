@@ -37,7 +37,9 @@ export class TournamentsService {
     if (dto.name !== undefined) tournament.name = dto.name.trim();
     if (dto.startsAt !== undefined) tournament.startsAt = dto.startsAt || null;
     if (dto.endsAt !== undefined) tournament.endsAt = dto.endsAt || null;
+    if (dto.playingDays !== undefined) tournament.playingDays = [...new Set(dto.playingDays)].sort();
     if (dto.city !== undefined) tournament.city = dto.city?.trim() || null;
+    if (dto.feePerPlayer !== undefined) tournament.feePerPlayer = dto.feePerPlayer;
     if (dto.status !== undefined) tournament.status = dto.status;
     return this.t.save(tournament);
   }

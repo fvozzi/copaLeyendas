@@ -268,11 +268,13 @@ export interface LocalityPayload {
 export interface Category { id: number; code: PairCategory; name: string; active: boolean; sortOrder: number; }
 export interface CategoryPayload { code: PairCategory; name: string; active?: boolean; sortOrder?: number; }
 export interface CourtAssistant { id: number; name: string; email: string; }
-export interface Court { id: number; name: string; address: string | null; city: string | null; provinceName: string | null; active: boolean; assistantIds: number[]; assistants: CourtAssistant[]; }
-export interface CourtPayload { name: string; address?: string; city?: string; provinceName?: string; active?: boolean; }
+export interface Venue { id: number; name: string; address: string | null; city: string | null; provinceName: string | null; startsAt: string; matchDurationMinutes: number; matchesPerDay: number; active: boolean; }
+export interface VenuePayload { name: string; address?: string; city?: string; provinceName?: string; startsAt?: string; matchDurationMinutes?: number; matchesPerDay?: number; active?: boolean; }
+export interface Court { id: number; name: string; venueId: number; venue?: Venue; address: string | null; city: string | null; provinceName: string | null; active: boolean; assistantIds: number[]; assistants: CourtAssistant[]; }
+export interface CourtPayload { name: string; venueId: number; active?: boolean; }
 
-export interface Tournament { id: number; name: string; startsAt: string | null; endsAt: string | null; city: string | null; status: 'DRAFT' | 'ACTIVE' | 'COMPLETED'; }
-export interface TournamentPayload { name: string; startsAt?: string; endsAt?: string; city?: string; status?: 'DRAFT' | 'ACTIVE' | 'COMPLETED'; }
+export interface Tournament { id: number; name: string; feePerPlayer: number; startsAt: string | null; endsAt: string | null; playingDays: string[]; city: string | null; status: 'DRAFT' | 'ACTIVE' | 'COMPLETED'; }
+export interface TournamentPayload { name: string; feePerPlayer?: number; startsAt?: string; endsAt?: string; playingDays?: string[]; city?: string; status?: 'DRAFT' | 'ACTIVE' | 'COMPLETED'; }
 export interface TournamentCategory { id: number; categoryId: number; pointsPerSet: number; setsToWin: number; zoneSize: number; category: Category; }
 export interface TournamentZone { id: number; name: string; capacity: number; tournamentCategoryId: number; court: Court; tournamentCategory: TournamentCategory; }
 export interface TournamentDetail extends Tournament { categories: TournamentCategory[]; zones: TournamentZone[]; }

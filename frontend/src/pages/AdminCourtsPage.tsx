@@ -1,36 +1,24 @@
 import { useEffect, useState } from 'react';
 import { AdminDataGrid } from '../components/AdminDataGrid';
 import { AdminDialog } from '../components/AdminDialog';
-import { createCourt, deleteCourt, getCourts, getUsers, updateCourt, updateCourtAssistants } from '../lib/api';
-import type { AdminUser, Court, CourtPayload } from '../types';
+import { createVenue, deleteVenue, getVenues, updateVenue } from '../lib/api';
+import type { Venue, VenuePayload } from '../types';
 
-const initial: CourtPayload = { name: '', address: '', city: 'Ciudad de Buenos Aires', provinceName: 'Buenos Aires', active: true };
+const initial: VenuePayload = { name: '', address: '', city: 'Ciudad de Buenos Aires', provinceName: 'Buenos Aires', startsAt: '10:00', matchDurationMinutes: 40, matchesPerDay: 16, active: true };
 
 export function AdminCourtsPage() {
-  const [items, setItems] = useState<Court[]>([]);
-  const [assistants, setAssistants] = useState<AdminUser[]>([]);
-  const [form, setForm] = useState<CourtPayload>(initial);
-  const [assistantIds, setAssistantIds] = useState<number[]>([]);
-  const [editing, setEditing] = useState<Court | null>(null);
+  const [items, setItems] = useState<Venue[]>([]);
+  const [form, setForm] = useState<VenuePayload>(initial);
+  const [editing, setEditing] = useState<Venue | null>(null);
   const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const load = () => getCourts(search || undefined).then(setItems).catch((reason: Error) => setError(reason.message));
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const load = () => getVenues().then(setItems).catch((reason: Error) => setError(reason.message));
+  useEffect(() => { load(); }, []);
+  const close = (force = false) => { if (saving && !force) return; setOpen(false); setEditing(null); setForm(initial); setModalError(null); };
+  const edit = (item: Venue) => { setModalError(null); setEditing(item); setForm({ name: item.name, address: item.address ?? '', city: item.city ?? '', provinceName: item.provinceName ?? '', startsAt: item.startsAt.slice(0, 5), matchDurationMinutes: item.matchDurationMinutes, matchesPerDay: item.matchesPerDay, active: item.active }); setOpen(true); };
+  const save = async (event: React.FormEvent) => { event.preventDefault(); setModalError(null); setSaving(true); try { if (editing) await updateVenue(editing.id, form); else await createVenue(form); close(true); await load(); } catch (reason) { setModalError(reason instanceof Error ? reason.message : 'No se pudo guardar la sede.'); } finally { setSaving(false); } };
 
-  useEffect(() => { load(); getUsers().then((users) => setAssistants(users.filter((user) => user.role === 'ASSISTANT'))).catch((reason: Error) => setError(reason.message)); }, []);
-  const close = () => { setOpen(false); setEditing(null); setForm(initial); setAssistantIds([]); };
-  const edit = (item: Court) => { setEditing(item); setForm({ name: item.name, address: item.address ?? '', city: item.city ?? '', provinceName: item.provinceName ?? '', active: item.active }); setAssistantIds(item.assistantIds ?? []); setOpen(true); };
-  const toggleAssistant = (id: number) => setAssistantIds((current) => current.includes(id) ? current.filter((value) => value !== id) : [...current, id]);
-  const save = async (event: React.FormEvent) => {
-    event.preventDefault();
-    try {
-      const court = editing ? await updateCourt(editing.id, form) : await createCourt(form);
-      await updateCourtAssistants(court.id, assistantIds);
-      close();
-      load();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo guardar la cancha.'); }
-  };
-  const remove = async (item: Court) => { if (!window.confirm(`Se eliminara ${item.name}.`)) return; try { await deleteCourt(item.id); load(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo eliminar la cancha.'); } };
-
-  return <div className="admin-panel"><div className="panel-header"><div><p className="eyebrow">ABM</p><h1>Canchas</h1></div><button className="primary-button" onClick={() => { setForm(initial); setAssistantIds([]); setOpen(true); }}>Agregar cancha</button></div><div className="toolbar"><input placeholder="Buscar cancha o ciudad" value={search} onChange={(event) => setSearch(event.target.value)} /><button className="secondary-button" onClick={load}>Buscar</button></div>{error && <div className="inline-state">{error}</div>}<section className="data-card"><AdminDataGrid rows={items} onEdit={edit} onDelete={remove} emptyMessage="No hay canchas cargadas." columns={[{ label: 'Cancha', render: (item) => <strong>{item.name}</strong> }, { label: 'Direccion', render: (item) => item.address ?? '-' }, { label: 'Ciudad', render: (item) => item.city ?? '-' }, { label: 'Asistentes', render: (item) => item.assistants?.length ? item.assistants.map((assistant) => assistant.name).join(', ') : '-' }, { label: 'Estado', render: (item) => <span className={`status-chip ${item.active ? 'status-live' : 'status-draft'}`}>{item.active ? 'Activa' : 'Inactiva'}</span> }]} /></section>{open && <AdminDialog title={editing ? 'Editar cancha' : 'Nueva cancha'} onClose={close}><form className="editor-form" onSubmit={save}><label>Nombre<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required /></label><label>Direccion<input value={form.address ?? ''} onChange={(event) => setForm({ ...form, address: event.target.value })} /></label><label>Ciudad<input value={form.city ?? ''} onChange={(event) => setForm({ ...form, city: event.target.value })} /></label><label>Provincia<input value={form.provinceName ?? ''} onChange={(event) => setForm({ ...form, provinceName: event.target.value })} /></label><div className="span-2"><span className="field-label">Encargados / asistentes asignados</span><div className="checkbox-list">{assistants.length ? assistants.map((assistant) => <label className="checkbox-row" key={assistant.id}><input type="checkbox" checked={assistantIds.includes(assistant.id)} onChange={() => toggleAssistant(assistant.id)} />{assistant.name} <span>({assistant.email})</span></label>) : <p className="field-hint">Primero crea usuarios con el rol Encargado / Asistente.</p>}</div></div><label className="checkbox-row span-2"><input type="checkbox" checked={form.active ?? true} onChange={(event) => setForm({ ...form, active: event.target.checked })} />Cancha activa</label><div className="span-2 form-actions"><button className="primary-button">Guardar</button></div></form></AdminDialog>}</div>;
+  return <div className="admin-panel"><div className="panel-header"><div><p className="eyebrow">ABM</p><h1>Sedes</h1></div><button className="primary-button" onClick={() => { setModalError(null); setForm(initial); setOpen(true); }}>Agregar sede</button></div>{error && <div className="inline-state">{error}</div>}<section className="data-card"><AdminDataGrid rows={items} emptyMessage="No hay sedes cargadas." columns={[{ label: 'Sede', render: (item) => <strong>{item.name}</strong> }, { label: 'Horario inicial', render: (item) => item.startsAt.slice(0, 5) }, { label: 'Duracion', render: (item) => `${item.matchDurationMinutes} min.` }, { label: 'Partidos por dia', render: (item) => item.matchesPerDay }, { label: 'Ciudad', render: (item) => item.city ?? '-' }, { label: 'Estado', render: (item) => <span className={`status-chip ${item.active ? 'status-live' : 'status-draft'}`}>{item.active ? 'Activa' : 'Inactiva'}</span> }]} renderActions={(item) => <><button className="inline-link" onClick={() => edit(item)}>Editar</button><button className="danger-link" onClick={async () => { if (window.confirm(`Se eliminara ${item.name}.`)) { try { await deleteVenue(item.id); load(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo eliminar la sede.'); } } }}>Eliminar</button></>} /></section>{open && <AdminDialog title={editing ? 'Editar sede' : 'Nueva sede'} onClose={close}><form className="editor-form" onSubmit={save}>{modalError && <div className="inline-state span-2">{modalError}</div>}<label>Nombre de la sede<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required /></label><label>Horario de inicio<input type="time" value={form.startsAt ?? '10:00'} onChange={(event) => setForm({ ...form, startsAt: event.target.value })} required /></label><label>Duracion por partido (minutos)<input type="number" min="1" max="240" value={form.matchDurationMinutes ?? 40} onChange={(event) => setForm({ ...form, matchDurationMinutes: Number(event.target.value) })} required /></label><label>Partidos por dia<input type="number" min="1" max="200" value={form.matchesPerDay ?? 16} onChange={(event) => setForm({ ...form, matchesPerDay: Number(event.target.value) })} required /></label><small className="field-hint span-2">El Programa usara estos valores para calcular los horarios de esta sede en cada dia de juego.</small><label>Direccion<input value={form.address ?? ''} onChange={(event) => setForm({ ...form, address: event.target.value })} /></label><label>Ciudad<input value={form.city ?? ''} onChange={(event) => setForm({ ...form, city: event.target.value })} /></label><label>Provincia<input value={form.provinceName ?? ''} onChange={(event) => setForm({ ...form, provinceName: event.target.value })} /></label><label className="checkbox-row"><input type="checkbox" checked={form.active ?? true} onChange={(event) => setForm({ ...form, active: event.target.checked })} />Sede activa</label><div className="span-2 form-actions"><button className="primary-button" disabled={saving}>{saving ? 'Guardando...' : 'Guardar sede'}</button></div></form></AdminDialog>}</div>;
 }

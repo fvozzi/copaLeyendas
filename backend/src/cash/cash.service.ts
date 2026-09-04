@@ -10,7 +10,7 @@ export class CashService {
   constructor(@InjectRepository(CashSettings) private settings: Repository<CashSettings>, @InjectRepository(CashExpense) private expenses: Repository<CashExpense>, @InjectRepository(PairRegistration) private registrations: Repository<PairRegistration>) {}
   async summary() {
     const [settings, expenses, registrations] = await Promise.all([this.getSettings(), this.expenses.find({ order: { createdAt: 'DESC' } }), this.registrations.find({ order: { createdAt: 'DESC' } })]);
-    const incomes = registrations.filter((item) => !item.feeWaived && Boolean(item.paymentProofStoredName)).map((item) => { const players = item.playerThreeName ? 3 : 2; return { id: item.id, team: item.localityName, players, amount: players * settings.feePerPlayer, paidAt: item.createdAt }; });
+    const incomes = registrations.filter((item) => !item.feeWaived && Boolean(item.paymentProofStoredName)).map((item) => { const players = item.playerThreeName ? 3 : 2; return { id: item.id, team: item.localityName, players, amount: players * item.feePerPlayer, paidAt: item.createdAt }; });
     const totalIncome = incomes.reduce((sum, item) => sum + item.amount, 0); const totalExpense = expenses.reduce((sum, item) => sum + item.amount, 0);
     return { feePerPlayer: settings.feePerPlayer, incomes, expenses, totalIncome, totalExpense, balance: totalIncome - totalExpense };
   }

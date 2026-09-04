@@ -17,6 +17,8 @@ import { AdminTournamentDetailPage } from './pages/AdminTournamentDetailPage';
 import { AdminZonePage } from './pages/AdminZonePage';
 import { AdminUsersPage } from './pages/AdminUsersPage';
 import { AdminCashPage } from './pages/AdminCashPage';
+import { AdminProgramPage } from './pages/AdminProgramPage';
+import { AdminPlayingCourtsPage } from './pages/AdminPlayingCourtsPage';
 import { HomePage } from './pages/HomePage';
 import { PostPage } from './pages/PostPage';
 import { RegistrationPage } from './pages/RegistrationPage';
@@ -46,8 +48,10 @@ export default function App() {
               <Route path="localidades" element={<AdminLocalitiesPage />} />
               <Route path="categorias" element={<AdminCategoriesPage />} />
               <Route path="canchas" element={<AdminCourtsPage />} />
+              <Route path="canchas/internas" element={<AdminPlayingCourtsPage />} />
               <Route path="torneos" element={<AdminTournamentsPage />} />
               <Route path="torneos/:id" element={<AdminTournamentDetailPage />} />
+              <Route path="programa" element={<AdminProgramPage />} />
               <Route path="zonas/:id" element={<AdminZonePage />} />
               <Route path="usuarios" element={<AdminUsersPage />} />
             </Route>
