@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { AdminDataGrid } from '../components/AdminDataGrid';
 import { getDashboardSummary } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import {
@@ -34,6 +35,8 @@ export function AdminDashboardPage() {
     return <div className="admin-panel inline-state">Cargando resumen...</div>;
   }
 
+  const matchesByVenue = summary.matchesByVenue ?? { tournamentName: null, venues: [], totalMatches: 0 };
+
   return (
     <div className="admin-panel">
       <div className="panel-header">
@@ -67,16 +70,9 @@ export function AdminDashboardPage() {
       </div>
 
       <div className="admin-grid">
-        <section className="data-card">
-          <h2>Publicaciones por seccion</h2>
-          <ul className="data-list">
-            {Object.entries(sectionMeta).map(([key, value]) => (
-              <li key={key}>
-                <span>{value.label}</span>
-                <strong>{summary.posts.bySection[key] ?? 0}</strong>
-              </li>
-            ))}
-          </ul>
+        <section className="data-card admin-grid-wide">
+          <div className="panel-header"><div><h2>Partidos por sede</h2><p className="field-hint">{matchesByVenue.tournamentName ?? 'No hay torneo activo.'}</p></div><strong>Total: {matchesByVenue.totalMatches}</strong></div>
+          <AdminDataGrid rows={matchesByVenue.venues.map((venue, index) => ({ ...venue, id: index + 1 }))} emptyMessage="No hay zonas configuradas para el torneo activo." columns={[{ label: 'Sede', render: (venue) => <strong>{venue.venue}</strong> }, { label: 'Categorias', render: (venue) => venue.categories.join(', ') }, { label: 'Partidos', render: (venue) => venue.matches }]} />
         </section>
         <section className="data-card">
           <h2>Inscripciones por categoria</h2>
@@ -119,6 +115,17 @@ export function AdminDashboardPage() {
               <li key={size}>
                 <span>{size}</span>
                 <strong>{summary.registrations.shirtSizes[size] ?? 0}</strong>
+              </li>
+            ))}
+          </ul>
+        </section>
+        <section className="data-card">
+          <h2>Publicaciones por seccion</h2>
+          <ul className="data-list">
+            {Object.entries(sectionMeta).map(([key, value]) => (
+              <li key={key}>
+                <span>{value.label}</span>
+                <strong>{summary.posts.bySection[key] ?? 0}</strong>
               </li>
             ))}
           </ul>

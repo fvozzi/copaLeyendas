@@ -90,6 +90,7 @@ async function request<T>(path: string, init: RequestInit = {}, requireAuth = fa
 
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
+    cache: 'no-store',
     headers,
   });
 
@@ -290,11 +291,11 @@ export function updateTournament(id: number, payload: TournamentPayload) { retur
 export function getTournament(id: number) { return request<TournamentDetail>(`/tournaments/${id}`, {}, true); }
 export function addTournamentCategory(id: number, payload: { categoryId: number; pointsPerSet: number; setsToWin: number; zoneSize: number }) { return request(`/tournaments/${id}/categories`, { method: 'POST', body: JSON.stringify(payload) }, true); }
 export function updateTournamentCategory(id: number, payload: { pointsPerSet: number; setsToWin: number; zoneSize: number }) { return request(`/tournaments/categories/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true); }
-export function createTournamentZone(payload: { tournamentCategoryId: number; courtId: number; name: string; capacity: number }) { return request('/tournaments/zones', { method: 'POST', body: JSON.stringify(payload) }, true); }
-export function updateTournamentZone(id: number, payload: { name: string; courtId: number; capacity: number }) { return request(`/tournaments/zones/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true); }
+export function createTournamentZone(payload: { tournamentCategoryId: number; venueId: number; name: string; capacity: number }) { return request('/tournaments/zones', { method: 'POST', body: JSON.stringify(payload) }, true); }
+export function updateTournamentZone(id: number, payload: { name: string; venueId: number; capacity: number }) { return request(`/tournaments/zones/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true); }
 export function divideTournamentZones(id: number) { return request(`/tournaments/categories/${id}/divide-zones`, { method: 'POST' }, true); }
 export function getTournamentScheduleGrid(id: number) { return request<TournamentScheduleSlot[]>(`/tournaments/${id}/schedule-grid`, {}, true); }
-export function updateTournamentScheduleSlot(id: number, payload: { scheduledAt?: string | null }) { return request<TournamentScheduleSlot>(`/tournaments/schedule-slots/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true); }
+export function updateTournamentScheduleSlot(id: number, payload: { scheduledAt?: string | null; courtId?: number | null }) { return request<TournamentScheduleSlot>(`/tournaments/schedule-slots/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true); }
 export function getZoneMatches(id: number) { return request<TournamentMatch[]>(`/tournaments/zones/${id}/matches`, {}, true); }
 export function generateZoneFixture(id: number) { return request<TournamentMatch[]>(`/tournaments/zones/${id}/fixture`, { method: 'POST' }, true); }
 export function saveMatchResult(id: number, homeScore: number, awayScore: number) { return request<TournamentMatch>(`/tournaments/matches/${id}/result`, { method: 'POST', body: JSON.stringify({ homeScore, awayScore }) }, true); }

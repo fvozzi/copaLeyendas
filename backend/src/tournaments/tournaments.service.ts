@@ -5,6 +5,7 @@ import { type AuthenticatedUser } from '../auth/current-user.decorator';
 import { UserRole } from '../auth/user.entity';
 import { CourtAssistantAssignment } from '../courts/court-assistant-assignment.entity';
 import { Court } from '../courts/court.entity';
+import { Venue } from '../courts/venue.entity';
 import { PairRegistration } from '../registrations/pair-registration.entity';
 import { RegistrationStatus } from '../registrations/registration.enums';
 import { MatchStatus, ParticipantSource } from './tournament.enums';
@@ -25,6 +26,7 @@ export class TournamentsService {
     @InjectRepository(TournamentMatch) private m: Repository<TournamentMatch>,
     @InjectRepository(TournamentScheduleSlot) private slots: Repository<TournamentScheduleSlot>,
     @InjectRepository(Court) private c: Repository<Court>,
+    @InjectRepository(Venue) private venues: Repository<Venue>,
     @InjectRepository(CourtAssistantAssignment) private assignments: Repository<CourtAssistantAssignment>,
     @InjectRepository(PairRegistration) private r: Repository<PairRegistration>,
   ) {}
@@ -53,11 +55,11 @@ export class TournamentsService {
     if (dto.registrationsOpen !== undefined) category.registrationsOpen = dto.registrationsOpen;
     return this.tc.save(category);
   }
-  async createZone(dto: { tournamentCategoryId: number; courtId: number; name: string; capacity: number }) { if (!(await this.c.findOneBy({ id: dto.courtId }))) throw new NotFoundException('Cancha no encontrada'); return this.z.save(this.z.create(dto)); }
-  async updateZone(id: number, dto: { name?: string; courtId?: number; capacity?: number }) {
+  async createZone(dto: { tournamentCategoryId: number; venueId: number; name: string; capacity: number }) { if (!(await this.venues.findOneBy({ id: dto.venueId }))) throw new NotFoundException('Sede no encontrada'); return this.z.save(this.z.create(dto)); }
+  async updateZone(id: number, dto: { name?: string; venueId?: number; capacity?: number }) {
     const zone = await this.z.findOneBy({ id });
     if (!zone) throw new NotFoundException('Zona no encontrada');
-    if (dto.courtId !== undefined) { if (!(await this.c.findOneBy({ id: dto.courtId }))) throw new NotFoundException('Cancha no encontrada'); zone.courtId = dto.courtId; }
+    if (dto.venueId !== undefined) { if (!(await this.venues.findOneBy({ id: dto.venueId }))) throw new NotFoundException('Sede no encontrada'); zone.venueId = dto.venueId; }
     if (dto.capacity !== undefined) { if (dto.capacity < await this.e.countBy({ zoneId: id })) throw new BadRequestException('El cupo no puede ser menor a las parejas ya asignadas'); zone.capacity = dto.capacity; }
     if (dto.name !== undefined) zone.name = dto.name.trim();
     return this.z.save(zone);
@@ -72,9 +74,9 @@ export class TournamentsService {
     if (existing.length) await this.z.remove(existing);
     const registrations = await this.r.find({ where: { category: category.category.code, status: RegistrationStatus.CONFIRMED }, order: { localityName: 'ASC', id: 'ASC' } });
     const count = Math.max(1, Math.ceil(registrations.length / category.zoneSize));
-    const courts = await this.c.find({ where: { active: true }, order: { name: 'ASC' } });
-    if (!courts.length) throw new BadRequestException('Debes habilitar al menos una cancha antes de dividir las zonas.');
-    const zones = await this.z.save(Array.from({ length: count }, (_, index) => this.z.create({ tournamentCategoryId, courtId: courts[index % courts.length].id, name: `Zona ${String.fromCharCode(65 + index)}`, capacity: category.zoneSize })));
+    const venues = await this.venues.find({ where: { active: true }, order: { name: 'ASC' } });
+    if (!venues.length) throw new BadRequestException('Debes habilitar al menos una sede antes de dividir las zonas.');
+    const zones = await this.z.save(Array.from({ length: count }, (_, index) => this.z.create({ tournamentCategoryId, venueId: venues[index % venues.length].id, name: `Zona ${String.fromCharCode(65 + index)}`, capacity: category.zoneSize })));
     const assignments = zones.map((zone) => ({ zone, entries: [] as PairRegistration[] }));
     for (const registration of registrations) {
       const eligible = assignments.filter((item) => item.entries.length < category.zoneSize && !item.entries.some((entry) => entry.localityName.trim().toLowerCase() === registration.localityName.trim().toLowerCase()));
@@ -86,22 +88,76 @@ export class TournamentsService {
   }
 
   async scheduleGrid(tournamentId: number) {
-    const categories = await this.tc.find({ where: { tournamentId }, relations: { category: true }, order: { id: 'ASC' } });
-    let sequence = (await this.slots.maximum('sequence', { tournamentId })) ?? 0;
-    for (const category of categories) {
-      if (await this.slots.exist({ where: { tournamentCategoryId: category.id } })) continue;
-      for (let matchOrder = 1; matchOrder <= 4; matchOrder += 1) for (let zone = 0; zone < 4; zone += 1) {
-        sequence += 1;
-        await this.slots.save(this.slots.create({ tournamentId, tournamentCategoryId: category.id, zoneName: `Zona ${String.fromCharCode(65 + zone)}`, matchOrder, sequence, scheduledAt: null }));
+    const tournament = await this.t.findOneBy({ id: tournamentId });
+    if (!tournament) throw new NotFoundException('Torneo no encontrado');
+    const [zones, courts] = await Promise.all([this.z.find({ where: { tournamentCategory: { tournamentId } }, relations: { venue: true, tournamentCategory: true }, order: { tournamentCategoryId: 'ASC', name: 'ASC' } }), this.c.find({ where: { active: true }, relations: { venue: true }, order: { id: 'ASC' } })]);
+    const existing = await this.slots.find({ where: { tournamentId }, order: { sequence: 'ASC' } });
+    const knockoutSlots = [...new Set(zones.map((zone) => zone.tournamentCategoryId))].reduce((total, categoryId) => total + (zones.filter((zone) => zone.tournamentCategoryId === categoryId).length >= 4 ? 7 : 0), 0);
+    const requiredSlots = zones.length * 4 + knockoutSlots;
+    const stageOrder = { ZONE: 0, QUARTERFINAL: 1, SEMIFINAL: 2, FINAL: 3 } as Record<string, number>;
+    const phasesAreOrdered = existing.every((slot, index) => index === 0 || (stageOrder[slot.stage] ?? -1) >= (stageOrder[existing[index - 1].stage] ?? -1));
+    const mustGenerate = requiredSlots > 0 && (existing.length !== requiredSlots || existing.every((slot) => !slot.scheduledAt) || !phasesAreOrdered);
+    if (mustGenerate) {
+      await this.slots.delete({ tournamentId });
+      const days = this.programDays(tournament);
+      const venueQueues = new Map<number, { zone: Zone; nextOrder: number }[]>();
+      for (const zone of zones) venueQueues.set(zone.venueId, [...(venueQueues.get(zone.venueId) ?? []), { zone, nextOrder: 1 }]);
+      const venueIds = [...venueQueues.keys()].sort((left, right) => left - right);
+      const venueCounts = new Map<number, number>();
+      const defaultCourts = new Map<number, Court | undefined>();
+      for (const venue of [...new Set(zones.map((zone) => zone.venueId))]) defaultCourts.set(venue, courts.find((court) => court.venueId === venue));
+      const generated: TournamentScheduleSlot[] = [];
+      let sequence = 0;
+      while ([...venueQueues.values()].some((queue) => queue.some((item) => item.nextOrder <= 4))) {
+        for (const venueId of venueIds) {
+          const queue = venueQueues.get(venueId)!;
+          const next = queue.find((item) => item.nextOrder <= 4);
+          if (!next) continue;
+          const venueIndex = venueCounts.get(venueId) ?? 0;
+          venueCounts.set(venueId, venueIndex + 1);
+          sequence += 1;
+          generated.push(this.slots.create({ tournamentId, tournamentCategoryId: next.zone.tournamentCategoryId, zoneName: next.zone.name, matchOrder: next.nextOrder, stage: 'ZONE', sequence, courtId: defaultCourts.get(next.zone.venueId)?.id ?? null, scheduledAt: this.programDate(days, next.zone.venue.startsAt, next.zone.venue.matchDurationMinutes, next.zone.venue.matchesPerDay, venueIndex) }));
+          next.nextOrder += 1;
+          queue.push(queue.shift()!);
+        }
       }
+      const knockoutCategories = [...new Set(zones.map((zone) => zone.tournamentCategoryId))].map((categoryId) => ({ categoryId, zones: zones.filter((zone) => zone.tournamentCategoryId === categoryId) })).filter((item) => item.zones.length >= 4);
+      const knockoutStages = [{ stage: 'QUARTERFINAL', label: 'Cuartos de final', matches: 4 }, { stage: 'SEMIFINAL', label: 'Semifinal', matches: 2 }, { stage: 'FINAL', label: 'Final', matches: 1 }] as const;
+      for (const knockoutStage of knockoutStages) for (const category of knockoutCategories) for (let matchOrder = 1; matchOrder <= knockoutStage.matches; matchOrder += 1) {
+        const venue = category.zones[0].venue;
+        const venueIndex = venueCounts.get(venue.id) ?? 0;
+        venueCounts.set(venue.id, venueIndex + 1);
+        sequence += 1;
+        generated.push(this.slots.create({ tournamentId, tournamentCategoryId: category.categoryId, zoneName: knockoutStage.label, matchOrder, stage: knockoutStage.stage, sequence, courtId: defaultCourts.get(venue.id)?.id ?? null, scheduledAt: this.programDate(days, venue.startsAt, venue.matchDurationMinutes, venue.matchesPerDay, venueIndex) }));
+      }
+      await this.slots.save(generated);
     }
-    const [slots, zones] = await Promise.all([this.slots.find({ where: { tournamentId }, relations: { tournamentCategory: { category: true } }, order: { sequence: 'ASC' } }), this.z.find({ where: { tournamentCategory: { tournamentId } }, relations: { court: true } })]);
-    return slots.map((slot) => ({ ...slot, court: zones.find((zone) => zone.tournamentCategoryId === slot.tournamentCategoryId && zone.name === slot.zoneName)?.court ?? null }));
+    return this.slots.find({ where: { tournamentId }, relations: { court: { venue: true }, tournamentCategory: { category: true } }, order: { sequence: 'ASC' } });
   }
 
-  async updateScheduleSlot(id: number, dto: { scheduledAt?: string | null }) {
+  private programDays(tournament: Tournament) {
+    if (tournament.playingDays.length) return [...tournament.playingDays].sort();
+    if (!tournament.startsAt) return [];
+    const days = [tournament.startsAt];
+    if (!tournament.endsAt) return days;
+    for (let day = new Date(`${tournament.startsAt}T00:00:00Z`), end = new Date(`${tournament.endsAt}T00:00:00Z`); day < end;) { day.setUTCDate(day.getUTCDate() + 1); days.push(day.toISOString().slice(0, 10)); }
+    return days;
+  }
+
+  private programDate(days: string[], startsAt: string, duration: number, matchesPerDay: number, index: number) {
+    const day = days[Math.floor(index / matchesPerDay)];
+    if (!day) return null;
+    const [hour, minute] = startsAt.slice(0, 5).split(':').map(Number);
+    const totalMinutes = hour * 60 + minute + (index % matchesPerDay) * duration;
+    const date = new Date(`${day}T00:00:00-03:00`);
+    date.setUTCHours(Math.floor(totalMinutes / 60) + 3, totalMinutes % 60, 0, 0);
+    return date;
+  }
+
+  async updateScheduleSlot(id: number, dto: { scheduledAt?: string | null; courtId?: number | null }) {
     const slot = await this.slots.findOneBy({ id }); if (!slot) throw new NotFoundException('Turno no encontrado');
     if (dto.scheduledAt !== undefined) slot.scheduledAt = dto.scheduledAt ? new Date(dto.scheduledAt) : null;
+    if (dto.courtId !== undefined) { if (dto.courtId === null) slot.courtId = null; else { if (!(await this.c.findOneBy({ id: dto.courtId }))) throw new NotFoundException('Cancha no encontrada'); slot.courtId = dto.courtId; } }
     await this.slots.save(slot);
     const zone = await this.z.findOneBy({ tournamentCategoryId: slot.tournamentCategoryId, name: slot.zoneName });
     if (zone) await this.m.update({ zoneId: zone.id, matchOrder: slot.matchOrder }, { scheduledAt: slot.scheduledAt });
@@ -127,7 +183,7 @@ export class TournamentsService {
 
   async schedule(id: number, scheduledAt: string, user: AuthenticatedUser) {
     const match = await this.matchWithZone(id);
-    await this.assertCourtAccess(user, match.zone.courtId);
+    this.assertDirectorAccess(user);
     match.scheduledAt = new Date(scheduledAt);
     return this.m.save(match);
   }
@@ -135,7 +191,7 @@ export class TournamentsService {
   async result(id: number, homeScore: number, awayScore: number, user: AuthenticatedUser) {
     if (homeScore === awayScore) throw new BadRequestException('El partido debe tener ganador');
     const match = await this.matchWithZone(id);
-    await this.assertCourtAccess(user, match.zone.courtId);
+    this.assertDirectorAccess(user);
     if (!match.homeRegistrationId || !match.awayRegistrationId) throw new BadRequestException('El partido no esta listo');
     match.homeScore = homeScore;
     match.awayScore = awayScore;
@@ -149,7 +205,7 @@ export class TournamentsService {
   async assertZoneAccess(user: AuthenticatedUser, zoneId: number) {
     const zone = await this.z.findOneBy({ id: zoneId });
     if (!zone) throw new NotFoundException('Zona no encontrada');
-    await this.assertCourtAccess(user, zone.courtId);
+    this.assertDirectorAccess(user);
   }
 
   matches(zoneId: number) { return this.m.find({ where: { zoneId }, relations: { homeRegistration: true, awayRegistration: true }, order: { matchOrder: 'ASC' } }); }
@@ -160,10 +216,9 @@ export class TournamentsService {
     return match;
   }
 
-  private async assertCourtAccess(user: AuthenticatedUser, courtId: number) {
+  private assertDirectorAccess(user: AuthenticatedUser) {
     if (user.role === UserRole.DIRECTOR) return;
-    if (user.role === UserRole.ASSISTANT && await this.assignments.existsBy({ courtId, userId: user.sub })) return;
-    throw new ForbiddenException('No tenes acceso a esta cancha.');
+    throw new ForbiddenException('La asignacion de canchas se define al programar los partidos.');
   }
 
   private async resolveDependents(source: TournamentMatch) {

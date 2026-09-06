@@ -4,6 +4,9 @@ import { Repository } from 'typeorm';
 import { ContentPost } from '../posts/content-post.entity';
 import { PairRegistration } from '../registrations/pair-registration.entity';
 import { RegistrationAccessGrant } from '../registrations/registration-access-grant.entity';
+import { TournamentStatus } from '../tournaments/tournament.enums';
+import { Tournament } from '../tournaments/tournament.entity';
+import { Zone } from '../tournaments/zone.entity';
 
 @Injectable()
 export class DashboardService {
@@ -14,14 +17,20 @@ export class DashboardService {
     private readonly registrationsRepository: Repository<PairRegistration>,
     @InjectRepository(RegistrationAccessGrant)
     private readonly accessGrantsRepository: Repository<RegistrationAccessGrant>,
+    @InjectRepository(Tournament)
+    private readonly tournamentsRepository: Repository<Tournament>,
+    @InjectRepository(Zone)
+    private readonly zonesRepository: Repository<Zone>,
   ) {}
 
   async getSummary() {
-    const [posts, registrations, accessGrants] = await Promise.all([
+    const [posts, registrations, accessGrants, tournament] = await Promise.all([
       this.postsRepository.find(),
       this.registrationsRepository.find(),
       this.accessGrantsRepository.find(),
+      this.tournamentsRepository.findOne({ where: { status: TournamentStatus.ACTIVE }, order: { startsAt: 'ASC', id: 'ASC' } }),
     ]);
+    const zones = tournament ? await this.zonesRepository.find({ where: { tournamentCategory: { tournamentId: tournament.id } }, relations: { venue: true, tournamentCategory: { category: true } } }) : [];
 
     return {
       posts: {
@@ -41,8 +50,21 @@ export class DashboardService {
         byCategory: countBy(accessGrants, 'category'),
         byStatus: countBy(accessGrants, 'status'),
       },
+      matchesByVenue: summarizeMatchesByVenue(tournament?.name ?? null, zones),
     };
   }
+}
+
+function summarizeMatchesByVenue(tournamentName: string | null, zones: Zone[]) {
+  const venues = new Map<string, { venue: string; categories: Set<string>; matches: number }>();
+  for (const zone of zones) {
+    const current = venues.get(zone.venue.name) ?? { venue: zone.venue.name, categories: new Set<string>(), matches: 0 };
+    current.categories.add(zone.tournamentCategory.category.name);
+    current.matches += 4;
+    venues.set(zone.venue.name, current);
+  }
+  const rows = [...venues.values()].sort((left, right) => left.venue.localeCompare(right.venue)).map((item) => ({ venue: item.venue, categories: [...item.categories].sort(), matches: item.matches }));
+  return { tournamentName, venues: rows, totalMatches: rows.reduce((total, item) => total + item.matches, 0) };
 }
 
 function countShirtSizes(registrations: PairRegistration[]) {
