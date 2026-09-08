@@ -2,59 +2,28 @@ import { useEffect, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { getPublicCurrentTournament, getPublicPosts } from '../lib/api';
 import { sectionMeta } from '../lib/content';
-import type { ContentPost, ContentSection, PublicCurrentTournament } from '../types';
+import type { ContentPost, ContentSection, PublicCurrentTournament, PublicTournamentZone } from '../types';
 
-const regulations = [
-  'Partidos en zona de grupos y finales a 25. Cuartos y semifinales a 21.',
-  'Cada pareja dispondrá de 2 minutos por partido, con flexibilidad ante la necesidad.',
-  'En caso de lesión se podrá realizar un cambio por un jugador del mismo club o ciudad que esté jugando el torneo en una categoría igual o inferior.',
-  'Es obligatorio el uso de protectores oculares.',
-  'Se informará el horario de inicio de cada partido. Los equipos tendrán 15 minutos de tolerancia antes de darles el encuentro por perdido.',
-  'Sistema de desempate por diferencia de puntos, seguido por el encuentro disputado entre sí. De persistir la igualdad, se define por moneda.',
-  'El saque se jugará con media.',
-  'El saque en Núcleo se hará del 2 a pasar el 2. En Goma del 3 a pasar el 3.',
-];
+const regulations = ['Partidos en zona de grupos y finales a 25. Cuartos y semifinales a 21.', 'Cada pareja dispone de 2 minutos por partido, con flexibilidad ante la necesidad.', 'En caso de lesion se podra realizar un cambio por un jugador del mismo club o ciudad que este jugando el torneo en una categoria igual o inferior.', 'Es obligatorio el uso de protectores oculares.', 'Se informara el horario de inicio de cada partido. Los equipos tendran 15 minutos de tolerancia antes de darles el encuentro por perdido.', 'Sistema de desempate por diferencia de puntos, seguido por el encuentro disputado entre si. De persistir la igualdad, se define por moneda.', 'El saque se jugara con media.', 'El saque en Nucleo se hara del 2 a pasar el 2. En Goma del 3 a pasar el 3.'];
 
 export function SectionPage() {
   const { section } = useParams<{ section: ContentSection }>();
-  const [posts, setPosts] = useState<ContentPost[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [currentTournament, setCurrentTournament] = useState<PublicCurrentTournament | null>(null);
-  const [tournamentError, setTournamentError] = useState<string | null>(null);
-
+  const [posts, setPosts] = useState<ContentPost[]>([]); const [loading, setLoading] = useState(true); const [currentTournament, setCurrentTournament] = useState<PublicCurrentTournament | null>(null); const [tournamentError, setTournamentError] = useState<string | null>(null);
   if (!section || !(section in sectionMeta)) return <Navigate to="/" replace />;
-
-  useEffect(() => {
-    getPublicPosts({ section }).then(setPosts).finally(() => setLoading(false));
-    if (section === 'torneos') {
-      setCurrentTournament(null);
-      setTournamentError(null);
-      getPublicCurrentTournament().then(setCurrentTournament).catch(() => setTournamentError('No se pudo cargar el torneo actual.'));
-    }
-  }, [section]);
-
-  return <section className="content-band section-page">
-    <div className="section-heading"><p className="eyebrow">{sectionMeta[section].label}</p><h1>{sectionMeta[section].intro}</h1></div>
-    {section === 'torneos' && currentTournament?.tournament ? <CurrentTournament tournament={currentTournament} /> : null}
-    {section === 'torneos' && currentTournament && !currentTournament.tournament ? <div className="inline-state public-tournament-state">No hay un torneo activo para mostrar.</div> : null}
-    {section === 'torneos' && tournamentError ? <div className="inline-state public-tournament-state">{tournamentError}</div> : null}
-    {section === 'torneos' ? <TournamentRegulations /> : null}
-    {loading ? <div className="inline-state">Cargando publicaciones...</div> : posts.length === 0 ? <div className="inline-state">No hay publicaciones publicadas en esta seccion.</div> : <div className="post-grid">{posts.map((post) => <article key={post.id} className="post-card"><h2>{post.title}</h2><p>{post.excerpt}</p><Link to={`/post/${post.slug}`} className="inline-link">Leer nota</Link></article>)}</div>}
-  </section>;
+  useEffect(() => { getPublicPosts({ section }).then(setPosts).finally(() => setLoading(false)); if (section === 'torneos') { setCurrentTournament(null); setTournamentError(null); getPublicCurrentTournament().then(setCurrentTournament).catch(() => setTournamentError('No se pudo cargar el torneo actual.')); } }, [section]);
+  return <section className="content-band section-page"><div className="section-heading"><p className="eyebrow">{sectionMeta[section].label}</p><h1>{sectionMeta[section].intro}</h1></div>{section === 'torneos' && currentTournament?.tournament ? <CurrentTournament tournament={currentTournament} /> : null}{section === 'torneos' && currentTournament && !currentTournament.tournament ? <div className="inline-state public-tournament-state">No hay un torneo activo para mostrar.</div> : null}{section === 'torneos' && tournamentError ? <div className="inline-state public-tournament-state">{tournamentError}</div> : null}{section === 'torneos' ? <TournamentRegulations /> : null}{loading ? <div className="inline-state">Cargando publicaciones...</div> : posts.length === 0 ? <div className="inline-state">No hay publicaciones publicadas en esta seccion.</div> : <div className="post-grid">{posts.map((post) => <article key={post.id} className="post-card"><h2>{post.title}</h2><p>{post.excerpt}</p><Link to={`/post/${post.slug}`} className="inline-link">Leer nota</Link></article>)}</div>}</section>;
 }
 
-function TournamentRegulations() {
-  return <section className="tournament-regulations" aria-labelledby="reglamento-title"><div><p className="eyebrow">Copa Leyendas</p><h2 id="reglamento-title">Reglamento</h2></div><ol>{regulations.map((rule) => <li key={rule}>{rule}</li>)}</ol></section>;
-}
+function TournamentRegulations() { return <section className="tournament-regulations" aria-labelledby="reglamento-title"><div className="tournament-regulations-heading"><div><p className="eyebrow">Copa Leyendas</p><h2 id="reglamento-title">Reglamento</h2></div><img src="/LogoFemme.png" alt="Copa Leyendas Femme" /></div><ol>{regulations.map((rule) => <li key={rule}>{rule}</li>)}</ol></section>; }
 
 function CurrentTournament({ tournament: current }: { tournament: PublicCurrentTournament }) {
-  const [tab, setTab] = useState<'results' | 'standings' | 'courts'>('results');
-  const tournament = current.tournament;
-  if (!tournament) return null;
-  const state = getTournamentState(tournament.startsAt, tournament.endsAt);
-  return <section className="public-tournament"><div className="public-tournament-heading"><div><p className="eyebrow">{state.heading}</p><h2>{tournament.name}</h2><p className={state.live ? 'tournament-date is-live' : 'tournament-date'}>{state.live && <span className="live-dot" aria-label="Torneo en juego" />}{formatDates(tournament.startsAt, tournament.endsAt)}{tournament.city ? ` · ${tournament.city}` : ''}</p></div><span className={`status-chip ${state.live ? 'status-live tournament-live-chip' : 'status-review'}`}>{state.label}</span></div><div className="public-tournament-tabs" role="tablist" aria-label="Informacion del torneo"><button type="button" className={tab === 'results' ? 'is-selected' : ''} onClick={() => setTab('results')}>Resultados</button><button type="button" className={tab === 'standings' ? 'is-selected' : ''} onClick={() => setTab('standings')}>Tabla</button><button type="button" className={tab === 'courts' ? 'is-selected' : ''} onClick={() => setTab('courts')}>Canchas</button></div>{tab === 'results' && <div className="tournament-zone-grid">{tournament.zones.map((zone) => <article key={zone.id} className="tournament-public-card"><p className="post-section">{zone.category} · {zone.name}</p><h3>{zone.court?.name ?? 'Partidos de la zona'}</h3>{zone.matches.length ? <ul className="match-list">{zone.matches.map((match) => <li key={match.id}><div><strong>{teamName(match.homeRegistration)}</strong><span>{teamName(match.awayRegistration)}</span></div><div className="match-score">{match.homeScore === null || match.awayScore === null ? 'Pendiente' : `${match.homeScore} - ${match.awayScore}`}<small>{formatMatchDate(match.scheduledAt)}</small></div></li>)}</ul> : <p className="empty-copy">Fixture en preparacion.</p>}</article>)}</div>}{tab === 'standings' && <div className="tournament-zone-grid">{tournament.zones.map((zone) => <article key={zone.id} className="tournament-public-card standings-card"><p className="post-section">{zone.category} · {zone.name}</p><h3>Tabla de posiciones</h3>{zone.standings.length ? <div className="public-table-wrap"><table className="public-table"><thead><tr><th>Equipo</th><th>PJ</th><th>PG</th><th>PP</th><th>Dif.</th><th>Pts.</th></tr></thead><tbody>{zone.standings.map((row) => <tr key={row.registration.id}><td>{teamName(row.registration)}</td><td>{row.played}</td><td>{row.wins}</td><td>{row.losses}</td><td>{row.pointsFor - row.pointsAgainst}</td><td><strong>{row.tablePoints}</strong></td></tr>)}</tbody></table></div> : <p className="empty-copy">Todavia no hay equipos asignados.</p>}</article>)}</div>}{tab === 'courts' && <div className="court-public-grid">{current.courts.length ? current.courts.map((court) => <article key={court.id} className="court-public-card"><p className="post-section">Cancha habilitada</p><h3>{court.name}</h3><p>{[court.address, court.city, court.provinceName].filter(Boolean).join(', ') || 'Ubicacion a confirmar'}</p><a className="inline-link" href={googleMapsLink(court)} target="_blank" rel="noreferrer">Abrir en Google Maps</a></article>) : <p className="empty-copy">No hay canchas asignadas todavia.</p>}</div>}</section>;
+  const [tab, setTab] = useState<'results' | 'courts'>('results'); const tournament = current.tournament!; const categories = [...new Set(tournament.zones.map((zone) => zone.category))]; const [category, setCategory] = useState(categories[0] ?? ''); const state = getTournamentState(tournament.startsAt, tournament.endsAt); const zones = tournament.zones.filter((zone) => zone.category === category);
+  return <section className="public-tournament public-tournament-femme"><div className="public-tournament-heading"><div><p className="eyebrow">{state.heading}</p><h2>{tournament.name}</h2><p className={state.live ? 'tournament-date is-live' : 'tournament-date'}>{state.live && <span className="live-dot" />}{formatDates(tournament.startsAt, tournament.endsAt)}{tournament.city ? ` · ${tournament.city}` : ''}</p></div><img className="public-tournament-logo" src="/LogoFemme.png" alt="Copa Leyendas Femme" /><span className={`status-chip ${state.live ? 'status-live tournament-live-chip' : 'status-review'}`}>{state.label}</span></div><div className="public-tournament-tabs"><button type="button" className={tab === 'results' ? 'is-selected' : ''} onClick={() => setTab('results')}>Resultados</button><button type="button" className={tab === 'courts' ? 'is-selected' : ''} onClick={() => setTab('courts')}>Canchas</button></div>{tab === 'results' ? <><div className="public-category-tabs">{categories.map((item) => <button key={item} type="button" className={category === item ? 'is-selected' : ''} onClick={() => setCategory(item)}>{item}</button>)}</div><div className="tournament-zone-grid">{zones.map((zone) => <ZoneResults key={zone.id} zone={zone} />)}</div><KnockoutBracket category={category} /></> : <div className="court-public-grid">{current.courts.length ? current.courts.map((court) => <article key={court.id} className="court-public-card"><p className="post-section">Cancha habilitada</p><h3>{court.name}</h3><p>{[court.address, court.city, court.provinceName].filter(Boolean).join(', ') || 'Ubicacion a confirmar'}</p><a className="inline-link" href={googleMapsLink(court)} target="_blank" rel="noreferrer">Abrir en Google Maps</a></article>) : <p className="empty-copy">No hay canchas asignadas todavia.</p>}</div>}</section>;
 }
 
+function ZoneResults({ zone }: { zone: PublicTournamentZone }) { return <article className="tournament-public-card"><p className="post-section">{zone.category} · {zone.name}</p><h3>{zone.venue.name}</h3>{zone.matches.length ? <ul className="match-list">{zone.matches.map((match) => <li key={match.id}><div><strong>{teamName(match.homeRegistration)}</strong><span>{teamName(match.awayRegistration)}</span></div><div className="match-score">{match.homeScore === null || match.awayScore === null ? 'Pendiente' : `${match.homeScore} - ${match.awayScore}`}<small>{formatMatchDate(match.scheduledAt)}</small></div></li>)}</ul> : <p className="empty-copy">Fixture en preparacion.</p>}</article>; }
+function KnockoutBracket({ category }: { category: string }) { return <section className="knockout-section"><div><p className="eyebrow">{category}</p><h3>Cruces finales</h3></div><div className="knockout-bracket"><div className="bracket-round"><p>Semifinales</p><BracketMatch home="Ganador de cuarto 1" away="Ganador de cuarto 2" /><BracketMatch home="Ganador de cuarto 3" away="Ganador de cuarto 4" /></div><div className="bracket-round bracket-final"><p>Final</p><BracketMatch home="Ganador semifinal 1" away="Ganador semifinal 2" /></div></div></section>; }
+function BracketMatch({ home, away }: { home: string; away: string }) { return <div className="bracket-match"><span>{home}</span><span>{away}</span></div>; }
 function teamName(registration: { playerOneName: string; playerTwoName: string; localityName: string } | null) { return registration ? `${registration.playerOneName} / ${registration.playerTwoName} · ${registration.localityName}` : 'A definir'; }
 function formatDates(startsAt: string | null, endsAt: string | null) { if (!startsAt) return 'Fechas a confirmar'; return endsAt && endsAt !== startsAt ? `${startsAt} al ${endsAt}` : startsAt; }
 function formatMatchDate(value: string | null) { return value ? new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)) : ''; }

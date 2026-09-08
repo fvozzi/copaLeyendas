@@ -2,7 +2,6 @@ import type {
   AccessGrantStatus,
   ContentSection,
   HeardAboutSource,
-  PairCategory,
   RegistrationStatus,
   ShirtSize,
 } from '../types';
@@ -30,13 +29,6 @@ export const sectionMeta: Record<
     label: 'Historias',
     intro: 'Cronicas, archivo y relatos del recorrido cultural de la paleta.',
   },
-};
-
-export const categoryLabels: Record<PairCategory, string> = {
-  DAMAS_A: 'Damas A',
-  DAMAS_B: 'Damas B',
-  DAMAS_NUCLEO_A: 'Damas Nucleo A',
-  DAMAS_NUCLEO_B: 'Damas Nucleo B',
 };
 
 export const registrationStatusLabels: Record<RegistrationStatus, string> = {

@@ -1,10 +1,12 @@
-import { IsEnum, IsOptional, IsString } from 'class-validator';
-import { PairCategory, RegistrationStatus } from '../registration.enums';
+import { Type } from 'class-transformer';
+import { IsEnum, IsInt, IsOptional, IsString } from 'class-validator';
+import { RegistrationStatus } from '../registration.enums';
 
 export class QueryRegistrationsDto {
   @IsOptional()
-  @IsEnum(PairCategory)
-  category?: PairCategory;
+  @Type(() => Number)
+  @IsInt()
+  categoryId?: number;
 
   @IsOptional()
   @IsEnum(RegistrationStatus)

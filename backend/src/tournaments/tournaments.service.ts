@@ -72,7 +72,7 @@ export class TournamentsService {
     const existing = await this.z.find({ where: { tournamentCategoryId } });
     if (existing.length && await this.e.count({ where: existing.map((zone) => ({ zoneId: zone.id })) })) throw new BadRequestException('No se pueden redistribuir zonas que ya tienen parejas asignadas.');
     if (existing.length) await this.z.remove(existing);
-    const registrations = await this.r.find({ where: { category: category.category.code, status: RegistrationStatus.CONFIRMED }, order: { localityName: 'ASC', id: 'ASC' } });
+    const registrations = await this.r.find({ where: { categoryId: category.categoryId, status: RegistrationStatus.CONFIRMED }, order: { localityName: 'ASC', id: 'ASC' } });
     const count = Math.max(1, Math.ceil(registrations.length / category.zoneSize));
     const venues = await this.venues.find({ where: { active: true }, order: { name: 'ASC' } });
     if (!venues.length) throw new BadRequestException('Debes habilitar al menos una sede antes de dividir las zonas.');

@@ -1,11 +1,5 @@
 export type ContentSection = 'leyendas' | 'canchas' | 'torneos' | 'historias';
 
-export type PairCategory =
-  | 'DAMAS_A'
-  | 'DAMAS_B'
-  | 'DAMAS_NUCLEO_A'
-  | 'DAMAS_NUCLEO_B';
-
 export type RegistrationStatus =
   | 'RECEIVED'
   | 'UNDER_REVIEW'
@@ -93,7 +87,8 @@ export interface DashboardSummary {
 export interface RegistrationAccessGrant {
   id: number;
   token: string;
-  category: PairCategory;
+  categoryId: number;
+  category: Category;
   localityName: string;
   provinceName: string;
   clubName: string;
@@ -112,7 +107,8 @@ export interface RegistrationAccessGrant {
 export interface PublicAccessGrant {
   id: number;
   token: string;
-  category: PairCategory;
+  categoryId: number;
+  category: Category;
   localityName: string;
   provinceName: string;
   clubName: string;
@@ -129,7 +125,8 @@ export interface PublicAccessGrant {
 export interface PairRegistration {
   id: number;
   accessGrantId: number;
-  category: PairCategory;
+  categoryId: number;
+  category: Category;
   localityName: string;
   provinceName: string;
   clubName: string;
@@ -236,9 +233,9 @@ export interface RegistrationStatusPayload {
 
 export interface AccessGrantPayload {
   localityId?: number;
-  category: PairCategory;
-  localityName: string;
-  provinceName: string;
+  categoryId?: number;
+  localityName?: string;
+  provinceName?: string;
   clubName?: string;
   contactName?: string;
   contactEmail?: string;
@@ -270,8 +267,8 @@ export interface LocalityPayload {
   categoryId?: number | null;
 }
 
-export interface Category { id: number; code: PairCategory; name: string; active: boolean; sortOrder: number; }
-export interface CategoryPayload { code: PairCategory; name: string; active?: boolean; sortOrder?: number; }
+export interface Category { id: number; name: string; active: boolean; sortOrder: number; }
+export interface CategoryPayload { name: string; active?: boolean; sortOrder?: number; }
 export interface CourtAssistant { id: number; name: string; email: string; }
 export interface Venue { id: number; name: string; address: string | null; city: string | null; provinceName: string | null; startsAt: string; matchDurationMinutes: number; matchesPerDay: number; active: boolean; }
 export interface VenuePayload { name: string; address?: string; city?: string; provinceName?: string; startsAt?: string; matchDurationMinutes?: number; matchesPerDay?: number; active?: boolean; }

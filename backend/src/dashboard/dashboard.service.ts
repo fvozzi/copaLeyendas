@@ -7,6 +7,7 @@ import { RegistrationAccessGrant } from '../registrations/registration-access-gr
 import { TournamentStatus } from '../tournaments/tournament.enums';
 import { Tournament } from '../tournaments/tournament.entity';
 import { Zone } from '../tournaments/zone.entity';
+import { Category } from '../categories/category.entity';
 
 @Injectable()
 export class DashboardService {
@@ -21,14 +22,17 @@ export class DashboardService {
     private readonly tournamentsRepository: Repository<Tournament>,
     @InjectRepository(Zone)
     private readonly zonesRepository: Repository<Zone>,
+    @InjectRepository(Category)
+    private readonly categoriesRepository: Repository<Category>,
   ) {}
 
   async getSummary() {
-    const [posts, registrations, accessGrants, tournament] = await Promise.all([
+    const [posts, registrations, accessGrants, tournament, categories] = await Promise.all([
       this.postsRepository.find(),
-      this.registrationsRepository.find(),
-      this.accessGrantsRepository.find(),
+      this.registrationsRepository.find({ relations: { category: true } }),
+      this.accessGrantsRepository.find({ relations: { category: true } }),
       this.tournamentsRepository.findOne({ where: { status: TournamentStatus.ACTIVE }, order: { startsAt: 'ASC', id: 'ASC' } }),
+      this.categoriesRepository.find({ order: { sortOrder: 'ASC', name: 'ASC' } }),
     ]);
     const zones = tournament ? await this.zonesRepository.find({ where: { tournamentCategory: { tournamentId: tournament.id } }, relations: { venue: true, tournamentCategory: { category: true } } }) : [];
 
@@ -41,13 +45,13 @@ export class DashboardService {
       },
       registrations: {
         total: registrations.length,
-        byCategory: countBy(registrations, 'category'),
+        byCategory: countByCategory(registrations, categories),
         byStatus: countBy(registrations, 'status'),
         shirtSizes: countShirtSizes(registrations),
       },
       accessGrants: {
         total: accessGrants.length,
-        byCategory: countBy(accessGrants, 'category'),
+        byCategory: countByCategory(accessGrants, categories),
         byStatus: countBy(accessGrants, 'status'),
       },
       matchesByVenue: summarizeMatchesByVenue(tournament?.name ?? null, zones),
@@ -82,4 +86,13 @@ function countBy<T>(items: T[], key: keyof T & string) {
     accumulator[value] = (accumulator[value] ?? 0) + 1;
     return accumulator;
   }, {});
+}
+
+function countByCategory(items: { categoryId: number; category: Category }[], categories: Category[]) {
+  const counts = Object.fromEntries(categories.map((category) => [category.name, 0])) as Record<string, number>;
+  for (const item of items) {
+    const name = item.category?.name ?? `Categoria ${item.categoryId}`;
+    counts[name] = (counts[name] ?? 0) + 1;
+  }
+  return counts;
 }

@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import shirtSizeGuideImage from '../assets/shirt-size-guide.png';
 import { createPublicRegistration, getPublicRegistrationAccess } from '../lib/api';
-import { categoryLabels, heardAboutLabels, shirtSizeLabels } from '../lib/content';
+import { heardAboutLabels, shirtSizeLabels } from '../lib/content';
 import type {
   HeardAboutSource,
   PublicAccessGrant,
@@ -50,6 +51,7 @@ const initialPlayerPhotos: PlayerPhotos = { playerOne: null, playerTwo: null, pl
 const initialPhotoMessages: PhotoMessages = { playerOne: null, playerTwo: null, playerThree: null };
 
 export function RegistrationPage() {
+  const [searchParams] = useSearchParams();
   const [tokenInput, setTokenInput] = useState('');
   const [access, setAccess] = useState<PublicAccessGrant | null>(null);
   const [loadingAccess, setLoadingAccess] = useState(false);
@@ -106,14 +108,13 @@ export function RegistrationPage() {
     }
   };
 
-  const handleTokenSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const validateToken = async (token: string) => {
     setLoadingAccess(true);
     setError(null);
     setSuccessMessage(null);
 
     try {
-      const result = await getPublicRegistrationAccess(tokenInput.trim());
+      const result = await getPublicRegistrationAccess(token.trim());
 
       if (!result.enabled) {
         throw new Error('Este token ya fue utilizado o fue revocado.');
@@ -131,6 +132,18 @@ export function RegistrationPage() {
     } finally {
       setLoadingAccess(false);
     }
+  };
+
+  useEffect(() => {
+    const token = searchParams.get('token')?.trim();
+    if (!token) return;
+    setTokenInput(token);
+    void validateToken(token);
+  }, [searchParams]);
+
+  const handleTokenSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    await validateToken(tokenInput);
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -219,7 +232,7 @@ export function RegistrationPage() {
               <p className="eyebrow">Localidad habilitada</p>
               <h2>{access.localityName}</h2>
               <p>
-                {categoryLabels[access.category]} - {access.provinceName}
+                {access.category.name} - {access.provinceName}
               </p>
               {access.feeWaived ? <p>Inscripcion bonificada por la organizacion.</p> : null}
               {access.paymentDeferredUntilConfirmed ? <p>Ingreso a lista de espera: no hace falta comprobante ahora. El pago se solicitara si la inscripcion es confirmada.</p> : null}

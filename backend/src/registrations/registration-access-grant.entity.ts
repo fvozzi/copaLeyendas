@@ -2,12 +2,15 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
+  ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { PairRegistration } from './pair-registration.entity';
-import { PairCategory, RegistrationAccessGrantStatus } from './registration.enums';
+import { RegistrationAccessGrantStatus } from './registration.enums';
+import { Category } from '../categories/category.entity';
 
 @Entity('registration_access_grants')
 export class RegistrationAccessGrant {
@@ -17,12 +20,12 @@ export class RegistrationAccessGrant {
   @Column({ unique: true })
   token: string;
 
-  @Column({
-    type: 'enum',
-    enum: PairCategory,
-    enumName: 'pair_category',
-  })
-  category: PairCategory;
+  @Column({ type: 'integer' })
+  categoryId: number;
+
+  @ManyToOne(() => Category, (category) => category.accessGrants, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'categoryId' })
+  category: Category;
 
   @Column()
   localityName: string;

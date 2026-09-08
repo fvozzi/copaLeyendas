@@ -1,10 +1,3 @@
-export enum PairCategory {
-  DAMAS_A = 'DAMAS_A',
-  DAMAS_B = 'DAMAS_B',
-  DAMAS_NUCLEO_A = 'DAMAS_NUCLEO_A',
-  DAMAS_NUCLEO_B = 'DAMAS_NUCLEO_B',
-}
-
 export enum RegistrationStatus {
   RECEIVED = 'RECEIVED',
   UNDER_REVIEW = 'UNDER_REVIEW',

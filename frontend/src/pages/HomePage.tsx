@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import heroImage from '../assets/hero-copa-leyendas-femme.png';
 import { getPublicPosts } from '../lib/api';
 import { sectionMeta, tournamentHighlights, tournamentStory } from '../lib/content';
 import type { ContentPost } from '../types';
@@ -22,7 +21,7 @@ export function HomePage() {
       <section
         className="hero-band"
         style={{
-          backgroundImage: `linear-gradient(90deg, rgba(7, 18, 21, 0.9) 0%, rgba(7, 18, 21, 0.82) 28%, rgba(7, 18, 21, 0.58) 54%, rgba(7, 18, 21, 0.5) 100%), url(${heroImage})`,
+          backgroundImage: 'linear-gradient(90deg, rgba(7, 18, 21, 0.88) 0%, rgba(7, 18, 21, 0.68) 34%, rgba(7, 18, 21, 0.12) 62%, transparent 100%), url(/BannerFemme.png)',
         }}
       >
         <div className="hero-content">
@@ -61,7 +60,7 @@ export function HomePage() {
         </div>
         <div className="section-grid">
           {Object.entries(sectionMeta).map(([key, value]) => (
-            <article key={key} className="section-card">
+            <article key={key} className={`section-card section-card-${key}`}>
               <p className="section-card-kicker">{value.label}</p>
               <p>{value.intro}</p>
               <Link to={`/secciones/${key}`} className="inline-link">

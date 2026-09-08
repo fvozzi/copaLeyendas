@@ -43,7 +43,7 @@ export function clearSession() {
   window.localStorage.removeItem(USER_KEY);
 }
 
-function buildQuery(params: Record<string, string | boolean | undefined>) {
+function buildQuery(params: Record<string, string | number | boolean | undefined>) {
   const searchParams = new URLSearchParams();
 
   Object.entries(params).forEach(([key, value]) => {
@@ -345,13 +345,13 @@ export function deletePlayer(id: number) {
 }
 
 export function getRegistrations(params?: {
-  category?: string;
+  categoryId?: number;
   status?: string;
   search?: string;
 }) {
   return request<PairRegistration[]>(
     `/registrations${buildQuery({
-      category: params?.category,
+      categoryId: params?.categoryId,
       status: params?.status,
       search: params?.search,
     })}`,
@@ -376,13 +376,13 @@ export function deleteRegistration(id: number) {
 }
 
 export function getAccessGrants(params?: {
-  category?: string;
+  categoryId?: number;
   status?: string;
   search?: string;
 }) {
   return request<RegistrationAccessGrant[]>(
     `/registrations/access-grants${buildQuery({
-      category: params?.category,
+      categoryId: params?.categoryId,
       status: params?.status,
       search: params?.search,
     })}`,

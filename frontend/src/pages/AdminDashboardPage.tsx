@@ -5,7 +5,6 @@ import { getDashboardSummary } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import {
   accessGrantStatusLabels,
-  categoryLabels,
   registrationStatusLabels,
   sectionMeta,
 } from '../lib/content';
@@ -77,10 +76,10 @@ export function AdminDashboardPage() {
         <section className="data-card">
           <h2>Inscripciones por categoria</h2>
           <ul className="data-list">
-            {Object.entries(categoryLabels).map(([key, value]) => (
-              <li key={key}>
-                <span>{value}</span>
-                <strong>{summary.registrations.byCategory[key] ?? 0}</strong>
+            {Object.entries(summary.registrations.byCategory).map(([name, count]) => (
+              <li key={name}>
+                <span>{name}</span>
+                <strong>{count}</strong>
               </li>
             ))}
           </ul>

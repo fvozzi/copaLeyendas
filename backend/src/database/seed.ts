@@ -4,9 +4,9 @@ import dataSource from './data-source';
 import { User, UserRole } from '../auth/user.entity';
 import { ContentPost, ContentSection } from '../posts/content-post.entity';
 import { RegistrationAccessGrant } from '../registrations/registration-access-grant.entity';
+import { Category } from '../categories/category.entity';
 import { ensurePaymentProofDir } from '../registrations/payment-proof-storage';
 import {
-  PairCategory,
   RegistrationAccessGrantStatus,
 } from '../registrations/registration.enums';
 
@@ -17,6 +17,7 @@ async function run() {
   const userRepository = dataSource.getRepository(User);
   const postRepository = dataSource.getRepository(ContentPost);
   const accessGrantRepository = dataSource.getRepository(RegistrationAccessGrant);
+  const categoryRepository = dataSource.getRepository(Category);
 
   const adminEmail = (process.env.SEED_ADMIN_EMAIL ?? 'admin@copaleyendas.local').trim().toLowerCase();
   const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'copa123';
@@ -112,11 +113,16 @@ async function run() {
     where: { token: sampleGrantToken },
   });
 
-  if (!existingGrant) {
+  const sampleCategory = await categoryRepository.findOne({
+    where: { active: true },
+    order: { sortOrder: 'ASC', id: 'ASC' },
+  });
+
+  if (!existingGrant && sampleCategory) {
     await accessGrantRepository.save(
       accessGrantRepository.create({
         token: sampleGrantToken,
-        category: PairCategory.DAMAS_A,
+        categoryId: sampleCategory.id,
         localityName: 'Ciudad de Buenos Aires',
         provinceName: 'Buenos Aires',
         clubName: 'Club Ejemplo',

@@ -28,6 +28,7 @@ import { PlayersService } from '../players/players.service';
 import { GoogleDrivePhotoStorageService } from './google-drive-photo-storage.service';
 import { Tournament } from '../tournaments/tournament.entity';
 import { TournamentStatus } from '../tournaments/tournament.enums';
+import { Category } from '../categories/category.entity';
 
 interface RegistrationFiles {
   paymentProof?: Express.Multer.File;
@@ -47,6 +48,8 @@ export class RegistrationsService {
     private readonly localitiesRepository: Repository<Locality>,
     @InjectRepository(Tournament)
     private readonly tournamentsRepository: Repository<Tournament>,
+    @InjectRepository(Category)
+    private readonly categoriesRepository: Repository<Category>,
     private readonly playersService: PlayersService,
     private readonly googleDrivePhotos: GoogleDrivePhotoStorageService,
   ) {}
@@ -57,13 +60,19 @@ export class RegistrationsService {
       ? await this.localitiesRepository.findOne({ where: { id: dto.localityId }, relations: { category: true } })
       : null;
     if (dto.localityId && !locality) throw new NotFoundException('Localidad no encontrada');
-    if (locality && (!locality.active || !locality.category || !locality.category.active)) {
+    if (locality && !locality.active) {
       throw new BadRequestException('La localidad debe tener una categoria activa para habilitarse');
     }
+    const category = locality?.category ?? (dto.categoryId
+      ? await this.categoriesRepository.findOne({ where: { id: dto.categoryId } })
+      : null);
+    if (!category) throw new BadRequestException('Debe seleccionar una categoria');
+    if (!category.active) throw new BadRequestException('La categoria seleccionada no esta activa');
     const localityName = locality?.name ?? dto.localityName?.trim() ?? '';
     const grant = this.accessGrantsRepository.create({
       token,
-      category: locality?.category?.code ?? dto.category,
+      categoryId: category.id,
+      category,
       localityName,
       provinceName: locality?.provinceName ?? dto.provinceName?.trim() ?? '',
       clubName: normalizeOptional(dto.clubName) ?? localityName,
@@ -81,10 +90,10 @@ export class RegistrationsService {
   }
 
   async listAccessGrants(query: QueryAccessGrantsDto) {
-    const qb = this.accessGrantsRepository.createQueryBuilder('grant');
+    const qb = this.accessGrantsRepository.createQueryBuilder('grant').leftJoinAndSelect('grant.category', 'category');
 
-    if (query.category) {
-      qb.andWhere('grant.category = :category', { category: query.category });
+    if (query.categoryId) {
+      qb.andWhere('grant.categoryId = :categoryId', { categoryId: query.categoryId });
     }
 
     if (query.status) {
@@ -149,6 +158,7 @@ export class RegistrationsService {
     return {
       id: grant.id,
       token: grant.token,
+      categoryId: grant.categoryId,
       category: grant.category,
       localityName: grant.localityName,
       provinceName: grant.provinceName,
@@ -202,7 +212,7 @@ export class RegistrationsService {
     const activeTournament = await this.tournamentsRepository.findOne({ where: { status: TournamentStatus.ACTIVE }, order: { startsAt: 'ASC', id: 'ASC' } });
     const registration = this.registrationsRepository.create({
       accessGrantId: grant.id,
-      category: grant.category,
+      categoryId: grant.categoryId,
       localityName: grant.localityName,
       provinceName: grant.provinceName,
       clubName: grant.clubName,
@@ -272,10 +282,10 @@ export class RegistrationsService {
   }
 
   async list(query: QueryRegistrationsDto) {
-    const qb = this.registrationsRepository.createQueryBuilder('registration');
+    const qb = this.registrationsRepository.createQueryBuilder('registration').leftJoinAndSelect('registration.category', 'category');
 
-    if (query.category) {
-      qb.andWhere('registration.category = :category', { category: query.category });
+    if (query.categoryId) {
+      qb.andWhere('registration.categoryId = :categoryId', { categoryId: query.categoryId });
     }
 
     if (query.status) {
@@ -306,6 +316,7 @@ export class RegistrationsService {
       where: { id },
       relations: {
         accessGrant: true,
+        category: true,
       },
     });
 
@@ -387,6 +398,7 @@ export class RegistrationsService {
     const normalizedToken = token.trim().toUpperCase();
     const grant = await this.accessGrantsRepository.findOne({
       where: { token: normalizedToken },
+      relations: { category: true },
     });
 
     if (!grant) {

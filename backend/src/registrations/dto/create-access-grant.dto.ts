@@ -3,14 +3,12 @@ import {
   IsBoolean,
   IsInt,
   IsEmail,
-  IsEnum,
   IsOptional,
   IsString,
   MaxLength,
   MinLength,
   ValidateIf,
 } from 'class-validator';
-import { PairCategory } from '../registration.enums';
 
 function toBoolean(value: unknown) {
   return value === true || value === 'true' || value === 'on';
@@ -21,8 +19,10 @@ export class CreateAccessGrantDto {
   @Type(() => Number)
   @IsInt()
   localityId?: number;
-  @IsEnum(PairCategory)
-  category: PairCategory;
+  @ValidateIf((dto: CreateAccessGrantDto) => !dto.localityId)
+  @Type(() => Number)
+  @IsInt()
+  categoryId?: number;
 
   @ValidateIf((dto: CreateAccessGrantDto) => !dto.localityId)
   @IsString()

@@ -8,9 +8,9 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { RegistrationAccessGrant } from './registration-access-grant.entity';
+import { Category } from '../categories/category.entity';
 import {
   HeardAboutSource,
-  PairCategory,
   RegistrationStatus,
   ShirtSize,
 } from './registration.enums';
@@ -29,12 +29,12 @@ export class PairRegistration {
   @JoinColumn({ name: 'accessGrantId' })
   accessGrant: RegistrationAccessGrant;
 
-  @Column({
-    type: 'enum',
-    enum: PairCategory,
-    enumName: 'pair_category',
-  })
-  category: PairCategory;
+  @Column({ type: 'integer' })
+  categoryId: number;
+
+  @ManyToOne(() => Category, (category) => category.registrations, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'categoryId' })
+  category: Category;
 
   @Column()
   localityName: string;
