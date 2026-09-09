@@ -13,6 +13,7 @@ import { CourtsModule } from './courts/courts.module';
 import { TournamentsModule } from './tournaments/tournaments.module';
 import { RegistrationsModule } from './registrations/registrations.module';
 import { CashModule } from './cash/cash.module';
+import { WhatsAppModule } from './whatsapp/whatsapp.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { CashModule } from './cash/cash.module';
     RegistrationsModule,
     DashboardModule,
     CashModule,
+    WhatsAppModule,
   ],
   controllers: [AppController],
 })
