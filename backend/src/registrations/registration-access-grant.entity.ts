@@ -65,6 +65,9 @@ export class RegistrationAccessGrant {
   @Column({ type: 'timestamp with time zone', nullable: true })
   consumedAt: Date | null;
 
+  @Column({ type: 'timestamp with time zone', nullable: true })
+  whatsappSentAt: Date | null;
+
   @OneToMany(() => PairRegistration, (registration) => registration.accessGrant)
   registrations: PairRegistration[];
 

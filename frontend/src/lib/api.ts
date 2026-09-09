@@ -418,7 +418,7 @@ export function deleteAccessGrant(id: number) {
 }
 
 export function sendAccessGrantTokenByWhatsApp(id: number) {
-  return request<{ success: boolean; messageId: string | null; contactName: string; contactPhone: string }>(
+  return request<{ success: boolean; messageId: string; whatsappSentAt: string; contactName: string; contactPhone: string }>(
     `/registrations/access-grants/${id}/send-whatsapp`,
     { method: 'POST', body: JSON.stringify({ siteUrl: window.location.origin }) },
     true,

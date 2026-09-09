@@ -3,7 +3,9 @@ import { createReadStream, existsSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   BadRequestException,
+  BadGatewayException,
   Injectable,
+  Logger,
   NotFoundException,
   StreamableFile,
 } from '@nestjs/common';
@@ -40,6 +42,8 @@ interface RegistrationFiles {
 
 @Injectable()
 export class RegistrationsService {
+  private readonly logger = new Logger(RegistrationsService.name);
+
   constructor(
     @InjectRepository(PairRegistration)
     private readonly registrationsRepository: Repository<PairRegistration>,
@@ -86,6 +90,7 @@ export class RegistrationsService {
       paymentDeferredUntilConfirmed: dto.paymentDeferredUntilConfirmed ?? false,
       status: RegistrationAccessGrantStatus.ACTIVE,
       consumedAt: null,
+      whatsappSentAt: null,
     });
 
     return this.accessGrantsRepository.save(grant);
@@ -160,9 +165,16 @@ export class RegistrationsService {
       grant.category.name,
     );
 
+    const messageId = result.messages?.[0]?.id;
+    if (!messageId) throw new BadGatewayException('WhatsApp no confirmo la aceptacion del mensaje');
+    const whatsappSentAt = new Date();
+    // Update only the send timestamp: the token may have been consumed during the request to Meta.
+    await this.accessGrantsRepository.update(id, { whatsappSentAt });
+
     return {
       success: true,
-      messageId: result.messages?.[0]?.id ?? null,
+      messageId,
+      whatsappSentAt,
       contactName,
       contactPhone: grant.contactPhone,
     };
@@ -303,11 +315,19 @@ export class RegistrationsService {
       adminNotes: null,
     });
 
-    const saved = await this.registrationsRepository.save(registration);
-    await this.playersService.syncRegistrationPlayers(saved);
-    grant.status = RegistrationAccessGrantStatus.USED;
-    grant.consumedAt = new Date();
-    await this.accessGrantsRepository.save(grant);
+    const saved = await this.registrationsRepository.manager.transaction(async (manager) => {
+      const consumed = await manager.update(RegistrationAccessGrant,
+        { id: grant.id, status: RegistrationAccessGrantStatus.ACTIVE },
+        { status: RegistrationAccessGrantStatus.USED, consumedAt: new Date() });
+      if (!consumed.affected) throw new BadRequestException('Token no disponible para nuevas inscripciones');
+      return manager.save(PairRegistration, registration);
+    });
+    try {
+      await this.playersService.syncRegistrationPlayers(saved);
+    } catch {
+      // The players list retries this synchronization from the saved registrations.
+      this.logger.warn(`Inscripcion ${saved.id} recibida; sincronizacion de jugadoras pendiente`);
+    }
 
     return {
       id: saved.id,

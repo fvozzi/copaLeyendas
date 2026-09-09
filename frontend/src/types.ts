@@ -100,6 +100,7 @@ export interface RegistrationAccessGrant {
   paymentDeferredUntilConfirmed: boolean;
   status: AccessGrantStatus;
   consumedAt: string | null;
+  whatsappSentAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
