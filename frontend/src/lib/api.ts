@@ -420,7 +420,7 @@ export function deleteAccessGrant(id: number) {
 export function sendAccessGrantTokenByWhatsApp(id: number) {
   return request<{ success: boolean; messageId: string | null; contactName: string; contactPhone: string }>(
     `/registrations/access-grants/${id}/send-whatsapp`,
-    { method: 'POST' },
+    { method: 'POST', body: JSON.stringify({ siteUrl: window.location.origin }) },
     true,
   );
 }

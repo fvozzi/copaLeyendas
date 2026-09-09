@@ -50,15 +50,18 @@ export class WhatsAppService {
     contactName: string,
     token: string,
     localityName: string,
+    siteUrl: string,
   ) {
+    const registrationUrl = new URL('/inscripcion', siteUrl);
+    registrationUrl.searchParams.set('token', token);
     const message = [
       `Hola ${contactName},`,
       '',
-      `Te enviamos el token de inscripcion para ${localityName} en Copa Leyendas:`,
+      `Completa la inscripcion para ${localityName} en Copa Leyendas desde este enlace:`,
       '',
-      token,
+      registrationUrl.toString(),
       '',
-      'Ingresalo en la seccion Inscripcion del sitio para completar el registro.',
+      'Al abrirlo, tu token se carga automaticamente y podes completar el formulario.',
     ].join('\n');
 
     return this.sendText(to, message);

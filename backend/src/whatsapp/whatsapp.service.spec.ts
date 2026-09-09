@@ -81,7 +81,7 @@ describe('WhatsAppService', () => {
     );
   });
 
-  it('sends a personalized registration token message', async () => {
+  it('sends a personalized registration link that opens the form with its token', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ messages: [{ id: 'wamid.registration' }] }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -92,6 +92,7 @@ describe('WhatsAppService', () => {
       'Facundo',
       'COPA-ABCDEFGH',
       'Rosario',
+      'https://copa.example.com',
     );
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -106,11 +107,11 @@ describe('WhatsAppService', () => {
             body: [
               'Hola Facundo,',
               '',
-              'Te enviamos el token de inscripcion para Rosario en Copa Leyendas:',
+              'Completa la inscripcion para Rosario en Copa Leyendas desde este enlace:',
               '',
-              'COPA-ABCDEFGH',
+              'https://copa.example.com/inscripcion?token=COPA-ABCDEFGH',
               '',
-              'Ingresalo en la seccion Inscripcion del sitio para completar el registro.',
+              'Al abrirlo, tu token se carga automaticamente y podes completar el formulario.',
             ].join('\n'),
             preview_url: false,
           },

@@ -20,6 +20,7 @@ import { UpdateAccessGrantStatusDto } from './dto/update-access-grant-status.dto
 import { QueryRegistrationsDto } from './dto/query-registrations.dto';
 import { UpdateRegistrationStatusDto } from './dto/update-registration-status.dto';
 import { RegistrationsService } from './registrations.service';
+import { SendAccessGrantWhatsAppDto } from './dto/send-access-grant-whatsapp.dto';
 
 @Controller('registrations')
 @UseGuards(JwtAuthGuard, DirectorGuard)
@@ -45,8 +46,11 @@ export class RegistrationsController {
   }
 
   @Post('access-grants/:id/send-whatsapp')
-  sendAccessGrantTokenByWhatsApp(@Param('id', ParseIntPipe) id: number) {
-    return this.registrationsService.sendAccessGrantTokenByWhatsApp(id);
+  sendAccessGrantTokenByWhatsApp(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: SendAccessGrantWhatsAppDto,
+  ) {
+    return this.registrationsService.sendAccessGrantTokenByWhatsApp(id, dto.siteUrl);
   }
 
   @Delete('access-grants/:id')

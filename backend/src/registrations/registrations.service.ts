@@ -135,7 +135,7 @@ export class RegistrationsService {
     return this.accessGrantsRepository.save(grant);
   }
 
-  async sendAccessGrantTokenByWhatsApp(id: number) {
+  async sendAccessGrantTokenByWhatsApp(id: number, siteUrl: string) {
     const grant = await this.accessGrantsRepository.findOne({ where: { id } });
 
     if (!grant) {
@@ -156,6 +156,7 @@ export class RegistrationsService {
       contactName,
       grant.token,
       grant.localityName,
+      siteUrl,
     );
 
     return {
