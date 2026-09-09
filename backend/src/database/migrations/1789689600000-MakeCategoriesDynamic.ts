@@ -4,8 +4,8 @@ export class MakeCategoriesDynamic1789689600000 implements MigrationInterface {
   async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query('ALTER TABLE "registration_access_grants" ADD "categoryId" integer');
     await queryRunner.query('ALTER TABLE "pair_registrations" ADD "categoryId" integer');
-    await queryRunner.query('UPDATE "registration_access_grants" AS grant SET "categoryId" = category.id FROM "categories" AS category WHERE grant.category::text = category.code::text');
-    await queryRunner.query('UPDATE "pair_registrations" AS registration SET "categoryId" = category.id FROM "categories" AS category WHERE registration.category::text = category.code::text');
+    await queryRunner.query('UPDATE "registration_access_grants" AS g SET "categoryId" = c.id FROM "categories" AS c WHERE g.category::text = c.code::text');
+    await queryRunner.query('UPDATE "pair_registrations" AS r SET "categoryId" = c.id FROM "categories" AS c WHERE r.category::text = c.code::text');
     await queryRunner.query('ALTER TABLE "registration_access_grants" ALTER COLUMN "categoryId" SET NOT NULL');
     await queryRunner.query('ALTER TABLE "pair_registrations" ALTER COLUMN "categoryId" SET NOT NULL');
     await queryRunner.query('ALTER TABLE "registration_access_grants" ADD CONSTRAINT "FK_grants_category" FOREIGN KEY ("categoryId") REFERENCES "categories"("id") ON DELETE RESTRICT');
@@ -27,8 +27,8 @@ export class MakeCategoriesDynamic1789689600000 implements MigrationInterface {
     await queryRunner.query('ALTER TABLE "categories" ADD CONSTRAINT "UQ_categories_code" UNIQUE ("code")');
     await queryRunner.query('ALTER TABLE "registration_access_grants" ADD "category" "pair_category"');
     await queryRunner.query('ALTER TABLE "pair_registrations" ADD "category" "pair_category"');
-    await queryRunner.query('UPDATE "registration_access_grants" AS grant SET "category" = category.code FROM "categories" AS category WHERE grant."categoryId" = category.id');
-    await queryRunner.query('UPDATE "pair_registrations" AS registration SET "category" = category.code FROM "categories" AS category WHERE registration."categoryId" = category.id');
+    await queryRunner.query('UPDATE "registration_access_grants" AS g SET "category" = c.code FROM "categories" AS c WHERE g."categoryId" = c.id');
+    await queryRunner.query('UPDATE "pair_registrations" AS r SET "category" = c.code FROM "categories" AS c WHERE r."categoryId" = c.id');
     await queryRunner.query('ALTER TABLE "registration_access_grants" ALTER COLUMN "category" SET NOT NULL');
     await queryRunner.query('ALTER TABLE "pair_registrations" ALTER COLUMN "category" SET NOT NULL');
     await queryRunner.query('ALTER TABLE "registration_access_grants" DROP CONSTRAINT "FK_grants_category"');
