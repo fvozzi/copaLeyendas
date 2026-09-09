@@ -104,7 +104,19 @@ export class WhatsAppService {
           if (isRecord(message)) this.logger.log(`Mensaje recibido: id=${String(message.id ?? '')} from=${String(message.from ?? '')} type=${String(message.type ?? '')}`);
         }
         for (const status of statuses) {
-          if (isRecord(status)) this.logger.log(`Estado de mensaje: id=${String(status.id ?? '')} status=${String(status.status ?? '')}`);
+          if (!isRecord(status)) continue;
+          const summary = `Estado de mensaje: id=${String(status.id ?? '')} status=${String(status.status ?? '')}`;
+          if (status.status === 'failed') {
+            const errors = Array.isArray(status.errors) ? status.errors.filter(isRecord).map((error) => ({
+              code: error.code,
+              title: error.title,
+              message: error.message,
+              details: isRecord(error.error_data) ? error.error_data.details : undefined,
+            })) : [];
+            this.logger.error(`${summary} errors=${JSON.stringify(errors)}`);
+          } else {
+            this.logger.log(summary);
+          }
         }
       }
     }

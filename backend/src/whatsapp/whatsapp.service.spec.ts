@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, Logger } from '@nestjs/common';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WhatsAppService } from './whatsapp.service';
 
@@ -39,6 +39,25 @@ describe('WhatsAppService', () => {
     const signature = `sha256=${createHmac('sha256', configuration.WHATSAPP_APP_SECRET).update(body).digest('hex')}`;
     expect(() => service.verifyWebhookSignature(body, signature)).not.toThrow();
     expect(() => service.verifyWebhookSignature(body, 'sha256=incorrect')).toThrow(ForbiddenException);
+  });
+
+  it('logs asynchronous delivery failures with the reason returned by Meta', () => {
+    const errorLog = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    createService().processWebhook({
+      entry: [{ changes: [{ field: 'messages', value: { statuses: [{
+        id: 'wamid.failed',
+        status: 'failed',
+        errors: [null, {
+          code: 131047,
+          title: 'Re-engagement message',
+          message: 'Re-engagement message',
+          error_data: { details: 'More than 24 hours have passed since the recipient last replied.' },
+        }],
+      }] } }] }],
+    });
+    expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('id=wamid.failed status=failed'));
+    expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('"code":131047'));
+    expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('More than 24 hours'));
   });
 
   it('sends normalized phone numbers to the configured Graph API endpoint', async () => {
