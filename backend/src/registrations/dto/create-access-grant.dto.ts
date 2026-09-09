@@ -3,8 +3,10 @@ import {
   IsBoolean,
   IsInt,
   IsEmail,
+  IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   MinLength,
   ValidateIf,
@@ -42,19 +44,25 @@ export class CreateAccessGrantDto {
   @MaxLength(160)
   clubName?: string;
 
-  @IsOptional()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsString()
+  @IsNotEmpty({ message: 'Debe ingresar el nombre del contacto' })
   @MaxLength(140)
-  contactName?: string;
+  contactName: string;
 
+  @Transform(({ value }) => typeof value === 'string' && value.trim() ? value.trim() : undefined)
   @IsOptional()
-  @IsEmail()
+  @IsEmail({}, { message: 'El email de contacto debe ser valido' })
   contactEmail?: string;
 
-  @IsOptional()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsString()
+  @IsNotEmpty({ message: 'Debe ingresar el numero de WhatsApp' })
+  @Matches(/^\+?[0-9 ()-]{8,40}$/, {
+    message: 'El numero de WhatsApp debe incluir solo numeros y el codigo de pais',
+  })
   @MaxLength(40)
-  contactPhone?: string;
+  contactPhone: string;
 
   @IsOptional()
   @IsString()

@@ -44,6 +44,11 @@ export class RegistrationsController {
     return this.registrationsService.updateAccessGrantStatus(id, dto);
   }
 
+  @Post('access-grants/:id/send-whatsapp')
+  sendAccessGrantTokenByWhatsApp(@Param('id', ParseIntPipe) id: number) {
+    return this.registrationsService.sendAccessGrantTokenByWhatsApp(id);
+  }
+
   @Delete('access-grants/:id')
   removeAccessGrant(@Param('id', ParseIntPipe) id: number) {
     return this.registrationsService.removeAccessGrant(id);

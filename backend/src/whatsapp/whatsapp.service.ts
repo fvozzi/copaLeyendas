@@ -45,6 +45,25 @@ export class WhatsAppService {
     });
   }
 
+  sendRegistrationToken(
+    to: string,
+    contactName: string,
+    token: string,
+    localityName: string,
+  ) {
+    const message = [
+      `Hola ${contactName},`,
+      '',
+      `Te enviamos el token de inscripcion para ${localityName} en Copa Leyendas:`,
+      '',
+      token,
+      '',
+      'Ingresalo en la seccion Inscripcion del sitio para completar el registro.',
+    ].join('\n');
+
+    return this.sendText(to, message);
+  }
+
   sendTemplate(to: string, templateName: string, languageCode = 'es_AR') {
     return this.send({
       messaging_product: 'whatsapp',

@@ -29,6 +29,7 @@ import { GoogleDrivePhotoStorageService } from './google-drive-photo-storage.ser
 import { Tournament } from '../tournaments/tournament.entity';
 import { TournamentStatus } from '../tournaments/tournament.enums';
 import { Category } from '../categories/category.entity';
+import { WhatsAppService } from '../whatsapp/whatsapp.service';
 
 interface RegistrationFiles {
   paymentProof?: Express.Multer.File;
@@ -52,6 +53,7 @@ export class RegistrationsService {
     private readonly categoriesRepository: Repository<Category>,
     private readonly playersService: PlayersService,
     private readonly googleDrivePhotos: GoogleDrivePhotoStorageService,
+    private readonly whatsAppService: WhatsAppService,
   ) {}
 
   async createAccessGrant(dto: CreateAccessGrantDto) {
@@ -131,6 +133,37 @@ export class RegistrationsService {
 
     grant.status = dto.status;
     return this.accessGrantsRepository.save(grant);
+  }
+
+  async sendAccessGrantTokenByWhatsApp(id: number) {
+    const grant = await this.accessGrantsRepository.findOne({ where: { id } });
+
+    if (!grant) {
+      throw new NotFoundException('Equipo habilitado no encontrado');
+    }
+
+    if (!grant.contactPhone) {
+      throw new BadRequestException('El token no tiene un telefono de contacto');
+    }
+
+    if (grant.status !== RegistrationAccessGrantStatus.ACTIVE) {
+      throw new BadRequestException('Solo se pueden enviar tokens activos');
+    }
+
+    const contactName = grant.contactName?.trim() || grant.localityName;
+    const result = await this.whatsAppService.sendRegistrationToken(
+      grant.contactPhone,
+      contactName,
+      grant.token,
+      grant.localityName,
+    );
+
+    return {
+      success: true,
+      messageId: result.messages?.[0]?.id ?? null,
+      contactName,
+      contactPhone: grant.contactPhone,
+    };
   }
 
   async removeAccessGrant(id: number) {

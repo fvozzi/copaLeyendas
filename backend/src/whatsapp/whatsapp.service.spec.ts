@@ -61,4 +61,42 @@ describe('WhatsAppService', () => {
       }),
     );
   });
+
+  it('sends a personalized registration token message', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ messages: [{ id: 'wamid.registration' }] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+
+    await createService().sendRegistrationToken(
+      '+54 9 11 1234-5678',
+      'Facundo',
+      'COPA-ABCDEFGH',
+      'Rosario',
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://graph.facebook.com/v25.0/123456789/messages',
+      expect.objectContaining({
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: '5491112345678',
+          type: 'text',
+          text: {
+            body: [
+              'Hola Facundo,',
+              '',
+              'Te enviamos el token de inscripcion para Rosario en Copa Leyendas:',
+              '',
+              'COPA-ABCDEFGH',
+              '',
+              'Ingresalo en la seccion Inscripcion del sitio para completar el registro.',
+            ].join('\n'),
+            preview_url: false,
+          },
+        }),
+      }),
+    );
+  });
 });

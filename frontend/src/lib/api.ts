@@ -417,6 +417,14 @@ export function deleteAccessGrant(id: number) {
   return request<{ success: boolean }>(`/registrations/access-grants/${id}`, { method: 'DELETE' }, true);
 }
 
+export function sendAccessGrantTokenByWhatsApp(id: number) {
+  return request<{ success: boolean; messageId: string | null; contactName: string; contactPhone: string }>(
+    `/registrations/access-grants/${id}/send-whatsapp`,
+    { method: 'POST' },
+    true,
+  );
+}
+
 export function getPaymentProofUrl(id: number) {
   return `${API_URL}/registrations/${id}/payment-proof`;
 }
