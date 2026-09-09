@@ -136,7 +136,7 @@ export class RegistrationsService {
   }
 
   async sendAccessGrantTokenByWhatsApp(id: number, siteUrl: string) {
-    const grant = await this.accessGrantsRepository.findOne({ where: { id } });
+    const grant = await this.accessGrantsRepository.findOne({ where: { id }, relations: { category: true } });
 
     if (!grant) {
       throw new NotFoundException('Equipo habilitado no encontrado');
@@ -157,6 +157,7 @@ export class RegistrationsService {
       grant.token,
       grant.localityName,
       siteUrl,
+      grant.category.name,
     );
 
     return {

@@ -51,13 +51,14 @@ export class WhatsAppService {
     token: string,
     localityName: string,
     siteUrl: string,
+    categoryName: string,
   ) {
     const registrationUrl = new URL('/inscripcion', siteUrl);
     registrationUrl.searchParams.set('token', token);
     const message = [
       `Hola ${contactName},`,
       '',
-      `Completa la inscripcion para ${localityName} en Copa Leyendas desde este enlace:`,
+      `Completa la inscripcion para ${localityName}, categoria ${categoryName}, en Copa Leyendas desde este enlace:`,
       '',
       registrationUrl.toString(),
       '',

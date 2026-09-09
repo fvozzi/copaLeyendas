@@ -93,6 +93,7 @@ describe('WhatsAppService', () => {
       'COPA-ABCDEFGH',
       'Rosario',
       'https://copa.example.com',
+      'Damas A',
     );
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -107,7 +108,7 @@ describe('WhatsAppService', () => {
             body: [
               'Hola Facundo,',
               '',
-              'Completa la inscripcion para Rosario en Copa Leyendas desde este enlace:',
+              'Completa la inscripcion para Rosario, categoria Damas A, en Copa Leyendas desde este enlace:',
               '',
               'https://copa.example.com/inscripcion?token=COPA-ABCDEFGH',
               '',
