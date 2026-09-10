@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
-import { ForbiddenException, Logger } from '@nestjs/common';
+import { BadGatewayException, ForbiddenException, Logger } from '@nestjs/common';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WhatsAppService } from './whatsapp.service';
 
@@ -81,7 +81,39 @@ describe('WhatsAppService', () => {
     );
   });
 
-  it('sends a personalized registration link that opens the form with its token', async () => {
+  it('supports a separately approved template name and language and normalizes body variables', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ messages: [{ id: 'wamid.test' }] })));
+    const service = createService({ ...configuration,
+      WHATSAPP_REGISTRATION_TEMPLATE_NAME: 'inscripcion_copa_v2',
+      WHATSAPP_REGISTRATION_TEMPLATE_LANGUAGE: 'es',
+    });
+    await service.sendRegistrationToken('+5491112345678', ' Facundo\nPerez ', 'COPA-ABCD1234', ' Junin  ', 'https://copa.example.com', 'Damas\tA');
+    const payload = JSON.parse(fetchMock.mock.calls[0][1]!.body as string);
+    expect(payload.template.name).toBe('inscripcion_copa_v2');
+    expect(payload.template.language.code).toBe('es');
+    expect(payload.template.components[0].parameters.map((parameter: { text: string }) => parameter.text)).toEqual([
+      'Facundo Perez', 'Junin', 'Damas A', 'https://copa.example.com/inscripcion?token=COPA-ABCD1234',
+    ]);
+  });
+
+  it('keeps parameterless templates compatible with the existing template endpoint', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ messages: [{ id: 'wamid.test' }] })));
+    await createService().sendTemplate('+5491112345678', 'hello_world', 'en_US');
+    const payload = JSON.parse(fetchMock.mock.calls[0][1]!.body as string);
+    expect(payload.template).toEqual({ name: 'hello_world', language: { code: 'en_US' } });
+  });
+
+  it('reports a rejected template without retrying as free-form text', async () => {
+    vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      error: { code: 132001, message: 'Template not found' },
+    }), { status: 400 }));
+    await expect(createService().sendRegistrationToken('+5491112345678', 'Facundo', 'COPA-ABCD1234', 'Junin', 'https://copa.example.com', 'Damas A'))
+      .rejects.toThrow(BadGatewayException);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it('sends the registration template with contact, team, category and the token link in order', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ messages: [{ id: 'wamid.registration' }] }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -103,18 +135,19 @@ describe('WhatsAppService', () => {
           messaging_product: 'whatsapp',
           recipient_type: 'individual',
           to: '5491112345678',
-          type: 'text',
-          text: {
-            body: [
-              'Hola Facundo,',
-              '',
-              'Completa la inscripcion para Rosario, categoria Damas A, en Copa Leyendas desde este enlace:',
-              '',
-              'https://copa.example.com/inscripcion?token=COPA-ABCDEFGH',
-              '',
-              'Al abrirlo, tu token se carga automaticamente y podes completar el formulario.',
-            ].join('\n'),
-            preview_url: false,
+          type: 'template',
+          template: {
+            name: 'inscripcion_copa_leyendas',
+            language: { code: 'es_AR' },
+            components: [{
+              type: 'body',
+              parameters: [
+                { type: 'text', text: 'Facundo' },
+                { type: 'text', text: 'Rosario' },
+                { type: 'text', text: 'Damas A' },
+                { type: 'text', text: 'https://copa.example.com/inscripcion?token=COPA-ABCDEFGH' },
+              ],
+            }],
           },
         }),
       }),

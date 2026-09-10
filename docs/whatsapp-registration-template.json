@@ -1,0 +1,22 @@
+{
+  "name": "inscripcion_copa_leyendas",
+  "language": "es_AR",
+  "category": "UTILITY",
+  "parameter_format": "POSITIONAL",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "Hola {{1}},\n\nRecibimos la solicitud de inscripción del equipo {{2}} para la categoría {{3}} de Copa Leyendas.\n\nPara continuar con esa solicitud, completá los datos de las jugadoras en el formulario:\n{{4}}\n\nGracias por completar los datos de tu equipo.",
+      "example": {
+        "body_text": [
+          [
+            "Facundo",
+            "Junin",
+            "Damas A",
+            "https://copaleyendas.com.ar/inscripcion?token=COPA-EJEMPLO1"
+          ]
+        ]
+      }
+    }
+  ]
+}

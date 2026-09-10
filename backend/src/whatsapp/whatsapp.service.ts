@@ -32,6 +32,7 @@ export class WhatsAppService {
       missing,
       graphApiVersion: required.WHATSAPP_GRAPH_API_VERSION || null,
       phoneNumberId: required.WHATSAPP_PHONE_NUMBER_ID || null,
+      registrationTemplate: this.registrationTemplate(),
     };
   }
 
@@ -55,26 +56,28 @@ export class WhatsAppService {
   ) {
     const registrationUrl = new URL('/inscripcion', siteUrl);
     registrationUrl.searchParams.set('token', token);
-    const message = [
-      `Hola ${contactName},`,
-      '',
-      `Completa la inscripcion para ${localityName}, categoria ${categoryName}, en Copa Leyendas desde este enlace:`,
-      '',
+    const template = this.registrationTemplate();
+    return this.sendTemplate(to, template.name, template.languageCode, [
+      contactName,
+      localityName,
+      categoryName,
       registrationUrl.toString(),
-      '',
-      'Al abrirlo, tu token se carga automaticamente y podes completar el formulario.',
-    ].join('\n');
-
-    return this.sendText(to, message);
+    ].map((value) => value.replace(/\s+/g, ' ').trim()));
   }
 
-  sendTemplate(to: string, templateName: string, languageCode = 'es_AR') {
+  sendTemplate(to: string, templateName: string, languageCode = 'es_AR', bodyParameters: string[] = []) {
     return this.send({
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
       to: normalizePhone(to),
       type: 'template',
-      template: { name: templateName, language: { code: languageCode } },
+      template: {
+        name: templateName,
+        language: { code: languageCode },
+        ...(bodyParameters.length ? {
+          components: [{ type: 'body', parameters: bodyParameters.map((text) => ({ type: 'text', text })) }],
+        } : {}),
+      },
     });
   }
 
@@ -153,6 +156,13 @@ export class WhatsAppService {
 
   private config(key: string) {
     return this.configService.get<string>(key)?.trim() ?? '';
+  }
+
+  private registrationTemplate() {
+    return {
+      name: this.config('WHATSAPP_REGISTRATION_TEMPLATE_NAME') || 'inscripcion_copa_leyendas',
+      languageCode: this.config('WHATSAPP_REGISTRATION_TEMPLATE_LANGUAGE') || 'es_AR',
+    };
   }
 
   private required(key: string) {
