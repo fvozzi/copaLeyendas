@@ -1,6 +1,6 @@
 import { createSign } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { Injectable, Logger } from '@nestjs/common';
+import { BadGatewayException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 interface ServiceAccount {
@@ -48,6 +48,17 @@ export class GoogleDrivePhotoStorageService {
     if (!response.ok) throw new Error(`Google Drive rechazo la foto (${response.status}): ${await response.text()}`);
     const payload = await response.json() as { id: string };
     return `drive:${payload.id}`;
+  }
+
+  async download(storedName: string) {
+    const id = storedName.slice(6);
+    if (!storedName.startsWith('drive:') || !/^[\w-]+$/.test(id)) throw new NotFoundException('Foto no encontrada');
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`, {
+      headers: { Authorization: `Bearer ${await this.token()}` },
+    });
+    if (response.status === 404) throw new NotFoundException('Foto no encontrada en Google Drive');
+    if (!response.ok) throw new BadGatewayException('No se pudo obtener la foto de Google Drive');
+    return Buffer.from(await response.arrayBuffer());
   }
 
   async remove(storedName: string) {

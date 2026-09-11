@@ -1,5 +1,5 @@
 import { Body, Controller, ForbiddenException, Get, Param, ParseIntPipe, Patch, Post, UseGuards } from '@nestjs/common';
-import { IsDateString, IsInt } from 'class-validator';
+import { IsDateString, IsInt, Min } from 'class-validator';
 import { CurrentUser, type AuthenticatedUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UserRole } from '../auth/user.entity';
@@ -9,6 +9,7 @@ import { TournamentsService } from './tournaments.service';
 
 class ScheduleMatchDto { @IsDateString() scheduledAt: string; }
 class ResultDto { @IsInt() homeScore: number; @IsInt() awayScore: number; }
+class AssignPlaceDto { @IsInt() @Min(1) registrationId: number; }
 
 @Controller('tournaments')
 @UseGuards(JwtAuthGuard)
@@ -30,6 +31,7 @@ export class TournamentsController {
   @Patch('schedule-slots/:id') scheduleSlot(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: { scheduledAt?: string | null; courtId?: number | null }) { this.assertDirector(user); return this.s.updateScheduleSlot(id, dto); }
   @Post('zones/:id/entries') entry(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: { registrationId: number }) { this.assertDirector(user); return this.s.addEntry(id, dto.registrationId); }
   @Post('zones/:id/fixture') fixture(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { this.assertDirector(user); return this.s.fixture(id); }
+  @Patch('zones/:id/places/:seed') place(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Param('seed', ParseIntPipe) seed: number, @Body() dto: AssignPlaceDto) { this.assertDirector(user); return this.s.assignPlace(id, dto.registrationId, seed); }
   @Patch('matches/:id/schedule') schedule(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: ScheduleMatchDto) { return this.s.schedule(id, dto.scheduledAt, user); }
   @Post('matches/:id/result') result(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: ResultDto) { return this.s.result(id, dto.homeScore, dto.awayScore, user); }
   private assertDirector(user: AuthenticatedUser) { if (user.role !== UserRole.DIRECTOR) throw new ForbiddenException('Solo Direccion puede configurar el torneo.'); }

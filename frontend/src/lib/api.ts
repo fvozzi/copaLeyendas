@@ -303,6 +303,14 @@ export function updateMatchSchedule(id: number, scheduledAt: string) { return re
 export function getZone(id: number) { return request<ZoneDetail>(`/tournaments/zones/${id}`, {}, true); }
 export function getAvailableZoneRegistrations(categoryId: number) { return request<PairRegistration[]>(`/tournaments/categories/${categoryId}/registrations`, {}, true); }
 export function addZoneEntry(zoneId: number, registrationId: number) { return request(`/tournaments/zones/${zoneId}/entries`, { method: 'POST', body: JSON.stringify({ registrationId }) }, true); }
+export function assignZonePlace(zoneId: number, seed: number, registrationId: number) { return request(`/tournaments/zones/${zoneId}/places/${seed}`, { method: 'PATCH', body: JSON.stringify({ registrationId }) }, true); }
+
+export async function getPlayerPhoto(id: number) {
+  const token = getToken();
+  const response = await fetch(`${API_URL}/players/${id}/photo`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!response.ok) throw new Error(await readError(response));
+  return response.blob();
+}
 
 export function createLocality(payload: LocalityPayload) {
   return request<Locality>('/localities', { method: 'POST', body: JSON.stringify(payload) }, true);

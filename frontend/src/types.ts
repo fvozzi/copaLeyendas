@@ -281,8 +281,8 @@ export interface TournamentPayload { name: string; feePerPlayer?: number; starts
 export interface TournamentCategory { id: number; categoryId: number; pointsPerSet: number; setsToWin: number; zoneSize: number; category: Category; }
 export interface TournamentZone { id: number; name: string; capacity: number; tournamentCategoryId: number; venueId: number; venue: Venue; tournamentCategory: TournamentCategory; }
 export interface TournamentDetail extends Tournament { categories: TournamentCategory[]; zones: TournamentZone[]; }
-export interface TournamentMatch { id: number; matchOrder: number; status: string; court?: Court | null; homeRegistration: PairRegistration | null; awayRegistration: PairRegistration | null; homeScore: number | null; awayScore: number | null; scheduledAt: string | null; }
-export interface ZoneEntry { id: number; registration: PairRegistration; }
+export interface TournamentMatch { id: number; matchOrder: number; status: string; court?: Court | null; homeRegistration: PairRegistration | null; awayRegistration: PairRegistration | null; homeSource?: 'DIRECT' | 'WINNER' | 'LOSER'; awaySource?: 'DIRECT' | 'WINNER' | 'LOSER'; homeSourceMatchId?: number | null; awaySourceMatchId?: number | null; homeScore: number | null; awayScore: number | null; scheduledAt: string | null; }
+export interface ZoneEntry { id: number; seed: number; registration: PairRegistration; }
 export interface ZoneDetail extends TournamentZone { entries: ZoneEntry[]; }
 export interface PublicStanding { registration: PairRegistration; played: number; wins: number; losses: number; pointsFor: number; pointsAgainst: number; tablePoints: number; }
 export interface PublicTournamentZone { id: number; name: string; category: string; venue: Venue; court?: Court; standings: PublicStanding[]; matches: TournamentMatch[]; }
@@ -291,6 +291,7 @@ export interface PublicCurrentTournament { tournament: PublicTournament | null; 
 export interface TournamentScheduleSlot { id: number; tournamentId: number; tournamentCategoryId: number; zoneName: string; matchOrder: number; stage: 'ZONE' | 'QUARTERFINAL' | 'SEMIFINAL' | 'FINAL'; sequence: number; courtId: number | null; court: Court | null; scheduledAt: string | null; tournamentCategory: TournamentCategory; }
 
 export interface Player {
+  hasPhoto?: boolean;
   id: number;
   fullName: string;
   dni: string;

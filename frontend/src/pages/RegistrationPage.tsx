@@ -171,6 +171,7 @@ export function RegistrationPage() {
         playerOneInstagram: form.playerOneInstagram?.trim() || undefined,
         playerTwoInstagram: form.playerTwoInstagram?.trim() || undefined,
         playerThreeName: form.playerThreeName?.trim() || undefined,
+        playerThreeShirtSize: form.playerThreeName?.trim() ? form.playerThreeShirtSize : undefined,
         playerThreeDni: form.playerThreeDni?.trim() || undefined,
         playerThreeBirthDate: form.playerThreeBirthDate?.trim() || undefined,
         playerThreePhone: form.playerThreePhone?.trim() || undefined,

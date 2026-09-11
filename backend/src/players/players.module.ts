@@ -5,11 +5,12 @@ import { PairRegistration } from '../registrations/pair-registration.entity';
 import { Player } from './player.entity';
 import { PlayersController } from './players.controller';
 import { PlayersService } from './players.service';
+import { GoogleDrivePhotoStorageService } from '../registrations/google-drive-photo-storage.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Player, Locality, PairRegistration])],
   controllers: [PlayersController],
-  providers: [PlayersService],
+  providers: [PlayersService, GoogleDrivePhotoStorageService],
   exports: [PlayersService],
 })
 export class PlayersModule {}

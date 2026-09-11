@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { type AuthenticatedUser } from '../auth/current-user.decorator';
 import { UserRole } from '../auth/user.entity';
 import { CourtAssistantAssignment } from '../courts/court-assistant-assignment.entity';
@@ -59,17 +59,71 @@ export class TournamentsService {
   async updateZone(id: number, dto: { name?: string; venueId?: number; capacity?: number }) {
     const zone = await this.z.findOneBy({ id });
     if (!zone) throw new NotFoundException('Zona no encontrada');
+    if (dto.capacity !== undefined && dto.capacity !== zone.capacity && await this.m.countBy({ zoneId: id })) throw new BadRequestException('No se puede cambiar el cupo de una zona con fixture generado');
     if (dto.venueId !== undefined) { if (!(await this.venues.findOneBy({ id: dto.venueId }))) throw new NotFoundException('Sede no encontrada'); zone.venueId = dto.venueId; }
     if (dto.capacity !== undefined) { if (dto.capacity < await this.e.countBy({ zoneId: id })) throw new BadRequestException('El cupo no puede ser menor a las parejas ya asignadas'); zone.capacity = dto.capacity; }
     if (dto.name !== undefined) zone.name = dto.name.trim();
     return this.z.save(zone);
   }
-  async addEntry(zoneId: number, registrationId: number) { const zone = await this.z.findOneBy({ id: zoneId }); if (!zone) throw new NotFoundException('Zona no encontrada'); if (await this.e.countBy({ zoneId }) >= zone.capacity) throw new BadRequestException('La zona alcanzo su cupo'); return this.e.save(this.e.create({ zoneId, registrationId })); }
+  addEntry(zoneId: number, registrationId: number) { return this.assignPlace(zoneId, registrationId); }
+
+  async assignPlace(zoneId: number, registrationId: number, requestedSeed?: number) {
+    return this.withLockedZone(zoneId, async (manager, zone) => {
+      const category = await manager.getRepository(TournamentCategory).findOne({ where: { id: zone.tournamentCategoryId }, lock: { mode: 'pessimistic_write' } });
+      const registration = await manager.getRepository(PairRegistration).findOneBy({ id: registrationId });
+      if (!registration || registration.status !== RegistrationStatus.CONFIRMED || registration.categoryId !== category?.categoryId) {
+        throw new BadRequestException('Selecciona una pareja confirmada de esta categoria');
+      }
+      const matches = await manager.getRepository(TournamentMatch).find({ where: { zoneId }, order: { matchOrder: 'ASC' } });
+      if (matches.some((match) => match.status === MatchStatus.PLAYED)) throw new BadRequestException('No se pueden reemplazar parejas cuando ya hay resultados cargados');
+      const entries = await this.orderedEntries(manager, zoneId);
+      const capacity = matches.length === 3 ? 3 : zone.capacity;
+      const seed = requestedSeed ?? Array.from({ length: capacity }, (_, index) => index + 1).find((position) => !entries.some((entry) => entry.seed === position));
+      if (!seed || !Number.isInteger(seed) || seed < 1 || seed > capacity) throw new BadRequestException('El lugar no esta disponible en esta zona');
+      const entry = entries.find((item) => item.seed === seed);
+      const assigned = await manager.getRepository(ZoneEntry).findOne({ where: { registrationId, zone: { tournamentCategoryId: zone.tournamentCategoryId } } });
+      if (assigned && assigned.id !== entry?.id) throw new BadRequestException('La pareja ya esta asignada a un lugar de esta categoria');
+      const saved = await manager.getRepository(ZoneEntry).save(entry ? { ...entry, registrationId } : { zoneId, registrationId, seed });
+      const positions = new Map(entries.map((item) => [item.seed, item.registrationId]));
+      positions.set(seed, registrationId);
+      const pairings = matches.length === 3 ? [[1, 2], [1, 3], [2, 3]] : [[1, 2], [3, 4]];
+      for (const match of matches) {
+        if (match.homeSource !== ParticipantSource.DIRECT || match.awaySource !== ParticipantSource.DIRECT) continue;
+        const pairing = pairings[match.matchOrder - 1];
+        if (!pairing) continue;
+        match.homeRegistrationId = positions.get(pairing[0]) ?? null;
+        match.awayRegistrationId = positions.get(pairing[1]) ?? null;
+        match.status = match.homeRegistrationId && match.awayRegistrationId ? MatchStatus.READY : MatchStatus.PENDING;
+        await manager.getRepository(TournamentMatch).save(match);
+      }
+      return saved;
+    });
+  }
+
+  private withLockedZone<T>(zoneId: number, action: (manager: EntityManager, zone: Zone) => Promise<T>) {
+    return this.z.manager.transaction(async (manager) => {
+      const zone = await manager.getRepository(Zone).findOne({ where: { id: zoneId }, lock: { mode: 'pessimistic_write' } });
+      if (!zone) throw new NotFoundException('Zona no encontrada');
+      return action(manager, zone);
+    });
+  }
+
+  private async orderedEntries(manager: EntityManager, zoneId: number) {
+    const repository = manager.getRepository(ZoneEntry);
+    const entries = await repository.find({ where: { zoneId }, order: { seed: 'ASC', id: 'ASC' } });
+    // Older manually assigned entries all used seed 0. Preserve their existing order.
+    if (entries.some((entry) => entry.seed < 1) || new Set(entries.map((entry) => entry.seed)).size !== entries.length) {
+      entries.forEach((entry, index) => { entry.seed = index + 1; });
+      await repository.save(entries);
+    }
+    return entries;
+  }
 
   async divideZones(tournamentCategoryId: number) {
     const category = await this.tc.findOne({ where: { id: tournamentCategoryId }, relations: { category: true } });
     if (!category) throw new NotFoundException('Categoria de torneo no encontrada');
     const existing = await this.z.find({ where: { tournamentCategoryId } });
+    if (existing.length && await this.m.count({ where: existing.map((zone) => ({ zoneId: zone.id })) })) throw new BadRequestException('No se pueden redistribuir zonas que ya tienen fixture generado.');
     if (existing.length && await this.e.count({ where: existing.map((zone) => ({ zoneId: zone.id })) })) throw new BadRequestException('No se pueden redistribuir zonas que ya tienen parejas asignadas.');
     if (existing.length) await this.z.remove(existing);
     const registrations = await this.r.find({ where: { categoryId: category.categoryId, status: RegistrationStatus.CONFIRMED }, order: { localityName: 'ASC', id: 'ASC' } });
@@ -165,20 +219,34 @@ export class TournamentsService {
   }
 
   async fixture(zoneId: number) {
-    const [entries, zone] = await Promise.all([this.e.find({ where: { zoneId }, order: { seed: 'ASC', id: 'ASC' } }), this.z.findOneBy({ id: zoneId })]);
-    if (!zone) throw new NotFoundException('Zona no encontrada');
-    if (![3, 4].includes(entries.length)) throw new BadRequestException('La zona debe tener 3 o 4 parejas');
-    await this.m.delete({ zoneId });
-    const planned = await this.slots.find({ where: { tournamentCategoryId: zone.tournamentCategoryId, zoneName: zone.name } });
-    const direct = (a: number, b: number, order: number) => { const slot = planned.find((item) => item.matchOrder === order); return this.m.save(this.m.create({ zoneId, matchOrder: order, homeRegistrationId: a, awayRegistrationId: b, scheduledAt: slot?.scheduledAt ?? null, status: MatchStatus.READY })); };
-    const p1 = await direct(entries[0].registrationId, entries[1].registrationId, 1);
-    if (entries.length === 3) { await direct(entries[0].registrationId, entries[2].registrationId, 2); await direct(entries[1].registrationId, entries[2].registrationId, 3); return this.matches(zoneId); }
-    const p2 = await direct(entries[2].registrationId, entries[3].registrationId, 2);
-    const thirdSlot = planned.find((item) => item.matchOrder === 3);
-    const fourthSlot = planned.find((item) => item.matchOrder === 4);
-    await this.m.save(this.m.create({ zoneId, matchOrder: 3, scheduledAt: thirdSlot?.scheduledAt ?? null, homeSource: ParticipantSource.WINNER, homeSourceMatchId: p1.id, awaySource: ParticipantSource.LOSER, awaySourceMatchId: p2.id, status: MatchStatus.PENDING }));
-    await this.m.save(this.m.create({ zoneId, matchOrder: 4, scheduledAt: fourthSlot?.scheduledAt ?? null, homeSource: ParticipantSource.WINNER, homeSourceMatchId: p2.id, awaySource: ParticipantSource.LOSER, awaySourceMatchId: p1.id, status: MatchStatus.PENDING }));
-    return this.matches(zoneId);
+    return this.withLockedZone(zoneId, async (manager, zone) => {
+      const repository = manager.getRepository(TournamentMatch);
+      const existing = await repository.find({ where: { zoneId }, relations: { homeRegistration: true, awayRegistration: true }, order: { matchOrder: 'ASC' } });
+      // Repeated clicks must not erase scheduled games or results.
+      if (existing.length) return existing;
+      if (![3, 4].includes(zone.capacity)) throw new BadRequestException('El cupo de la zona debe ser de 3 o 4 parejas');
+      const entries = await this.orderedEntries(manager, zoneId);
+      const positions = new Map(entries.map((entry) => [entry.seed, entry.registrationId]));
+      const planned = await manager.getRepository(TournamentScheduleSlot).find({ where: { tournamentCategoryId: zone.tournamentCategoryId, zoneName: zone.name, stage: 'ZONE' } });
+      const scheduledAt = (order: number) => planned.find((item) => item.matchOrder === order)?.scheduledAt ?? null;
+      const direct = (home: number, away: number, order: number) => {
+        const homeRegistrationId = positions.get(home) ?? null;
+        const awayRegistrationId = positions.get(away) ?? null;
+        return repository.save(repository.create({ zoneId, matchOrder: order, homeRegistrationId, awayRegistrationId,
+          homeSource: ParticipantSource.DIRECT, awaySource: ParticipantSource.DIRECT,
+          scheduledAt: scheduledAt(order), status: homeRegistrationId && awayRegistrationId ? MatchStatus.READY : MatchStatus.PENDING }));
+      };
+      const p1 = await direct(1, 2, 1);
+      if (zone.capacity === 3) {
+        await direct(1, 3, 2);
+        await direct(2, 3, 3);
+      } else {
+        const p2 = await direct(3, 4, 2);
+        await repository.save(repository.create({ zoneId, matchOrder: 3, scheduledAt: scheduledAt(3), homeSource: ParticipantSource.WINNER, homeSourceMatchId: p1.id, awaySource: ParticipantSource.LOSER, awaySourceMatchId: p2.id, status: MatchStatus.PENDING }));
+        await repository.save(repository.create({ zoneId, matchOrder: 4, scheduledAt: scheduledAt(4), homeSource: ParticipantSource.WINNER, homeSourceMatchId: p2.id, awaySource: ParticipantSource.LOSER, awaySourceMatchId: p1.id, status: MatchStatus.PENDING }));
+      }
+      return repository.find({ where: { zoneId }, relations: { homeRegistration: true, awayRegistration: true }, order: { matchOrder: 'ASC' } });
+    });
   }
 
   async schedule(id: number, scheduledAt: string, user: AuthenticatedUser) {
@@ -189,17 +257,22 @@ export class TournamentsService {
   }
 
   async result(id: number, homeScore: number, awayScore: number, user: AuthenticatedUser) {
-    if (homeScore === awayScore) throw new BadRequestException('El partido debe tener ganador');
-    const match = await this.matchWithZone(id);
     this.assertDirectorAccess(user);
-    if (!match.homeRegistrationId || !match.awayRegistrationId) throw new BadRequestException('El partido no esta listo');
-    match.homeScore = homeScore;
-    match.awayScore = awayScore;
-    match.winnerRegistrationId = homeScore > awayScore ? match.homeRegistrationId : match.awayRegistrationId;
-    match.status = MatchStatus.PLAYED;
-    await this.m.save(match);
-    await this.resolveDependents(match);
-    return match;
+    if (homeScore === awayScore) throw new BadRequestException('El partido debe tener ganador');
+    const initial = await this.matchWithZone(id);
+    return this.withLockedZone(initial.zoneId, async (manager) => {
+      const repository = manager.getRepository(TournamentMatch);
+      const match = await repository.findOneBy({ id });
+      if (!match) throw new NotFoundException('Partido no encontrado');
+      if (!match.homeRegistrationId || !match.awayRegistrationId) throw new BadRequestException('El partido no esta listo');
+      match.homeScore = homeScore;
+      match.awayScore = awayScore;
+      match.winnerRegistrationId = homeScore > awayScore ? match.homeRegistrationId : match.awayRegistrationId;
+      match.status = MatchStatus.PLAYED;
+      await repository.save(match);
+      await this.resolveDependents(match, repository);
+      return match;
+    });
   }
 
   async assertZoneAccess(user: AuthenticatedUser, zoneId: number) {
@@ -221,8 +294,8 @@ export class TournamentsService {
     throw new ForbiddenException('La asignacion de canchas se define al programar los partidos.');
   }
 
-  private async resolveDependents(source: TournamentMatch) {
-    const matches = await this.m.find({ where: [{ homeSourceMatchId: source.id }, { awaySourceMatchId: source.id }] });
+  private async resolveDependents(source: TournamentMatch, repository = this.m) {
+    const matches = await repository.find({ where: [{ homeSourceMatchId: source.id }, { awaySourceMatchId: source.id }] });
     for (const match of matches) {
       const fill = async (side: 'home' | 'away') => {
         const sourceId = side === 'home' ? match.homeSourceMatchId : match.awaySourceMatchId;
@@ -235,7 +308,7 @@ export class TournamentsService {
       await fill('home');
       await fill('away');
       if (match.homeRegistrationId && match.awayRegistrationId) match.status = MatchStatus.READY;
-      await this.m.save(match);
+      await repository.save(match);
     }
   }
 }

@@ -73,7 +73,9 @@ function summarizeMatchesByVenue(tournamentName: string | null, zones: Zone[]) {
 
 function countShirtSizes(registrations: PairRegistration[]) {
   return registrations.reduce<Record<string, number>>((accumulator, registration) => {
-    [registration.playerOneShirtSize, registration.playerTwoShirtSize, registration.playerThreeShirtSize]
+    [registration.playerOneName?.trim() ? registration.playerOneShirtSize : null,
+      registration.playerTwoName?.trim() ? registration.playerTwoShirtSize : null,
+      registration.playerThreeName?.trim() ? registration.playerThreeShirtSize : null]
       .filter((size): size is NonNullable<typeof size> => Boolean(size))
       .forEach((size) => { accumulator[size] = (accumulator[size] ?? 0) + 1; });
     return accumulator;

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AdminDataGrid } from '../components/AdminDataGrid';
 import { AdminDialog } from '../components/AdminDialog';
-import { createPlayer, deletePlayer, downloadPlayersExport, getLocalities, getPlayers, updatePlayer } from '../lib/api';
+import { createPlayer, deletePlayer, downloadPlayersExport, getLocalities, getPlayerPhoto, getPlayers, updatePlayer } from '../lib/api';
 import { shirtSizeLabels } from '../lib/content';
 import type { Locality, Player, PlayerPayload } from '../types';
 
@@ -15,6 +15,25 @@ export function AdminPlayersPage() {
   const [editing, setEditing] = useState<Player | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [photo, setPhoto] = useState<{ url: string; name: string } | null>(null);
+  const [loadingPhoto, setLoadingPhoto] = useState<number | null>(null);
+  useEffect(() => () => { if (photo) URL.revokeObjectURL(photo.url); }, [photo]);
+  const openPhoto = async (player: Player, download = false) => {
+    setLoadingPhoto(player.id);
+    setError(null);
+    try {
+      const blob = await getPlayerPhoto(player.id);
+      const url = URL.createObjectURL(blob);
+      const extension = ({ 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' } as Record<string, string>)[blob.type] ?? 'bin';
+      if (download) {
+        const link = document.createElement('a');
+        link.href = url; link.download = `${player.fullName.replace(/[^\p{L}\p{N} -]/gu, '')}.${extension}`;
+        document.body.append(link); link.click(); link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } else setPhoto({ url, name: player.fullName });
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo abrir la foto.'); }
+    finally { setLoadingPhoto(null); }
+  };
   const load = () => getPlayers(search || undefined).then(setPlayers).catch((reason: Error) => setError(reason.message));
   useEffect(() => { load(); getLocalities().then(setLocalities).catch((reason: Error) => setError(reason.message)); }, []);
   const openCreate = () => { setEditing(null); setForm(initialForm); setError(null); setDialogOpen(true); };
@@ -35,6 +54,7 @@ export function AdminPlayersPage() {
       { label: 'Localidad / equipo', render: (item) => item.locality ? `${item.locality.name}, ${item.locality.provinceName}` : 'Sin asignar' },
       { label: 'Celular', render: (item) => item.phone ?? '-' },
       { label: 'Talle', render: (item) => item.shirtSize ?? '-' },
+      { label: 'Foto', render: (item) => item.hasPhoto ? <div className="list-actions"><button className="inline-link" disabled={loadingPhoto !== null} onClick={() => void openPhoto(item)}>Ver foto</button><button className="inline-link" disabled={loadingPhoto !== null} onClick={() => void openPhoto(item, true)}>Descargar</button></div> : 'Sin foto' },
     ]} rows={players} onEdit={openEdit} onDelete={remove} emptyMessage="No hay jugadoras cargadas." /></section>
     {dialogOpen ? <AdminDialog title={editing ? 'Editar jugadora' : 'Nueva jugadora'} onClose={closeDialog}><form className="editor-form" onSubmit={save}>
       <label>Nombre y apellido<input value={form.fullName} onChange={(event) => setForm({ ...form, fullName: event.target.value })} required /></label>
@@ -46,5 +66,6 @@ export function AdminPlayersPage() {
       <label>Talle de camiseta<select value={form.shirtSize ?? ''} onChange={(event) => setForm({ ...form, shirtSize: event.target.value as PlayerPayload['shirtSize'] })}><option value="">Sin definir</option>{shirtSizeLabels.map((size) => <option key={size} value={size}>{size}</option>)}</select></label>
       <div className="form-actions span-2"><button type="submit" className="primary-button">Guardar</button></div>
     </form></AdminDialog> : null}
+    {photo ? <AdminDialog title={photo.name} onClose={() => setPhoto(null)}><img src={photo.url} alt={`Foto de ${photo.name}`} style={{ display: 'block', maxWidth: '100%', maxHeight: '70vh', margin: 'auto', objectFit: 'contain' }} /></AdminDialog> : null}
   </div>;
 }

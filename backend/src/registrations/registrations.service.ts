@@ -300,7 +300,7 @@ export class RegistrationsService {
       playerThreeBirthDate: normalizeOptional(dto.playerThreeBirthDate),
       playerThreePhone: normalizeOptional(dto.playerThreePhone),
       playerThreeInstagram: normalizeOptional(dto.playerThreeInstagram),
-      playerThreeShirtSize: dto.playerThreeShirtSize ?? null,
+      playerThreeShirtSize: dto.playerThreeName?.trim() ? dto.playerThreeShirtSize ?? null : null,
       playerThreeHasCommercialAgreement: dto.playerThreeHasCommercialAgreement ?? false,
       playerThreeCommercialAgreementDetails: normalizeOptional(dto.playerThreeCommercialAgreementDetails),
       playerThreePhotoStoredName: drivePhotos.playerThree ?? playerThreePhoto?.filename ?? null,

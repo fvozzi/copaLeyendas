@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, StreamableFile } from '@nestjs/common';
+import { createReadStream, existsSync } from 'node:fs';
+import { basename, join } from 'node:path';
+import { GoogleDrivePhotoStorageService } from '../registrations/google-drive-photo-storage.service';
+import { resolvePaymentProofDir } from '../registrations/payment-proof-storage';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, Repository } from 'typeorm';
 import { Locality } from '../localities/locality.entity';
@@ -15,10 +19,11 @@ export class PlayersService {
     @InjectRepository(Locality) private readonly localitiesRepository: Repository<Locality>,
     @InjectRepository(PairRegistration)
     private readonly registrationsRepository: Repository<PairRegistration>,
+    private readonly drivePhotos: GoogleDrivePhotoStorageService,
   ) {}
 
   async list(query: QueryPlayersDto) {
-    await this.importRegisteredPlayers();
+    const registrations = await this.importRegisteredPlayers();
     const qb = this.playersRepository.createQueryBuilder('player').leftJoinAndSelect('player.locality', 'locality');
     if (query.search?.trim()) {
       const term = `%${query.search.trim().toLowerCase()}%`;
@@ -28,7 +33,27 @@ export class PlayersService {
           .orWhere('LOWER(COALESCE(locality.name, \'\')) LIKE :term', { term });
       }));
     }
-    return qb.orderBy('player.fullName', 'ASC').getMany();
+    const photos = registeredPhotos(registrations);
+    const players = await qb.orderBy('player.fullName', 'ASC').getMany();
+    return players.map((player) => ({ ...player, hasPhoto: photos.has(player.dni.trim()) }));
+  }
+
+  async getPhoto(id: number) {
+    const player = await this.getById(id);
+    const registrations = await this.registrationsRepository.find({
+      where: [{ playerOneDni: player.dni }, { playerTwoDni: player.dni }, { playerThreeDni: player.dni }],
+      order: { createdAt: 'ASC', id: 'ASC' },
+    });
+    const photo = registeredPhotos(registrations).get(player.dni.trim());
+    if (!photo) throw new NotFoundException('La jugadora no tiene foto');
+    const contentType = ['image/jpeg', 'image/png', 'image/webp'].includes(photo.contentType ?? '') ? photo.contentType! : 'application/octet-stream';
+    if (photo.storedName.startsWith('drive:')) {
+      return { filename: photo.filename, contentType, stream: new StreamableFile(await this.drivePhotos.download(photo.storedName)) };
+    }
+    if (basename(photo.storedName) !== photo.storedName) throw new NotFoundException('Foto no encontrada');
+    const path = join(resolvePaymentProofDir(), photo.storedName);
+    if (!existsSync(path)) throw new NotFoundException('El archivo de la foto no esta disponible');
+    return { filename: photo.filename, contentType, stream: new StreamableFile(createReadStream(path)) };
   }
 
   async getById(id: number) {
@@ -89,12 +114,13 @@ export class PlayersService {
 
   private async importRegisteredPlayers() {
     const registrations = await this.registrationsRepository.find({
-      order: { createdAt: 'ASC' },
+      order: { createdAt: 'ASC', id: 'ASC' },
     });
 
     for (const registration of registrations) {
       await this.syncRegistrationPlayers(registration);
     }
+    return registrations;
   }
 
   async syncRegistrationPlayers(registration: PairRegistration) {
@@ -166,6 +192,21 @@ export class PlayersService {
 function normalizeOptional(value?: string | null) {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
+}
+
+function registeredPhotos(registrations: PairRegistration[]) {
+  const photos = new Map<string, { storedName: string; filename: string; contentType: string | null }>();
+  for (const registration of registrations) {
+    for (const prefix of ['playerOne', 'playerTwo', 'playerThree'] as const) {
+      const dni = registration[`${prefix}Dni`]?.trim();
+      const storedName = registration[`${prefix}PhotoStoredName`];
+      if (dni && registration[`${prefix}Name`]?.trim() && storedName) photos.set(dni, {
+        storedName, filename: registration[`${prefix}PhotoOriginalName`] || 'foto-jugadora',
+        contentType: registration[`${prefix}PhotoMimeType`],
+      });
+    }
+  }
+  return photos;
 }
 
 function toCsv(headers: string[], rows: (string | number)[][]) {
