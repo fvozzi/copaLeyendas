@@ -4,6 +4,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { SiteLayout } from './components/SiteLayout';
 import { AuthProvider } from './lib/auth';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
+import { AdminBackupsPage } from './pages/AdminBackupsPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
 import { AdminPostEditorPage } from './pages/AdminPostEditorPage';
 import { AdminPostsPage } from './pages/AdminPostsPage';
@@ -54,6 +55,7 @@ export default function App() {
               <Route path="programa" element={<AdminProgramPage />} />
               <Route path="zonas/:id" element={<AdminZonePage />} />
               <Route path="usuarios" element={<AdminUsersPage />} />
+              <Route path="backups" element={<AdminBackupsPage />} />
             </Route>
           </Route>
         </Routes>

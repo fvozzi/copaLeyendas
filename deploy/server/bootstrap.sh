@@ -23,7 +23,7 @@ if [[ "$(id -u)" -ne 0 ]]; then
 fi
 
 apt-get update
-apt-get install -y ca-certificates curl gnupg git nginx postgresql postgresql-contrib
+apt-get install -y ca-certificates curl gnupg git nginx postgresql postgresql-contrib postgresql-client
 
 if ! command -v node >/dev/null 2>&1 || ! node --version | grep -q "^v${NODE_MAJOR}\."; then
   install -m 0755 -d /etc/apt/keyrings
@@ -53,6 +53,7 @@ install -d -m 0755 -o "$APP_USER" -g "$APP_GROUP" "$APP_DIR/shared"
 install -d -m 0755 -o "$APP_USER" -g "$APP_GROUP" "$APP_DIR/shared/frontend"
 install -d -m 0755 -o "$APP_USER" -g "$APP_GROUP" "$APP_DIR/shared/backend"
 install -d -m 0755 -o "$APP_USER" -g "$APP_GROUP" "$APP_DIR/shared/payment-proofs"
+install -d -m 0700 -o "$APP_USER" -g "$APP_GROUP" "$APP_DIR/shared/backups"
 
 if [[ ! -d "$APP_DIR/app/.git" ]]; then
   if [[ -z "$REPO_SSH" ]]; then

@@ -8,6 +8,7 @@ import { TournamentStatus } from '../tournaments/tournament.enums';
 import { Tournament } from '../tournaments/tournament.entity';
 import { Zone } from '../tournaments/zone.entity';
 import { Category } from '../categories/category.entity';
+import { RegistrationStatus } from '../registrations/registration.enums';
 
 @Injectable()
 export class DashboardService {
@@ -46,6 +47,7 @@ export class DashboardService {
       registrations: {
         total: registrations.length,
         byCategory: countByCategory(registrations, categories),
+        confirmedByCategory: countByCategory(registrations.filter((registration) => registration.status === RegistrationStatus.CONFIRMED), categories),
         byStatus: countBy(registrations, 'status'),
         shirtSizes: countShirtSizes(registrations),
       },

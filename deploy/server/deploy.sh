@@ -29,6 +29,7 @@ cd "$APP_DIR/app"
 install -m 0640 -o "$APP_USER" -g "$APP_GROUP" "$APP_DIR/shared/backend/.env" "$APP_DIR/app/backend/.env"
 install -m 0640 -o "$APP_USER" -g "$APP_GROUP" "$APP_DIR/shared/frontend/.env" "$APP_DIR/app/frontend/.env"
 install -d -m 0755 -o "$APP_USER" -g "$APP_GROUP" "$APP_DIR/shared/payment-proofs"
+install -d -m 0700 -o "$APP_USER" -g "$APP_GROUP" "$APP_DIR/shared/backups"
 
 if [[ -n "$RELEASE_ARCHIVE" ]]; then
   if [[ ! -f "$RELEASE_ARCHIVE" ]]; then

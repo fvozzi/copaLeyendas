@@ -1026,6 +1026,40 @@ textarea {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.category-summary-wrap {
+  overflow-x: auto;
+  margin: 0.75rem 0;
+}
+
+.category-summary-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.category-summary-table th,
+.category-summary-table td {
+  padding: 0.65rem 0.4rem;
+  text-align: right;
+  vertical-align: top;
+  border-bottom: 1px solid var(--line);
+}
+
+.category-summary-table th:first-child {
+  text-align: left;
+}
+
+.category-summary-table tbody th {
+  font-weight: 400;
+}
+
+.category-count {
+  display: inline-grid;
+  gap: 0.2rem;
+}
+
+.category-count-full { color: #825600; }
+.category-count-over { color: #a32917; }
+
 .admin-grid-wide {
   grid-column: span 2;
 }

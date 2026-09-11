@@ -69,6 +69,7 @@ export interface DashboardSummary {
   registrations: {
     total: number;
     byCategory: Record<string, number>;
+    confirmedByCategory: Record<string, number>;
     byStatus: Record<string, number>;
     shirtSizes: Record<string, number>;
   };
@@ -304,6 +305,16 @@ export interface Player {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface DatabaseBackup {
+  id: number; triggerType: 'MANUAL' | 'SCHEDULED'; status: 'RUNNING' | 'SUCCESS' | 'FAILED';
+  createdByName: string | null; fileName: string | null; fileSizeBytes: number | null;
+  errorMessage: string | null; startedAt: string; finishedAt: string | null; canDownload: boolean;
+}
+export interface BackupSettings {
+  enabled: boolean; retentionCount: number; scheduleHour: number; scheduleMinute: number;
+}
+export interface BackupOverview extends BackupSettings { timezone: string; backups: DatabaseBackup[]; }
 
 export interface PlayerPayload {
   fullName: string;

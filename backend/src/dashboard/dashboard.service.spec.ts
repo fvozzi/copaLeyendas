@@ -17,3 +17,20 @@ describe('shirt summary', () => {
     expect((await service.getSummary()).registrations.shirtSizes).toEqual({ M: 3 });
   });
 });
+
+describe('category capacity summary', () => {
+  it('counts all generated grants separately from director-confirmed registrations and includes empty categories', async () => {
+    const a = { id: 1, name: 'Damas A' };
+    const b = { id: 2, name: 'Damas B' };
+    const registrations = ['RECEIVED', 'UNDER_REVIEW', 'CONFIRMED', 'WAITLIST', 'REJECTED'].map((status) => ({ categoryId: 1, category: a, status }));
+    const grants = ['ACTIVE', 'USED', 'REVOKED'].map((status) => ({ categoryId: 1, category: a, status }));
+    const empty = { find: vi.fn(async () => []) };
+    const service = new DashboardService(empty as never, { find: vi.fn(async () => registrations) } as never,
+      { find: vi.fn(async () => grants) } as never, { findOne: vi.fn(async () => null) } as never,
+      empty as never, { find: vi.fn(async () => [a, b]) } as never);
+    const summary = await service.getSummary();
+    expect(summary.accessGrants.byCategory).toEqual({ 'Damas A': 3, 'Damas B': 0 });
+    expect(summary.registrations.byCategory).toEqual({ 'Damas A': 5, 'Damas B': 0 });
+    expect(summary.registrations.confirmedByCategory).toEqual({ 'Damas A': 1, 'Damas B': 0 });
+  });
+});

@@ -187,3 +187,9 @@ sudo FORCE_SERVER_BUILD=true bash /var/www/copa-leyendas/app/deploy/server/deplo
 - Habilitar backups del Droplet y de la base PostgreSQL.
 - Guardar comprobantes en `shared/payment-proofs`, no dentro del release.
 - Mantener `DB_SYNCHRONIZE=false` en produccion.
+
+## 8. Backups de la base
+
+El panel de Dirección incorpora **Backups**: ejecución diaria (03:00 Argentina por defecto), creación a demanda y descarga. Se conservan 30 copias completadas; horario y retención son configurables. El deploy crea `shared/backups` fuera del release y aplica la migración de configuración/historial. El servidor necesita `pg_dump` compatible con su PostgreSQL.
+
+Ver [configuración, alcance y restauración de prueba](../docs/backups.md). Estas copias contienen la base de datos; fotos y comprobantes requieren respaldo separado.

@@ -35,6 +35,7 @@ export function AdminDashboardPage() {
   }
 
   const matchesByVenue = summary.matchesByVenue ?? { tournamentName: null, venues: [], totalMatches: 0 };
+  const categoryNames = [...new Set([...Object.keys(summary.accessGrants.byCategory), ...Object.keys(summary.registrations.byCategory)])];
 
   return (
     <div className="admin-panel">
@@ -75,14 +76,18 @@ export function AdminDashboardPage() {
         </section>
         <section className="data-card">
           <h2>Inscripciones por categoria</h2>
-          <ul className="data-list">
-            {Object.entries(summary.registrations.byCategory).map(([name, count]) => (
-              <li key={name}>
-                <span>{name}</span>
-                <strong>{count}</strong>
-              </li>
-            ))}
-          </ul>
+          <p className="field-hint">Cupo de referencia: 16 parejas por categoría.</p>
+          <div className="category-summary-wrap">
+            <table className="category-summary-table" aria-label="Inscripciones por categoría">
+              <thead><tr><th scope="col">Categoría</th><th scope="col">Generadas</th><th scope="col">Confirmadas</th></tr></thead>
+              <tbody>{categoryNames.map((name) => <tr key={name}>
+                <th scope="row">{name}</th>
+                <td><CategoryCount count={summary.accessGrants.byCategory[name] ?? 0} /></td>
+                <td><CategoryCount count={summary.registrations.confirmedByCategory?.[name] ?? 0} /></td>
+              </tr>)}</tbody>
+            </table>
+          </div>
+          <p className="field-hint">Generadas: todas las habilitaciones emitidas, incluidas las revocadas. Confirmadas: aprobadas por Dirección.</p>
           <Link to="/app/inscripciones" className="inline-link">Ver inscripciones</Link>
         </section>
         <section className="data-card">
@@ -132,4 +137,11 @@ export function AdminDashboardPage() {
       </div>
     </div>
   );
+}
+
+function CategoryCount({ count }: { count: number }) {
+  return <span className={`category-count${count > 16 ? ' category-count-over' : count === 16 ? ' category-count-full' : ''}`}>
+    <strong>{count}</strong>
+    {count >= 16 ? <small>{count > 16 ? `Excede por ${count - 16}` : 'Cupo completo'}</small> : null}
+  </span>;
 }

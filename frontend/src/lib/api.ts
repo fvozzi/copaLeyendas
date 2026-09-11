@@ -1,4 +1,5 @@
 import type {
+  BackupOverview, BackupSettings, DatabaseBackup,
   AccessGrantPayload,
   AccessGrantStatusPayload,
   DashboardSummary,
@@ -23,6 +24,20 @@ import type {
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
 const TOKEN_KEY = 'copa_leyendas_token';
 const USER_KEY = 'copa_leyendas_user';
+
+export function getBackups() { return request<BackupOverview>('/backups', {}, true); }
+export function updateBackupSettings(settings: BackupSettings) { return request<BackupOverview>('/backups/settings', { method: 'PATCH', body: JSON.stringify(settings) }, true); }
+export function createBackup() { return request<{ id: number; status: 'RUNNING' }>('/backups', { method: 'POST' }, true); }
+export async function downloadBackup(backup: DatabaseBackup) {
+  const token = getToken();
+  const response = await fetch(`${API_URL}/backups/${backup.id}/download`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!response.ok) throw new Error(await readError(response));
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a');
+  link.href = url; link.download = backup.fileName ?? `copa-leyendas-${backup.id}.dump`;
+  document.body.append(link); link.click(); link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 export function getToken() {
   return window.localStorage.getItem(TOKEN_KEY);

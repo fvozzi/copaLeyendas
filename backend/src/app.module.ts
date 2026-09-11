@@ -14,6 +14,7 @@ import { TournamentsModule } from './tournaments/tournaments.module';
 import { RegistrationsModule } from './registrations/registrations.module';
 import { CashModule } from './cash/cash.module';
 import { WhatsAppModule } from './whatsapp/whatsapp.module';
+import { BackupsModule } from './backups/backups.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { WhatsAppModule } from './whatsapp/whatsapp.module';
     DashboardModule,
     CashModule,
     WhatsAppModule,
+    BackupsModule,
   ],
   controllers: [AppController],
 })
