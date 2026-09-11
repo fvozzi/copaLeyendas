@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import shirtSizeGuideImage from '../assets/shirt-size-guide.png';
 import { createPublicRegistration, getPublicRegistrationAccess } from '../lib/api';
@@ -200,27 +200,28 @@ export function RegistrationPage() {
       <div className="registration-copy">
         <p className="eyebrow">Inscripcion con token</p>
         <h1>Solo se registran localidades habilitadas por Direccion del Torneo</h1>
-          <p>
+          {!access ? <p>
             Primero ingresas el token entregado por la organizacion. Si el token esta activo, se
             abre el formulario para cargar hasta 3 jugadoras y completar la inscripcion.
-          </p>
+          </p> : <p>Completá los datos de tu equipo para finalizar la inscripción.</p>}
           <p><strong>Consultas y asesoramiento con respecto al formulario</strong><br />Mel: (011) 37768403 / Sonia: (011) 69338065</p>
       </div>
 
-      <form className="token-card" onSubmit={handleTokenSubmit}>
+      {!access && !successMessage ? <form className="token-card" onSubmit={handleTokenSubmit}>
         <label>
           Token de habilitacion
           <input
             value={tokenInput}
             onChange={(event) => setTokenInput(event.target.value.toUpperCase())}
             placeholder="COPA-XXXXXXX"
+            disabled={loadingAccess}
             required
           />
         </label>
         <button type="submit" className="primary-button" disabled={loadingAccess}>
           {loadingAccess ? 'Validando...' : 'Validar token'}
         </button>
-      </form>
+      </form> : null}
 
       {error ? <p className="form-error">{error}</p> : null}
       {successMessage ? <div className="registration-success" role="status"><p className="eyebrow">Registro confirmado</p><h2>{successMessage}</h2><p>Recibimos los datos del equipo. La organización se comunicará si necesita información adicional.</p></div> : null}
@@ -437,6 +438,15 @@ function PlayerFields(props: {
   errors: FieldErrors;
   onChange: (field: keyof PublicRegistrationPayload, value: string) => void;
 }) {
+  const fileInput = useRef<HTMLInputElement>(null);
+  const cameraInput = useRef<HTMLInputElement>(null);
+  const [showCamera] = useState(() => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+  const selectPhoto = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) void props.onPhotoChange(file);
+    event.target.value = '';
+  };
   const isOptional = !props.required;
   const hasName = props.name.trim().length > 0;
   const shouldRequire = props.required || hasName;
@@ -539,20 +549,34 @@ function PlayerFields(props: {
           </select>
           <FieldError message={fieldError('ShirtSize')} />
         </label>
-        <label>
-          Foto de la jugadora
-          <input type="file" accept="image/*" capture="environment" onChange={(event) => { void props.onPhotoChange(event.target.files?.[0] ?? null); }} />
+        <div className="player-photo-field" role="group" aria-labelledby={`${props.fieldPrefix}-photo-label`}>
+          <span id={`${props.fieldPrefix}-photo-label`} className="field-label">Foto de la jugadora</span>
+          <div className="player-photo-actions">
+            <button type="button" className="secondary-button" onClick={() => fileInput.current?.click()}>Buscar en archivos</button>
+            {showCamera ? <button type="button" className="secondary-button" onClick={() => cameraInput.current?.click()}>Usar cámara</button> : null}
+          </div>
+          <input ref={fileInput} type="file" accept="image/*" hidden aria-label={`Archivo de foto: ${props.title}`} onChange={selectPhoto} />
+          {showCamera ? <input ref={cameraInput} type="file" accept="image/*" capture="environment" hidden aria-label={`Cámara: ${props.title}`} onChange={selectPhoto} /> : null}
+          {props.photo ? <small className="field-hint">{props.photo.name}</small> : null}
           <small className="field-hint">Sube una imagen para que te presentemos en redes como pelotari. La optimizamos automaticamente antes de enviarla.</small>
-          {props.photoMessage ? <small className="field-hint">{props.photoMessage}</small> : null}
+          {props.photoMessage ? <small className="field-hint" role="status">{props.photoMessage}</small> : null}
           <FieldError message={fieldError('Photo')} />
-        </label>
+        </div>
       </div>
-      {shouldRequire ? <label className="checkbox-row">
-        <input type="checkbox" checked={props.hasCommercialAgreement} onChange={(event) => props.onCommercialAgreementChange(event.target.checked, props.commercialAgreementDetails)} />
-        Tenés acuerdo con alguna marca de Paleta
-      </label> : null}
-      {shouldRequire && props.hasCommercialAgreement ? <label>Marca de Paleta<select value={props.commercialAgreementDetails} onChange={(event) => props.onCommercialAgreementChange(true, event.target.value)} required><option value="">Seleccionar marca</option><option value="Guastavino">Guastavino</option><option value="Dabber">Dabber</option><option value="Otra">Otra</option></select></label> : null}
-      {shouldRequire && props.hasCommercialAgreement ? <FieldError message={fieldError('CommercialAgreementDetails')} /> : null}
+      <fieldset className="player-agreement-options">
+        <legend>Tenés acuerdo con:</legend>
+        <small className="field-hint">Podés marcar una opción o dejar todas sin marcar.</small>
+        <div className="player-agreement-brands">
+          {['Guastavino', 'Dabber', 'Otra'].map((brand) => (
+            <label key={brand} className="checkbox-row">
+              <input type="checkbox" checked={props.hasCommercialAgreement && props.commercialAgreementDetails === brand}
+                onChange={(event) => props.onCommercialAgreementChange(event.target.checked, event.target.checked ? brand : '')} />
+              {brand}
+            </label>
+          ))}
+        </div>
+        {shouldRequire ? <FieldError message={fieldError('CommercialAgreementDetails')} /> : null}
+      </fieldset>
     </div>
   );
 }
