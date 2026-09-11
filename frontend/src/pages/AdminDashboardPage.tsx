@@ -79,7 +79,7 @@ export function AdminDashboardPage() {
           <p className="field-hint">Cupo de referencia: 16 parejas por categoría.</p>
           <div className="category-summary-wrap">
             <table className="category-summary-table" aria-label="Inscripciones por categoría">
-              <thead><tr><th scope="col">Categoría</th><th scope="col">Generadas</th><th scope="col">Confirmadas</th></tr></thead>
+              <thead><tr><th scope="col">Categoría</th><th scope="col" title="Total de habilitaciones generadas" aria-label="Total de habilitaciones generadas">TOT</th><th scope="col" title="Inscripciones confirmadas" aria-label="Inscripciones confirmadas">CONF</th></tr></thead>
               <tbody>{categoryNames.map((name) => <tr key={name}>
                 <th scope="row">{name}</th>
                 <td><CategoryCount count={summary.accessGrants.byCategory[name] ?? 0} /></td>
@@ -87,7 +87,7 @@ export function AdminDashboardPage() {
               </tr>)}</tbody>
             </table>
           </div>
-          <p className="field-hint">Generadas: todas las habilitaciones emitidas, incluidas las revocadas. Confirmadas: aprobadas por Dirección.</p>
+          <p className="field-hint">TOT: todas las habilitaciones emitidas, incluidas las revocadas. CONF: aprobadas por Dirección.</p>
           <Link to="/app/inscripciones" className="inline-link">Ver inscripciones</Link>
         </section>
         <section className="data-card">

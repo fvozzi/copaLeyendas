@@ -1027,12 +1027,13 @@ textarea {
 }
 
 .category-summary-wrap {
-  overflow-x: auto;
+  min-width: 0;
   margin: 0.75rem 0;
 }
 
 .category-summary-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
 }
 
@@ -1041,10 +1042,12 @@ textarea {
   padding: 0.65rem 0.4rem;
   text-align: right;
   vertical-align: top;
+  overflow-wrap: anywhere;
   border-bottom: 1px solid var(--line);
 }
 
 .category-summary-table th:first-child {
+  width: 60%;
   text-align: left;
 }
 
