@@ -51,8 +51,11 @@ export function AdminPlayersPage() {
     <section className="data-card"><AdminDataGrid columns={[
       { label: 'Nombre y apellido', render: (item) => <strong>{item.fullName}</strong> },
       { label: 'DNI', render: (item) => item.dni },
+      { label: 'Nacimiento', sortValue: (item) => item.birthDate ?? '', render: (item) => item.birthDate ? item.birthDate.split('-').reverse().join('/') : '-' },
       { label: 'Localidad / equipo', render: (item) => item.locality ? `${item.locality.name}, ${item.locality.provinceName}` : 'Sin asignar' },
       { label: 'Celular', render: (item) => item.phone ?? '-' },
+      { label: 'Instagram', render: (item) => item.instagram || '-' },
+      { label: 'Marca / acuerdo', render: (item) => item.hasCommercialAgreement == null ? 'Sin datos' : item.hasCommercialAgreement ? item.commercialAgreementDetails || 'Marca no especificada' : 'Sin acuerdo' },
       { label: 'Talle', render: (item) => item.shirtSize ?? '-' },
       { label: 'Foto', render: (item) => item.hasPhoto ? <div className="list-actions"><button className="inline-link" disabled={loadingPhoto !== null} onClick={() => void openPhoto(item)}>Ver foto</button><button className="inline-link" disabled={loadingPhoto !== null} onClick={() => void openPhoto(item, true)}>Descargar</button></div> : 'Sin foto' },
     ]} rows={players} onEdit={openEdit} onDelete={remove} emptyMessage="No hay jugadoras cargadas." /></section>

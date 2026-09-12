@@ -293,6 +293,8 @@ export interface TournamentScheduleSlot { id: number; tournamentId: number; tour
 
 export interface Player {
   hasPhoto?: boolean;
+  hasCommercialAgreement?: boolean | null;
+  commercialAgreementDetails?: string | null;
   id: number;
   fullName: string;
   dni: string;

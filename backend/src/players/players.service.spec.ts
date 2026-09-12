@@ -17,10 +17,35 @@ function setup(storedName = 'drive:photo-id') {
   const registrations = { find: vi.fn(async () => [registration]) };
   const drive = { download: vi.fn(async () => Buffer.from('photo-content')) };
   const service = new PlayersService(players as never, {} as never, registrations as never, drive as never);
-  return { service, registrations, drive, registration };
+  return { service, registrations, drive, registration, player, query };
 }
 
 afterEach(() => vi.restoreAllMocks());
+
+describe('registered player agreements', () => {
+  it('matches each player by DNI, including the third player, and uses the latest declaration', async () => {
+    const { service, registrations, query, player } = setup();
+    vi.spyOn(service, 'syncRegistrationPlayers').mockResolvedValue();
+    query.getMany.mockResolvedValue([player, { id: 5, dni: '222', fullName: 'Two' }, { id: 6, dni: '333', fullName: 'Three' }, { id: 7, dni: '444', fullName: 'Manual' }]);
+    registrations.find.mockResolvedValue([
+      { playerOneDni: player.dni, playerOneName: player.fullName, playerOneHasCommercialAgreement: true, playerOneCommercialAgreementDetails: 'Dabber', playerTwoDni: '222', playerTwoName: 'Two', playerTwoHasCommercialAgreement: true, playerTwoCommercialAgreementDetails: 'Guastavino', playerThreeDni: '333', playerThreeName: 'Three', playerThreeHasCommercialAgreement: true, playerThreeCommercialAgreementDetails: 'Otra' },
+      { playerTwoDni: player.dni, playerTwoName: player.fullName, playerTwoHasCommercialAgreement: false, playerTwoCommercialAgreementDetails: 'Dabber' },
+    ] as never);
+    const result = await service.list({});
+    expect(result.map(({ hasCommercialAgreement, commercialAgreementDetails }) => [hasCommercialAgreement, commercialAgreementDetails])).toEqual([[false, null], [true, 'Guastavino'], [true, 'Otra'], [null, null]]);
+  });
+
+  it('includes the declared brand in the full export and leaves the insurance export focused on identity', async () => {
+    const { service } = setup();
+    vi.spyOn(service, 'list').mockResolvedValue([{ id: 4, fullName: 'Test', dni: '12345678', birthDate: '1980-04-03', hasCommercialAgreement: true, commercialAgreementDetails: 'Dabber', createdAt: new Date('2026-09-01'), updatedAt: new Date('2026-09-01') }] as never);
+    const full = await service.export('full');
+    expect(full.content).toContain('"Marca / acuerdo"');
+    expect(full.content).toContain('"Dabber"');
+    const insurance = await service.export('insurance');
+    expect(insurance.content).not.toContain('Dabber');
+    expect(insurance.content).toContain('1980-04-03');
+  });
+});
 
 describe('registered player photos', () => {
   it('lists photos already saved in registrations without changing the player record', async () => {

@@ -15,6 +15,7 @@ import { TournamentScheduleSlot } from './tournament-schedule-slot.entity';
 import { Tournament } from './tournament.entity';
 import { ZoneEntry } from './zone-entry.entity';
 import { Zone } from './zone.entity';
+import { distributeProgramCourts } from './program-courts';
 
 @Injectable()
 export class TournamentsService {
@@ -157,9 +158,6 @@ export class TournamentsService {
       const venueQueues = new Map<number, { zone: Zone; nextOrder: number }[]>();
       for (const zone of zones) venueQueues.set(zone.venueId, [...(venueQueues.get(zone.venueId) ?? []), { zone, nextOrder: 1 }]);
       const venueIds = [...venueQueues.keys()].sort((left, right) => left - right);
-      const venueCounts = new Map<number, number>();
-      const defaultCourts = new Map<number, Court | undefined>();
-      for (const venue of [...new Set(zones.map((zone) => zone.venueId))]) defaultCourts.set(venue, courts.find((court) => court.venueId === venue));
       const generated: TournamentScheduleSlot[] = [];
       let sequence = 0;
       while ([...venueQueues.values()].some((queue) => queue.some((item) => item.nextOrder <= 4))) {
@@ -167,10 +165,8 @@ export class TournamentsService {
           const queue = venueQueues.get(venueId)!;
           const next = queue.find((item) => item.nextOrder <= 4);
           if (!next) continue;
-          const venueIndex = venueCounts.get(venueId) ?? 0;
-          venueCounts.set(venueId, venueIndex + 1);
           sequence += 1;
-          generated.push(this.slots.create({ tournamentId, tournamentCategoryId: next.zone.tournamentCategoryId, zoneName: next.zone.name, matchOrder: next.nextOrder, stage: 'ZONE', sequence, courtId: defaultCourts.get(next.zone.venueId)?.id ?? null, scheduledAt: this.programDate(days, next.zone.venue.startsAt, next.zone.venue.matchDurationMinutes, next.zone.venue.matchesPerDay, venueIndex) }));
+          generated.push(this.slots.create({ tournamentId, tournamentCategoryId: next.zone.tournamentCategoryId, zoneName: next.zone.name, matchOrder: next.nextOrder, stage: 'ZONE', sequence, courtId: null, scheduledAt: null }));
           next.nextOrder += 1;
           queue.push(queue.shift()!);
         }
@@ -178,12 +174,10 @@ export class TournamentsService {
       const knockoutCategories = [...new Set(zones.map((zone) => zone.tournamentCategoryId))].map((categoryId) => ({ categoryId, zones: zones.filter((zone) => zone.tournamentCategoryId === categoryId) })).filter((item) => item.zones.length >= 4);
       const knockoutStages = [{ stage: 'QUARTERFINAL', label: 'Cuartos de final', matches: 4 }, { stage: 'SEMIFINAL', label: 'Semifinal', matches: 2 }, { stage: 'FINAL', label: 'Final', matches: 1 }] as const;
       for (const knockoutStage of knockoutStages) for (const category of knockoutCategories) for (let matchOrder = 1; matchOrder <= knockoutStage.matches; matchOrder += 1) {
-        const venue = category.zones[0].venue;
-        const venueIndex = venueCounts.get(venue.id) ?? 0;
-        venueCounts.set(venue.id, venueIndex + 1);
         sequence += 1;
-        generated.push(this.slots.create({ tournamentId, tournamentCategoryId: category.categoryId, zoneName: knockoutStage.label, matchOrder, stage: knockoutStage.stage, sequence, courtId: defaultCourts.get(venue.id)?.id ?? null, scheduledAt: this.programDate(days, venue.startsAt, venue.matchDurationMinutes, venue.matchesPerDay, venueIndex) }));
+        generated.push(this.slots.create({ tournamentId, tournamentCategoryId: category.categoryId, zoneName: knockoutStage.label, matchOrder, stage: knockoutStage.stage, sequence, courtId: null, scheduledAt: null }));
       }
+      distributeProgramCourts(generated, zones, courts, (venue, index) => this.programDate(days, venue.startsAt, venue.matchDurationMinutes, venue.matchesPerDay, index));
       await this.slots.save(generated);
     }
     return this.slots.find({ where: { tournamentId }, relations: { court: { venue: true }, tournamentCategory: { category: true } }, order: { sequence: 'ASC' } });

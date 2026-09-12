@@ -573,6 +573,16 @@ img {
   margin: 1rem 0;
 }
 
+.program-court-picker {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 9rem;
+  max-width: 18rem;
+}
+
+.program-court-picker select { width: 100%; }
+.program-court-picker small { overflow-wrap: anywhere; }
+
 .program-subtabs button {
   border: 1px solid var(--line);
   border-radius: 999px;

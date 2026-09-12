@@ -21,6 +21,36 @@ vi.mock('../courts/venue.entity', () => ({ Venue: class Venue {} }));
 vi.mock('../courts/court-assistant-assignment.entity', () => ({ CourtAssistantAssignment: class CourtAssistantAssignment {} }));
 vi.mock('../auth/user.entity', () => ({ UserRole: { DIRECTOR: 'DIRECTOR', ASSISTANT: 'ASSISTANT' } }));
 
+it('distributes a new schedule across courts and preserves an existing schedule on later reads', async () => {
+  const venue = { id: 1, active: true, startsAt: '10:00', matchDurationMinutes: 40, matchesPerDay: 1 };
+  const zone = { id: 1, name: 'A', capacity: 4, tournamentCategoryId: 1, venueId: 1, venue };
+  let stored: any[] = [];
+  const repository = {
+    find: vi.fn(async () => stored),
+    create: vi.fn((value) => value),
+    delete: vi.fn(async () => { stored = []; }),
+    save: vi.fn(async (values) => { stored = values; }),
+  };
+  const service = new TournamentsService(
+    { findOneBy: vi.fn(async () => ({ id: 1, playingDays: ['2026-11-20', '2026-11-21'] })) } as never,
+    {} as never, { find: vi.fn(async () => [zone]) } as never, {} as never, {} as never,
+    repository as never,
+    { find: vi.fn(async () => [{ id: 1, venueId: 1, active: true }, { id: 2, venueId: 1, active: true }]) } as never,
+    {} as never, {} as never, {} as never,
+  );
+  await service.scheduleGrid(1);
+  expect(stored.map((slot) => slot.courtId)).toEqual([1, 2, 1, 2]);
+  expect(stored.map((slot) => slot.scheduledAt.toISOString())).toEqual([
+    '2026-11-20T13:00:00.000Z', '2026-11-20T13:00:00.000Z',
+    '2026-11-21T13:00:00.000Z', '2026-11-21T13:00:00.000Z',
+  ]);
+  stored[0].courtId = 2;
+  await service.scheduleGrid(1);
+  expect(stored[0].courtId).toBe(2);
+  expect(repository.save).toHaveBeenCalledTimes(1);
+  expect(repository.delete).toHaveBeenCalledTimes(1);
+});
+
 function setup(capacity = 4) {
   const zone = { id: 1, capacity, tournamentCategoryId: 8, name: 'A' };
   const entries: any[] = [];

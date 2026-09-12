@@ -35,3 +35,18 @@ it('downloads the authenticated photo with the player name and image extension',
   expect(getPlayerPhoto).toHaveBeenCalledWith(1);
   expect(clicked).toHaveBeenCalledOnce();
 });
+
+it('shows the brand, birth date and Instagram, distinguishing no agreement from missing data', async () => {
+  vi.mocked(getPlayers).mockResolvedValue([
+    { id: 1, fullName: 'Player One', birthDate: '1980-04-03', instagram: '@jugadora', hasCommercialAgreement: true, commercialAgreementDetails: 'Dabber' },
+    { id: 2, fullName: 'Player Two', hasCommercialAgreement: false },
+    { id: 3, fullName: 'Player Three', hasCommercialAgreement: null },
+  ] as never);
+  await act(async () => root.render(createElement(AdminPlayersPage)));
+  const rows = container.querySelectorAll('tbody tr');
+  expect(rows[0].querySelector('[data-label="Marca / acuerdo"]')?.textContent).toBe('Dabber');
+  expect(rows[0].querySelector('[data-label="Nacimiento"]')?.textContent).toBe('03/04/1980');
+  expect(rows[0].querySelector('[data-label="Instagram"]')?.textContent).toBe('@jugadora');
+  expect(rows[1].querySelector('[data-label="Marca / acuerdo"]')?.textContent).toBe('Sin acuerdo');
+  expect(rows[2].querySelector('[data-label="Marca / acuerdo"]')?.textContent).toBe('Sin datos');
+});

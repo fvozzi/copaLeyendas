@@ -34,8 +34,12 @@ export class PlayersService {
       }));
     }
     const photos = registeredPhotos(registrations);
+    const agreements = registeredAgreements(registrations);
     const players = await qb.orderBy('player.fullName', 'ASC').getMany();
-    return players.map((player) => ({ ...player, hasPhoto: photos.has(player.dni.trim()) }));
+    return players.map((player) => ({
+      ...player, hasPhoto: photos.has(player.dni.trim()),
+      ...(agreements.get(player.dni.trim()) ?? { hasCommercialAgreement: null, commercialAgreementDetails: null }),
+    }));
   }
 
   async getPhoto(id: number) {
@@ -99,7 +103,7 @@ export class PlayersService {
     if (kind === 'full') {
       return {
         filename: 'jugadoras-completo.csv',
-        content: toCsv(['ID', 'Nombre completo', 'DNI', 'Fecha nacimiento', 'Celular', 'Instagram', 'Talle camiseta', 'Localidad / equipo', 'Provincia', 'Fecha de alta', 'Ultima actualizacion'], players.map((player) => [player.id, player.fullName, player.dni, player.birthDate ?? '', player.phone ?? '', player.instagram ?? '', player.shirtSize ?? '', player.locality?.name ?? '', player.locality?.provinceName ?? '', player.createdAt.toISOString(), player.updatedAt.toISOString()])),
+        content: toCsv(['ID', 'Nombre completo', 'DNI', 'Fecha nacimiento', 'Celular', 'Instagram', 'Marca / acuerdo', 'Talle camiseta', 'Localidad / equipo', 'Provincia', 'Fecha de alta', 'Ultima actualizacion'], players.map((player) => [player.id, player.fullName, player.dni, player.birthDate ?? '', player.phone ?? '', player.instagram ?? '', player.hasCommercialAgreement === null ? 'Sin datos' : player.hasCommercialAgreement ? player.commercialAgreementDetails ?? 'Marca no especificada' : 'Sin acuerdo', player.shirtSize ?? '', player.locality?.name ?? '', player.locality?.provinceName ?? '', player.createdAt.toISOString(), player.updatedAt.toISOString()])),
       };
     }
     throw new BadRequestException('Tipo de exportacion invalido');
@@ -192,6 +196,23 @@ export class PlayersService {
 function normalizeOptional(value?: string | null) {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
+}
+
+function registeredAgreements(registrations: PairRegistration[]) {
+  const agreements = new Map<string, { hasCommercialAgreement: boolean | null; commercialAgreementDetails: string | null }>();
+  // Registrations arrive oldest first, so the latest declaration for each DNI wins.
+  for (const registration of registrations) {
+    for (const prefix of ['playerOne', 'playerTwo', 'playerThree'] as const) {
+      const dni = registration[`${prefix}Dni`]?.trim();
+      if (!dni || !registration[`${prefix}Name`]?.trim()) continue;
+      const hasAgreement = registration[`${prefix}HasCommercialAgreement`] ?? null;
+      agreements.set(dni, {
+        hasCommercialAgreement: hasAgreement,
+        commercialAgreementDetails: hasAgreement ? normalizeOptional(registration[`${prefix}CommercialAgreementDetails`]) : null,
+      });
+    }
+  }
+  return agreements;
 }
 
 function registeredPhotos(registrations: PairRegistration[]) {
