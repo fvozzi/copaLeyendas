@@ -23,39 +23,34 @@ vi.mock('../courts/venue.entity', () => ({ Venue: class Venue {} }));
 vi.mock('../courts/court-assistant-assignment.entity', () => ({ CourtAssistantAssignment: class CourtAssistantAssignment {} }));
 vi.mock('../auth/user.entity', () => ({ UserRole: { DIRECTOR: 'DIRECTOR', ASSISTANT: 'ASSISTANT' } }));
 
-it('distributes a new schedule across courts and preserves an existing schedule on later reads', async () => {
-  const venue = { id: 1, active: true, startsAt: '10:00', matchDurationMinutes: 40, matchesPerDay: 1 };
-  const zone = { id: 1, name: 'A', capacity: 4, tournamentCategoryId: 1, venueId: 1, venue };
-  let stored: any[] = [];
-  const repository = {
-    find: vi.fn(async () => stored),
-    create: vi.fn((value) => value),
-    delete: vi.fn(async () => { stored = []; }),
-    save: vi.fn(async (values) => { stored = values; }),
-  };
-  const service = new TournamentsService(
-    { findOneBy: vi.fn(async () => ({ id: 1, playingDays: ['2026-11-20', '2026-11-21'] })) } as never,
-    {} as never, { find: vi.fn(async () => [zone]) } as never, {} as never, {} as never,
-    repository as never,
-    { find: vi.fn(async () => [{ id: 1, venueId: 1, active: true }, { id: 2, venueId: 1, active: true }]) } as never,
-    {} as never, {} as never, {} as never,
-  );
-  await service.scheduleGrid(1);
-  expect(stored.map((slot) => slot.courtId)).toEqual([1, 2, 1, 2]);
-  expect(stored.map((slot) => slot.scheduledAt.toISOString())).toEqual([
+it('uses the same real games in Program and Zone, preserves scheduling, and reflects assigned pairs and results', async () => {
+  const { service, planned, matches, slotRepository, venue } = setup();
+  planned.length = 0;
+  venue.matchesPerDay = 1;
+  const program = await service.scheduleGrid(1);
+  expect(program).toHaveLength(4);
+  expect(program.map((slot) => slot.courtId)).toEqual([1, 2, 1, 2]);
+  expect(program.map((slot) => slot.scheduledAt?.toISOString())).toEqual([
     '2026-11-20T13:00:00.000Z', '2026-11-20T13:00:00.000Z',
     '2026-11-21T13:00:00.000Z', '2026-11-21T13:00:00.000Z',
   ]);
-  stored[0].courtId = 2;
-  await service.scheduleGrid(1);
-  expect(stored[0].courtId).toBe(2);
-  expect(repository.save).toHaveBeenCalledTimes(1);
-  expect(repository.delete).toHaveBeenCalledTimes(1);
+  const ids = program.map((slot) => slot.matchId);
+  expect((await service.matches(1)).map((match) => match.id)).toEqual(ids);
+  await service.assignPlace(1, 10, 1); await service.assignPlace(1, 20, 2);
+  await service.result(matches[0].id, 25, 10, { role: 'DIRECTOR' } as never);
+  await service.updateScheduleSlot(program[0].id, { courtId: 2, scheduledAt: '2026-11-22T14:00:00Z' });
+  const zone = await service.matches(1);
+  expect(zone[0].scheduledAt?.toISOString()).toBe('2026-11-22T14:00:00.000Z');
+  expect(zone[0].court?.id).toBe(2);
+  const again = await service.scheduleGrid(1);
+  expect(again.map((slot) => slot.matchId)).toEqual(ids);
+  expect(again[0].match).toMatchObject({ homeRegistrationId: 10, awayRegistrationId: 20, homeScore: 25, awayScore: 10 });
+  expect(slotRepository.delete).not.toHaveBeenCalled();
 });
 
 it('redistributes existing slots atomically, updating only courts, and rejects tournaments with results', async () => {
   const venue = { id: 1, active: true, matchDurationMinutes: 40 };
-  const slots = [1, 2].map((id) => ({ id, sequence: id, stage: 'ZONE', matchOrder: id, zoneName: 'A', tournamentCategoryId: 1, courtId: 1, scheduledAt: new Date(`2026-11-20T${id === 1 ? '13:00' : '13:40'}:00Z`) }));
+  const slots = [1, 2].map((id) => ({ id, matchId: id, sequence: id, stage: 'ZONE', matchOrder: id, zoneName: 'A', tournamentCategoryId: 1, courtId: 1, scheduledAt: new Date(`2026-11-20T${id === 1 ? '13:00' : '13:40'}:00Z`) }));
   const query = { where: vi.fn().mockReturnThis(), orderBy: vi.fn().mockReturnThis(), setLock: vi.fn().mockReturnThis(), getMany: vi.fn(async () => slots) };
   const repository = { createQueryBuilder: vi.fn(() => query), update: vi.fn(), find: vi.fn(async () => slots) };
   const matches = { count: vi.fn(async () => 0) };
@@ -68,7 +63,7 @@ it('redistributes existing slots atomically, updating only courts, and rejects t
   const manager = { getRepository: (entity: any) => repositories.get(entity) };
   const transaction = vi.fn(async (fn) => fn(manager));
   const service = new TournamentsService({} as never, {} as never, {} as never, {} as never, {} as never, { manager: { transaction } } as never, {} as never, {} as never, {} as never, {} as never);
-  expect(await service.redistributeCourts(1)).toBe(slots);
+  expect(await service.redistributeCourts(1)).toHaveLength(2);
   expect(transaction).toHaveBeenCalledOnce();
   expect(repository.update.mock.calls).toEqual([[1, { courtId: 1 }], [2, { courtId: 2 }]]);
   repository.update.mockClear();
@@ -82,7 +77,9 @@ it('redistributes existing slots atomically, updating only courts, and rejects t
 });
 
 function setup(capacity = 4) {
-  const zone = { id: 1, capacity, tournamentCategoryId: 8, name: 'A' };
+  const venue = { id: 1, active: true, name: 'Club', startsAt: '10:00', matchDurationMinutes: 40, matchesPerDay: 16 };
+  const zone = { id: 1, capacity, tournamentCategoryId: 8, name: 'A', venueId: 1, venue };
+  const category = { id: 8, tournamentId: 1, categoryId: 3, category: { name: 'Damas A' } };
   const entries: any[] = [];
   const matches: any[] = [];
   const registration = { id: 10, categoryId: 3, status: RegistrationStatus.CONFIRMED };
@@ -101,7 +98,7 @@ function setup(capacity = 4) {
     find: vi.fn(async ({ where }: any) => Array.isArray(where) ? matches.filter((match) => where.some((condition) => Object.entries(condition).every(([key, value]) => match[key] === value))) : matches),
     findOne: vi.fn(async ({ where }: any) => matches.find((match) => match.id === where.id) ?? null),
     findOneBy: vi.fn(async ({ id }: any) => matches.find((match) => match.id === id) ?? null),
-    create: vi.fn((value) => ({ homeRegistrationId: null, awayRegistrationId: null, homeScore: null, awayScore: null, ...value })),
+    create: vi.fn((value) => ({ homeRegistrationId: null, awayRegistrationId: null, homeScore: null, awayScore: null, homeSource: ParticipantSource.DIRECT, awaySource: ParticipantSource.DIRECT, ...value })),
     save: vi.fn(async (value) => {
       const saved = { ...value, id: value.id ?? matches.length + 1 };
       const index = matches.findIndex((match) => match.id === saved.id);
@@ -110,17 +107,33 @@ function setup(capacity = 4) {
     }),
   };
   const schedule = new Date('2026-11-21T13:00:00Z');
+  const courts = [1, 2].map((id) => ({ id, active: true, venueId: 1, venue }));
+  const planned: any[] = [{ id: 1, tournamentId: 1, tournamentCategoryId: 8, stage: 'ZONE', zoneName: 'A', sequence: 1, matchOrder: 1, scheduledAt: schedule, courtId: 1, matchId: null }];
+  const hydrate = (slot: any) => ({ ...slot, court: courts.find((court) => court.id === slot.courtId) ?? null, tournamentCategory: category, match: matches.find((match) => match.id === slot.matchId) ? { ...matches.find((match) => match.id === slot.matchId), zone } : null });
+  const filterSlot = (slot: any, where: any): boolean => Array.isArray(where) ? where.some((condition) => filterSlot(slot, condition)) : Object.entries(where).every(([key, value]) => key === 'match' ? matches.some((match) => match.id === slot.matchId && match.zoneId === (value as any).zoneId) : slot[key] === value);
+  const slotRepository = {
+    find: vi.fn(async ({ where }: any) => planned.filter((slot) => filterSlot(slot, where)).map(hydrate)),
+    findOneBy: vi.fn(async (where: any) => planned.find((slot) => filterSlot(slot, where)) ?? null),
+    create: vi.fn((slot) => slot), delete: vi.fn(),
+    update: vi.fn(async (id, value) => Object.assign(planned.find((slot) => slot.id === id), value)),
+    save: vi.fn(async (value: any): Promise<any> => {
+      if (Array.isArray(value)) return Promise.all(value.map((item) => slotRepository.save(item)));
+      const saved = { ...value, id: value.id ?? planned.length + 1 }; planned.push(saved); return saved;
+    }),
+  };
+  const tournamentRepository = { findOne: vi.fn(async () => ({ id: 1 })), findOneBy: vi.fn(async () => ({ id: 1, playingDays: ['2026-11-20', '2026-11-21'] })) };
   const repositories = new Map<any, any>([
-    [Zone, { findOne: vi.fn(async () => zone) }],
-    [TournamentCategory, { findOne: vi.fn(async () => ({ categoryId: 3 })) }],
+    [Zone, { findOne: vi.fn(async () => zone), find: vi.fn(async () => [zone]) }],
+    [TournamentCategory, { findOne: vi.fn(async () => category), findOneBy: vi.fn(async () => category) }],
+    [Tournament, tournamentRepository], [Court, { find: vi.fn(async () => courts), findOneBy: vi.fn(async ({ id }) => courts.find((court) => court.id === id)) }],
     [PairRegistration, { findOneBy: vi.fn(async ({ id }) => ({ ...registration, id })) }],
     [ZoneEntry, entryRepository], [TournamentMatch, matchRepository],
-    [TournamentScheduleSlot, { find: vi.fn(async () => [{ matchOrder: 1, scheduledAt: schedule }]) }],
+    [TournamentScheduleSlot, slotRepository],
   ]);
   const manager = { getRepository: (entity: any) => repositories.get(entity) };
   const zoneRepository = { manager: { transaction: vi.fn(async (fn) => fn(manager)) } };
-  const service = new TournamentsService({} as never, {} as never, zoneRepository as never, {} as never, matchRepository as never, {} as never, {} as never, {} as never, {} as never, {} as never);
-  return { service, entries, matches, matchRepository, registration, schedule, entryRepository };
+  const service = new TournamentsService(tournamentRepository as never, {} as never, zoneRepository as never, {} as never, matchRepository as never, { ...slotRepository, manager: zoneRepository.manager } as never, repositories.get(Court) as never, {} as never, {} as never, {} as never);
+  return { service, entries, matches, matchRepository, registration, schedule, entryRepository, planned, slotRepository, venue };
 }
 
 describe('fixtures with unassigned places', () => {

@@ -1,4 +1,5 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, OneToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { TournamentMatch } from './tournament-match.entity';
 import { TournamentCategory } from './tournament-category.entity';
 import { Tournament } from './tournament.entity';
 import { Court } from '../courts/court.entity';
@@ -6,6 +7,9 @@ import { Court } from '../courts/court.entity';
 @Entity('tournament_schedule_slots')
 export class TournamentScheduleSlot {
   @PrimaryGeneratedColumn() id: number;
+  @Column({ type: 'integer', nullable: true, unique: true }) matchId: number | null;
+  @OneToOne(() => TournamentMatch, (match) => match.scheduleSlot, { nullable: true, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'matchId' }) match: TournamentMatch | null;
   @Column() tournamentId: number;
   @ManyToOne(() => Tournament, { onDelete: 'CASCADE' }) @JoinColumn({ name: 'tournamentId' }) tournament: Tournament;
   @Column() tournamentCategoryId: number;

@@ -3,10 +3,10 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AdminProgramPage } from './AdminProgramPage';
-import { getCourts, getVenues, getTournaments, getTournamentScheduleGrid, updateTournamentScheduleSlot, redistributeTournamentCourts } from '../lib/api';
+import { getCourts, getVenues, getTournaments, getTournamentScheduleGrid, updateTournamentScheduleSlot, redistributeTournamentCourts, saveMatchResult } from '../lib/api';
 import type { Court, Venue, Tournament, TournamentScheduleSlot } from '../types';
 
-vi.mock('../lib/api', () => ({ getCourts: vi.fn(), getVenues: vi.fn(), getTournaments: vi.fn(), getTournamentScheduleGrid: vi.fn(), updateTournamentScheduleSlot: vi.fn(), redistributeTournamentCourts: vi.fn() }));
+vi.mock('../lib/api', () => ({ getCourts: vi.fn(), getVenues: vi.fn(), getTournaments: vi.fn(), getTournamentScheduleGrid: vi.fn(), updateTournamentScheduleSlot: vi.fn(), redistributeTournamentCourts: vi.fn(), saveMatchResult: vi.fn() }));
 let root: Root;
 let container: HTMLDivElement;
 const venue = { id: 1, name: 'Club con nombre largo', active: true } as Venue;
@@ -36,6 +36,20 @@ it('shows all courts in a venue, including empty ones, and filters their games',
   expect(container.textContent).toContain('No hay partidos asignados');
   await click('Cancha 1 (1)');
   expect(container.querySelectorAll('tbody tr')).toHaveLength(1);
+});
+
+it('shows actual pairs and submits results to the real fixture match, not the planning row', async () => {
+  const actual = { ...slot, matchId: 500, match: { id: 500, zoneId: 9, matchOrder: 1, status: 'READY', homeRegistration: { playerOneName: 'Ana', playerTwoName: 'Bea', localityName: 'Junin' }, awayRegistration: { playerOneName: 'Carla', playerTwoName: 'Dora', localityName: 'Salta' }, homeScore: null, awayScore: null } } as TournamentScheduleSlot;
+  vi.mocked(redistributeTournamentCourts).mockResolvedValue([actual]);
+  await click('Repartir entre canchas');
+  expect(container.textContent).toContain('Ana / Bea (Junin) vs Carla / Dora (Salta)');
+  expect(container.querySelector('a[href="/app/zonas/9"]')).toBeTruthy();
+  vi.mocked(getTournamentScheduleGrid).mockResolvedValue([{ ...actual, match: { ...actual.match!, status: 'PLAYED', homeScore: 25, awayScore: 0 } }]);
+  await click('Resultado');
+  const form = document.querySelector('form')!;
+  await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+  expect(saveMatchResult).toHaveBeenCalledWith(500, 25, 0);
+  expect(container.textContent).toContain('25 - 0');
 });
 
 it('redistributes existing games and refreshes court counts', async () => {

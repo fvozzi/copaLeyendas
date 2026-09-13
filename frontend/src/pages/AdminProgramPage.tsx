@@ -1,12 +1,30 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminDataGrid, type AdminGridColumn } from '../components/AdminDataGrid';
-import { getCourts, getVenues, getTournamentScheduleGrid, getTournaments, updateTournamentScheduleSlot, redistributeTournamentCourts } from '../lib/api';
+import { AdminDialog } from '../components/AdminDialog';
+import { getCourts, getVenues, getTournamentScheduleGrid, getTournaments, updateTournamentScheduleSlot, redistributeTournamentCourts, saveMatchResult } from '../lib/api';
 import type { Court, Venue, Tournament, TournamentScheduleSlot } from '../types';
 
 type ProgramTab = 'matches' | 'venues' | 'categories';
 const bySchedule = (left: TournamentScheduleSlot, right: TournamentScheduleSlot) => (left.scheduledAt ?? '9999').localeCompare(right.scheduledAt ?? '9999') || left.sequence - right.sequence;
 const matchLabel = (slot: TournamentScheduleSlot, allSlots: TournamentScheduleSlot[]) => {
+  if (slot.match) {
+    const match = slot.match;
+    const participant = (side: 'home' | 'away') => {
+      const pair = side === 'home' ? match.homeRegistration : match.awayRegistration;
+      if (pair) return `${pair.playerOneName} / ${pair.playerTwoName} (${pair.localityName})`;
+      const sourceId = side === 'home' ? match.homeSourceMatchId : match.awaySourceMatchId;
+      const source = side === 'home' ? match.homeSource : match.awaySource;
+      if (sourceId) return `${source === 'LOSER' ? 'Perdedora' : 'Ganadora'} P${allSlots.find((item) => item.matchId === sourceId)?.sequence ?? '?'}`;
+      const qualifierZoneId = side === 'home' ? match.homeQualifierZoneId : match.awayQualifierZoneId;
+      const rank = side === 'home' ? match.homeQualifierRank : match.awayQualifierRank;
+      if (qualifierZoneId) return `${rank}.ª de ${allSlots.find((item) => item.match?.zoneId === qualifierZoneId)?.zoneName ?? 'zona a definir'}`;
+      const zoneGames = allSlots.filter((item) => item.stage === 'ZONE' && item.match?.zoneId === match.zoneId);
+      const positions = (zoneGames.length === 3 ? [[1, 2], [1, 3], [2, 3]] : [[1, 2], [3, 4]])[match.matchOrder - 1];
+      return positions ? `Pareja ${positions[side === 'home' ? 0 : 1]} · A definir` : 'A definir';
+    };
+    return `${participant('home')} vs ${participant('away')}`;
+  }
   if (slot.stage === 'QUARTERFINAL') return `Cuartos ${slot.matchOrder}`;
   if (slot.stage === 'SEMIFINAL') return `Semifinal ${slot.matchOrder}`;
   if (slot.stage === 'FINAL') return 'Final';
@@ -28,6 +46,23 @@ export function AdminProgramPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [editing, setEditing] = useState<{ slot: TournamentScheduleSlot; kind: 'schedule' | 'result' } | null>(null);
+  const [date, setDate] = useState('');
+  const [scores, setScores] = useState({ home: 25, away: 0 });
+  const editMatch = (slot: TournamentScheduleSlot, kind: 'schedule' | 'result') => {
+    setError(null); setEditing({ slot, kind }); setScores({ home: 25, away: 0 });
+    setDate(slot.scheduledAt ? new Date(new Date(slot.scheduledAt).getTime() - new Date(slot.scheduledAt).getTimezoneOffset() * 60_000).toISOString().slice(0, 16) : '');
+  };
+  const saveMatch = async (event: React.FormEvent) => {
+    event.preventDefault(); if (!editing) return;
+    setSaving(true); setError(null);
+    try {
+      if (editing.kind === 'result' && editing.slot.matchId) await saveMatchResult(editing.slot.matchId, scores.home, scores.away);
+      else await updateTournamentScheduleSlot(editing.slot.id, { scheduledAt: new Date(date).toISOString() });
+      setSlots(await getTournamentScheduleGrid(tournamentId)); setEditing(null);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo guardar el partido.'); }
+    finally { setSaving(false); }
+  };
   const redistribute = async () => {
     setSaving(true); setError(null); setNotice(null);
     try {
@@ -72,6 +107,7 @@ export function AdminProgramPage() {
     { label: 'Categoría', render: (slot) => slot.tournamentCategory.category.name },
     { label: 'Zona / Etapa', render: (slot) => slot.zoneName },
     { label: 'Cruce', render: (slot) => matchLabel(slot, slots) },
+    { label: 'Resultado', render: (slot) => slot.match?.homeScore != null ? `${slot.match.homeScore} - ${slot.match.awayScore}` : slot.match?.status === 'READY' ? 'Listo para jugar' : 'Pendiente' },
     { label: 'Cancha / Sede', sortValue: (slot) => `${slot.court?.venue?.name ?? ''} ${slot.court?.name ?? ''}`, render: (slot) => <div className="program-court-picker">
       <select disabled={saving} aria-label={`Cancha para partido ${slot.sequence}`} value={slot.courtId ?? 0} onChange={(event) => void assignCourt(slot, Number(event.target.value))}>
         <option value="0">Sin asignar</option>
@@ -80,6 +116,11 @@ export function AdminProgramPage() {
       <small className="field-hint">{slot.court?.venue?.name ?? 'Sede a definir'}</small>
     </div> },
     { label: 'Horario', render: (slot) => slot.scheduledAt ? new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(slot.scheduledAt)) : 'A definir' },
+    { label: 'Gestión', render: (slot) => <div className="list-actions">
+      {slot.match?.zoneId && <Link to={`/app/zonas/${slot.match.zoneId}`}>Asignar parejas / ver zona</Link>}
+      {slot.match?.status !== 'PLAYED' && <button type="button" className="inline-link" disabled={saving} onClick={() => editMatch(slot, 'schedule')}>Horario</button>}
+      {slot.match?.status === 'READY' && <button type="button" className="inline-link" disabled={saving} onClick={() => editMatch(slot, 'result')}>Resultado</button>}
+    </div> },
   ];
   const byCategory = slots.reduce<Record<string, Record<string, TournamentScheduleSlot[]>>>((groups, slot) => {
     const category = slot.tournamentCategory.category.name;
@@ -105,6 +146,11 @@ export function AdminProgramPage() {
     </ProgramSubTabs>}
     {tab === 'categories' && <ProgramSubTabs options={categoryOptions} selected={selectedCategory} onSelect={setCategoryTab} ariaLabel="Categorías del programa">{selectedCategory && <section className="data-card"><div className="panel-header"><h2>{selectedCategory}</h2></div>{Object.entries(byCategory[selectedCategory]).sort(([a], [b]) => a.localeCompare(b)).map(([section, sectionSlots]) => <div className="program-zone" key={section}><h3>{section}</h3><AdminDataGrid rows={[...sectionSlots].sort(bySchedule)} emptyMessage="No hay partidos previstos." columns={columns} /></div>)}</section>}</ProgramSubTabs>}
     {tournamentId > 0 && !slots.length && <div className="inline-state">Agregá categorías y zonas al torneo para generar el programa.</div>}
+    {editing && <AdminDialog title={`${editing.kind === 'result' ? 'Resultado' : 'Horario'} P${editing.slot.sequence}`} onClose={() => { if (!saving) setEditing(null); }}><form className="editor-form" onSubmit={saveMatch}>
+      {error && <div className="inline-state span-2" role="alert">{error}</div>}
+      {editing.kind === 'schedule' ? <label>Fecha y hora<input type="datetime-local" value={date} onChange={(event) => setDate(event.target.value)} required /></label> : <><label>Local<input type="number" min="0" value={scores.home} onChange={(event) => setScores({ ...scores, home: Number(event.target.value) })} required /></label><label>Visitante<input type="number" min="0" value={scores.away} onChange={(event) => setScores({ ...scores, away: Number(event.target.value) })} required /></label></>}
+      <div className="span-2 form-actions"><button className="primary-button" disabled={saving}>Guardar</button></div>
+    </form></AdminDialog>}
   </div>;
 }
 

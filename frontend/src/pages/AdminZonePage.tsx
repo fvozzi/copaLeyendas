@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { AdminDataGrid } from '../components/AdminDataGrid';
 import { AdminDialog } from '../components/AdminDialog';
 import { useAuth } from '../lib/auth';
-import { assignZonePlace, generateZoneFixture, getAvailableZoneRegistrations, getZone, getZoneMatches, saveMatchResult, updateMatchSchedule } from '../lib/api';
+import { assignZonePlace, getAvailableZoneRegistrations, getZone, getZoneMatches, saveMatchResult, updateMatchSchedule } from '../lib/api';
 import type { PairRegistration, TournamentMatch, ZoneDetail } from '../types';
 
 const dateTimeValue = (value: string | null) => value ? new Date(new Date(value).getTime() - new Date(value).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '';
@@ -58,18 +58,18 @@ export function AdminZonePage() {
     if (registration) return pairName(registration);
     const source = side === 'home' ? match.homeSource : match.awaySource;
     const sourceId = side === 'home' ? match.homeSourceMatchId : match.awaySourceMatchId;
-    if (source === 'WINNER' || source === 'LOSER') return `${source === 'WINNER' ? 'Ganadora' : 'Perdedora'} P${matches.find((item) => item.id === sourceId)?.matchOrder ?? '?'}`;
+    if (source === 'WINNER' || source === 'LOSER') { const previous = matches.find((item) => item.id === sourceId); return `${source === 'WINNER' ? 'Ganadora' : 'Perdedora'} P${previous?.sequence ?? previous?.matchOrder ?? '?'}`; }
     const pairing = (capacity === 3 ? [[1, 2], [1, 3], [2, 3]] : [[1, 2], [3, 4]])[match.matchOrder - 1];
     return pairing ? `Pareja ${pairing[side === 'home' ? 0 : 1]} · A definir` : 'Según resultado previo';
   };
 
   return <div className="admin-panel">
     <div className="panel-header"><div><p className="eyebrow">{zone.tournamentCategory.category.name}</p><h1>{zone.name}</h1><p>Cupo {zone.entries.length}/{capacity}</p></div>
-      {director && <button className="primary-button" onClick={() => void run(() => generateZoneFixture(zoneId), 'No se pudo generar el fixture.')} disabled={busy || matches.length > 0}>{busy ? 'Guardando...' : matches.length ? 'Fixture generado' : 'Generar fixture'}</button>}
+      {director && <Link className="secondary-button" to="/app/programa">Ver Programa</Link>}
     </div>
     {error && <div className="inline-state" role="alert">{error}</div>}
     {director && <section className="data-card"><h2>Parejas de la zona</h2>
-      <p>{locked ? 'Las parejas no se pueden reemplazar porque ya hay resultados cargados.' : 'Podés generar los partidos ahora y completar o reemplazar cada pareja después, conservando los horarios.'}</p>
+      <p>{locked ? 'Las parejas no se pueden reemplazar porque ya hay resultados cargados.' : 'Los partidos ya están creados. Asigná las parejas en sus lugares; Programa muestra estos mismos partidos.'}</p>
       <AdminDataGrid rows={places} emptyMessage="La zona no tiene lugares disponibles." columns={[
         { label: 'Lugar', render: (place) => <strong>Pareja {place.id}</strong> },
         { label: 'Pareja asignada', render: (place) => place.entry ? pairName(place.entry.registration) : 'A definir' },
@@ -81,8 +81,8 @@ export function AdminZonePage() {
       ]} />
     </section>}
     <section className="data-card"><h2>Fixture y resultados</h2>
-      <AdminDataGrid rows={matches} emptyMessage="Generá el fixture para crear los partidos, aunque todavía no tengas parejas asignadas." columns={[
-        { label: 'Partido', render: (match) => `P${match.matchOrder}` },
+      <AdminDataGrid rows={matches} emptyMessage="No hay partidos disponibles en esta zona." columns={[
+        { label: 'Partido', render: (match) => `P${match.sequence ?? match.matchOrder}` },
         { label: 'Cancha', render: (match) => match.court?.name ?? 'A definir' },
         { label: 'Horario', render: (match) => formattedDateTime(match.scheduledAt) },
         { label: 'Local', render: (match) => participant(match, 'home') },
@@ -91,7 +91,7 @@ export function AdminZonePage() {
         { label: 'Estado', render: (match) => ({ PENDING: 'Pendiente', READY: 'Listo', PLAYED: 'Jugado' }[match.status] ?? match.status) },
       ]} renderActions={(match) => <>{match.status !== 'PLAYED' && <button className="inline-link" disabled={busy} onClick={() => { setScheduleMatch(match); setScheduledAt(dateTimeValue(match.scheduledAt)); }}>Horario</button>}{match.status === 'READY' && <button className="inline-link" disabled={busy} onClick={() => { setResultMatch(match); setScore({ home: 25, away: 0 }); }}>Resultado</button>}</>} />
     </section>
-    {resultMatch && <AdminDialog title={`Resultado P${resultMatch.matchOrder}`} onClose={() => setResultMatch(null)}><form className="editor-form" onSubmit={result}><label>Local<input type="number" min="0" value={score.home} onChange={(event) => setScore({ ...score, home: Number(event.target.value) })} /></label><label>Visitante<input type="number" min="0" value={score.away} onChange={(event) => setScore({ ...score, away: Number(event.target.value) })} /></label><div className="span-2 form-actions"><button className="primary-button" disabled={busy}>Guardar resultado</button></div></form></AdminDialog>}
-    {scheduleMatch && <AdminDialog title={`Horario P${scheduleMatch.matchOrder}`} onClose={() => setScheduleMatch(null)}><form className="editor-form" onSubmit={schedule}><label className="span-2">Fecha y hora<input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} required /></label><div className="span-2 form-actions"><button className="primary-button" disabled={busy}>Guardar horario</button></div></form></AdminDialog>}
+    {resultMatch && <AdminDialog title={`Resultado P${resultMatch.sequence ?? resultMatch.matchOrder}`} onClose={() => setResultMatch(null)}><form className="editor-form" onSubmit={result}><label>Local<input type="number" min="0" value={score.home} onChange={(event) => setScore({ ...score, home: Number(event.target.value) })} /></label><label>Visitante<input type="number" min="0" value={score.away} onChange={(event) => setScore({ ...score, away: Number(event.target.value) })} /></label><div className="span-2 form-actions"><button className="primary-button" disabled={busy}>Guardar resultado</button></div></form></AdminDialog>}
+    {scheduleMatch && <AdminDialog title={`Horario P${scheduleMatch.sequence ?? scheduleMatch.matchOrder}`} onClose={() => setScheduleMatch(null)}><form className="editor-form" onSubmit={schedule}><label className="span-2">Fecha y hora<input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} required /></label><div className="span-2 form-actions"><button className="primary-button" disabled={busy}>Guardar horario</button></div></form></AdminDialog>}
   </div>;
 }

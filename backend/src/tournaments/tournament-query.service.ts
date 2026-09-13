@@ -10,6 +10,8 @@ import { RegistrationStatus } from '../registrations/registration.enums';
 import { TournamentMatch } from './tournament-match.entity';
 import { TournamentStatus } from './tournament.enums';
 import { Court } from '../courts/court.entity';
+import { matchView } from './program-view';
+import { standings } from './zone-standings';
 
 @Injectable()
 export class TournamentQueryService {
@@ -23,7 +25,7 @@ export class TournamentQueryService {
 
     const [zones, matches, courts] = await Promise.all([
       this.zones.find({ where: { tournamentCategory: { tournamentId: tournament.id } }, relations: { venue: true, tournamentCategory: { category: true } }, order: { name: 'ASC' } }),
-      this.matches.find({ where: { zone: { tournamentCategory: { tournamentId: tournament.id } } }, relations: { zone: { tournamentCategory: { category: true } }, homeRegistration: true, awayRegistration: true }, order: { zoneId: 'ASC', matchOrder: 'ASC' } }),
+      this.matches.find({ where: { zone: { tournamentCategory: { tournamentId: tournament.id } } }, relations: { zone: { tournamentCategory: { category: true } }, homeRegistration: true, awayRegistration: true, scheduleSlot: { court: { venue: true } } }, order: { zoneId: 'ASC', matchOrder: 'ASC' } }),
       this.courts.find({ where: { active: true }, order: { name: 'ASC' } }),
     ]);
     const entries = zones.length ? await this.entries.find({ where: zones.map((zone) => ({ zoneId: zone.id })), relations: { registration: true }, order: { seed: 'ASC', id: 'ASC' } }) : [];
@@ -38,22 +40,10 @@ export class TournamentQueryService {
           venue: zone.venue,
           court: zone.venue,
           standings: standings(entries.filter((entry) => entry.zoneId === zone.id), matches.filter((match) => match.zoneId === zone.id)),
-          matches: matches.filter((match) => match.zoneId === zone.id),
+          matches: matches.filter((match) => match.zoneId === zone.id).map((match) => matchView(match)),
         })),
       },
       courts,
     };
   }
-}
-
-function standings(entries: ZoneEntry[], matches: TournamentMatch[]) {
-  const rows = new Map(entries.map((entry) => [entry.registrationId, { registration: entry.registration, played: 0, wins: 0, losses: 0, pointsFor: 0, pointsAgainst: 0, tablePoints: 0 }]));
-  for (const match of matches) {
-    if (match.homeScore === null || match.awayScore === null || !match.homeRegistrationId || !match.awayRegistrationId) continue;
-    const home = rows.get(match.homeRegistrationId); const away = rows.get(match.awayRegistrationId);
-    if (!home || !away) continue;
-    home.played += 1; away.played += 1; home.pointsFor += match.homeScore; home.pointsAgainst += match.awayScore; away.pointsFor += match.awayScore; away.pointsAgainst += match.homeScore;
-    if (match.homeScore > match.awayScore) { home.wins += 1; home.tablePoints += 2; away.losses += 1; } else { away.wins += 1; away.tablePoints += 2; home.losses += 1; }
-  }
-  return [...rows.values()].sort((a, b) => b.tablePoints - a.tablePoints || (b.pointsFor - b.pointsAgainst) - (a.pointsFor - a.pointsAgainst) || b.pointsFor - a.pointsFor);
 }

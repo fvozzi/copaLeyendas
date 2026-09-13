@@ -16,6 +16,8 @@ import { Tournament } from './tournament.entity';
 import { ZoneEntry } from './zone-entry.entity';
 import { Zone } from './zone.entity';
 import { distributeProgramCourts, redistributeExistingCourts } from './program-courts';
+import { matchView, programRelations, programView } from './program-view';
+import { standings } from './zone-standings';
 
 @Injectable()
 export class TournamentsService {
@@ -103,6 +105,11 @@ export class TournamentsService {
 
   private withLockedZone<T>(zoneId: number, action: (manager: EntityManager, zone: Zone) => Promise<T>) {
     return this.z.manager.transaction(async (manager) => {
+      const initial = await manager.getRepository(Zone).findOne({ where: { id: zoneId } });
+      if (!initial) throw new NotFoundException('Zona no encontrada');
+      const category = await manager.getRepository(TournamentCategory).findOneBy({ id: initial.tournamentCategoryId });
+      if (!category) throw new NotFoundException('Categoria no encontrada');
+      await manager.getRepository(Tournament).findOne({ where: { id: category.tournamentId }, lock: { mode: 'pessimistic_write' } });
       const zone = await manager.getRepository(Zone).findOne({ where: { id: zoneId }, lock: { mode: 'pessimistic_write' } });
       if (!zone) throw new NotFoundException('Zona no encontrada');
       return action(manager, zone);
@@ -143,30 +150,39 @@ export class TournamentsService {
   }
 
   async scheduleGrid(tournamentId: number) {
-    const tournament = await this.t.findOneBy({ id: tournamentId });
+    return this.slots.manager.transaction(async (manager) => {
+      await manager.getRepository(Tournament).findOne({ where: { id: tournamentId }, lock: { mode: 'pessimistic_write' } });
+      const zones = await manager.getRepository(Zone).find({ where: { tournamentCategory: { tournamentId } }, order: { id: 'ASC' } });
+      for (const zone of zones) await manager.getRepository(Zone).findOne({ where: { id: zone.id }, lock: { mode: 'pessimistic_write' } });
+      return this.buildScheduleGrid(manager, tournamentId);
+    });
+  }
+
+  private async buildScheduleGrid(manager: EntityManager, tournamentId: number) {
+    const slotsRepository = manager.getRepository(TournamentScheduleSlot);
+    const zonesRepository = manager.getRepository(Zone);
+    const tournament = await manager.getRepository(Tournament).findOneBy({ id: tournamentId });
     if (!tournament) throw new NotFoundException('Torneo no encontrado');
-    const [zones, courts] = await Promise.all([this.z.find({ where: { tournamentCategory: { tournamentId } }, relations: { venue: true, tournamentCategory: true }, order: { tournamentCategoryId: 'ASC', name: 'ASC' } }), this.c.find({ where: { active: true }, relations: { venue: true }, order: { id: 'ASC' } })]);
-    const existing = await this.slots.find({ where: { tournamentId }, order: { sequence: 'ASC' } });
-    const knockoutSlots = [...new Set(zones.map((zone) => zone.tournamentCategoryId))].reduce((total, categoryId) => total + (zones.filter((zone) => zone.tournamentCategoryId === categoryId).length >= 4 ? 7 : 0), 0);
-    const requiredSlots = zones.length * 4 + knockoutSlots;
-    const stageOrder = { ZONE: 0, QUARTERFINAL: 1, SEMIFINAL: 2, FINAL: 3 } as Record<string, number>;
-    const phasesAreOrdered = existing.every((slot, index) => index === 0 || (stageOrder[slot.stage] ?? -1) >= (stageOrder[existing[index - 1].stage] ?? -1));
-    const mustGenerate = requiredSlots > 0 && (existing.length !== requiredSlots || existing.every((slot) => !slot.scheduledAt) || !phasesAreOrdered);
-    if (mustGenerate) {
-      await this.slots.delete({ tournamentId });
-      const days = this.programDays(tournament);
+    const [zones, courts] = await Promise.all([zonesRepository.find({ where: { tournamentCategory: { tournamentId } }, relations: { venue: true, tournamentCategory: true }, order: { tournamentCategoryId: 'ASC', name: 'ASC' } }), manager.getRepository(Court).find({ where: { active: true }, relations: { venue: true }, order: { id: 'ASC' } })]);
+    const existing = await slotsRepository.find({ where: { tournamentId }, order: { sequence: 'ASC' } });
+    const days = this.programDays(tournament);
+    const generated: TournamentScheduleSlot[] = [];
+    const existingWithMatches = await slotsRepository.find({ where: { tournamentId }, relations: { match: true } });
+    const findExisting = (zone: Zone, order: number) => existingWithMatches.find((slot) => slot.stage === 'ZONE' && slot.matchOrder === order && (slot.match?.zoneId === zone.id || (!slot.matchId && slot.tournamentCategoryId === zone.tournamentCategoryId && slot.zoneName === zone.name)));
+    let sequence = Math.max(0, ...existing.map((slot) => slot.sequence));
+    {
       const venueQueues = new Map<number, { zone: Zone; nextOrder: number }[]>();
       for (const zone of zones) venueQueues.set(zone.venueId, [...(venueQueues.get(zone.venueId) ?? []), { zone, nextOrder: 1 }]);
       const venueIds = [...venueQueues.keys()].sort((left, right) => left - right);
-      const generated: TournamentScheduleSlot[] = [];
-      let sequence = 0;
-      while ([...venueQueues.values()].some((queue) => queue.some((item) => item.nextOrder <= 4))) {
+      while ([...venueQueues.values()].some((queue) => queue.some((item) => item.nextOrder <= item.zone.capacity))) {
         for (const venueId of venueIds) {
           const queue = venueQueues.get(venueId)!;
-          const next = queue.find((item) => item.nextOrder <= 4);
+          const next = queue.find((item) => item.nextOrder <= item.zone.capacity);
           if (!next) continue;
-          sequence += 1;
-          generated.push(this.slots.create({ tournamentId, tournamentCategoryId: next.zone.tournamentCategoryId, zoneName: next.zone.name, matchOrder: next.nextOrder, stage: 'ZONE', sequence, courtId: null, scheduledAt: null }));
+          if (!findExisting(next.zone, next.nextOrder)) {
+            sequence += 1;
+            generated.push(slotsRepository.create({ tournamentId, tournamentCategoryId: next.zone.tournamentCategoryId, zoneName: next.zone.name, matchOrder: next.nextOrder, stage: 'ZONE', sequence, courtId: null, scheduledAt: null }));
+          }
           next.nextOrder += 1;
           queue.push(queue.shift()!);
         }
@@ -174,13 +190,17 @@ export class TournamentsService {
       const knockoutCategories = [...new Set(zones.map((zone) => zone.tournamentCategoryId))].map((categoryId) => ({ categoryId, zones: zones.filter((zone) => zone.tournamentCategoryId === categoryId) })).filter((item) => item.zones.length >= 4);
       const knockoutStages = [{ stage: 'QUARTERFINAL', label: 'Cuartos de final', matches: 4 }, { stage: 'SEMIFINAL', label: 'Semifinal', matches: 2 }, { stage: 'FINAL', label: 'Final', matches: 1 }] as const;
       for (const knockoutStage of knockoutStages) for (const category of knockoutCategories) for (let matchOrder = 1; matchOrder <= knockoutStage.matches; matchOrder += 1) {
+        if (existing.some((slot) => slot.tournamentCategoryId === category.categoryId && slot.stage === knockoutStage.stage && slot.matchOrder === matchOrder)) continue;
         sequence += 1;
-        generated.push(this.slots.create({ tournamentId, tournamentCategoryId: category.categoryId, zoneName: knockoutStage.label, matchOrder, stage: knockoutStage.stage, sequence, courtId: null, scheduledAt: null }));
+        generated.push(slotsRepository.create({ tournamentId, tournamentCategoryId: category.categoryId, zoneName: knockoutStage.label, matchOrder, stage: knockoutStage.stage, sequence, courtId: null, scheduledAt: null }));
       }
-      distributeProgramCourts(generated, zones, courts, (venue, index) => this.programDate(days, venue.startsAt, venue.matchDurationMinutes, venue.matchesPerDay, index));
-      await this.slots.save(generated);
+      // Automatic scheduling only for a brand-new program. Later additions remain available for scheduling without moving existing games.
+      if (!existing.length) distributeProgramCourts(generated, zones, courts, (venue, index) => this.programDate(days, venue.startsAt, venue.matchDurationMinutes, venue.matchesPerDay, index));
+      if (generated.length) await slotsRepository.save(generated);
     }
-    return this.slots.find({ where: { tournamentId }, relations: { court: { venue: true }, tournamentCategory: { category: true } }, order: { sequence: 'ASC' } });
+    for (const zone of zones) await this.fixtureInManager(manager, zone);
+    await this.ensureKnockoutMatches(manager, tournamentId, zones);
+    return programView(await slotsRepository.find({ where: { tournamentId }, relations: programRelations, order: { sequence: 'ASC' } }));
   }
 
   async redistributeCourts(tournamentId: number) {
@@ -188,7 +208,7 @@ export class TournamentsService {
       const tournament = await manager.getRepository(Tournament).findOne({ where: { id: tournamentId }, lock: { mode: 'pessimistic_write' } });
       if (!tournament) throw new NotFoundException('Torneo no encontrado');
       const repository = manager.getRepository(TournamentScheduleSlot);
-      const slots = await repository.createQueryBuilder('slot').where('slot.tournamentId = :tournamentId', { tournamentId }).orderBy('slot.sequence', 'ASC').setLock('pessimistic_write').getMany();
+      const slots = (await repository.createQueryBuilder('slot').where('slot.tournamentId = :tournamentId', { tournamentId }).orderBy('slot.sequence', 'ASC').setLock('pessimistic_write').getMany()).filter((slot) => slot.matchId);
       if (!slots.length) throw new BadRequestException('No hay partidos programados para repartir.');
       const played = await manager.getRepository(TournamentMatch).count({ where: { zone: { tournamentCategory: { tournamentId } }, status: MatchStatus.PLAYED } });
       if (played) throw new BadRequestException('El torneo ya tiene resultados cargados. Cambiá las canchas de los partidos pendientes individualmente.');
@@ -197,17 +217,87 @@ export class TournamentsService {
       redistributeExistingCourts(slots, zones, courts);
       // Updating only courtId preserves match IDs, dates, participants and results.
       for (const slot of slots) await repository.update(slot.id, { courtId: slot.courtId });
-      return repository.find({ where: { tournamentId }, relations: { court: { venue: true }, tournamentCategory: { category: true } }, order: { sequence: 'ASC' } });
+      return programView(await repository.find({ where: { tournamentId }, relations: programRelations, order: { sequence: 'ASC' } }));
     });
   }
 
   private programDays(tournament: Tournament) {
-    if (tournament.playingDays.length) return [...tournament.playingDays].sort();
+    // PostgreSQL date[] may be returned as Date objects depending on the driver parser.
+    const isoDay = (day: string | Date) => typeof day === 'string' ? day.slice(0, 10) : day.toISOString().slice(0, 10);
+    if (tournament.playingDays.length) return tournament.playingDays.map(isoDay).sort();
     if (!tournament.startsAt) return [];
     const days = [tournament.startsAt];
     if (!tournament.endsAt) return days;
     for (let day = new Date(`${tournament.startsAt}T00:00:00Z`), end = new Date(`${tournament.endsAt}T00:00:00Z`); day < end;) { day.setUTCDate(day.getUTCDate() + 1); days.push(day.toISOString().slice(0, 10)); }
     return days;
+  }
+
+  private async linkZoneMatches(manager: EntityManager, zone: Zone, matches: TournamentMatch[]) {
+    const repository = manager.getRepository(TournamentScheduleSlot);
+    const category = await manager.getRepository(TournamentCategory).findOneBy({ id: zone.tournamentCategoryId });
+    if (!category) throw new NotFoundException('Categoria no encontrada');
+    const planned = await repository.find({ where: [{ match: { zoneId: zone.id } }, { tournamentCategoryId: zone.tournamentCategoryId, zoneName: zone.name, stage: 'ZONE' }], relations: { court: { venue: true } } });
+    const all = await repository.find({ where: { tournamentId: category.tournamentId } });
+    let sequence = Math.max(0, ...all.map((slot) => slot.sequence));
+    const result = [];
+    for (const match of matches) {
+      let slot = planned.find((item) => item.matchId === match.id) ?? planned.find((item) => !item.matchId && item.matchOrder === match.matchOrder);
+      if (!slot) {
+        slot = await repository.save(repository.create({ tournamentId: category.tournamentId, tournamentCategoryId: category.id, zoneName: zone.name, stage: 'ZONE', matchOrder: match.matchOrder, sequence: ++sequence, courtId: null, scheduledAt: match.scheduledAt, matchId: match.id }));
+      } else if (!slot.matchId) {
+        // Prefer a time explicitly saved on the old real fixture when linking legacy data.
+        slot.scheduledAt = match.scheduledAt ?? slot.scheduledAt;
+        slot.matchId = match.id;
+        await repository.update(slot.id, { matchId: match.id, scheduledAt: slot.scheduledAt });
+      }
+      if (slot.zoneName !== zone.name) { slot.zoneName = zone.name; await repository.update(slot.id, { zoneName: zone.name }); }
+      result.push(matchView(match, slot));
+    }
+    return result;
+  }
+
+  private async ensureKnockoutMatches(manager: EntityManager, tournamentId: number, zones: Zone[]) {
+    const repository = manager.getRepository(TournamentMatch);
+    const slotsRepository = manager.getRepository(TournamentScheduleSlot);
+    const slots = await slotsRepository.find({ where: { tournamentId }, relations: { match: true }, order: { sequence: 'ASC' } });
+    const stageOrder = ['QUARTERFINAL', 'SEMIFINAL', 'FINAL'];
+    for (const stage of stageOrder) for (const slot of slots.filter((item) => item.stage === stage)) {
+      if (slot.matchId) continue;
+      const categoryZones = zones.filter((zone) => zone.tournamentCategoryId === slot.tournamentCategoryId).sort((a, b) => a.name.localeCompare(b.name, 'es', { numeric: true }));
+      const sources = slots.filter((item) => item.tournamentCategoryId === slot.tournamentCategoryId && item.stage === (stage === 'SEMIFINAL' ? 'QUARTERFINAL' : 'SEMIFINAL')).sort((a, b) => a.matchOrder - b.matchOrder);
+      const homeZone = categoryZones[slot.matchOrder - 1];
+      const awayZone = categoryZones[(slot.matchOrder - 1) ^ 1];
+      const match = await repository.save(repository.create({ zoneId: null, matchOrder: slot.matchOrder, status: MatchStatus.PENDING,
+        scheduledAt: slot.scheduledAt, homeSource: stage === 'QUARTERFINAL' ? ParticipantSource.DIRECT : ParticipantSource.WINNER,
+        awaySource: stage === 'QUARTERFINAL' ? ParticipantSource.DIRECT : ParticipantSource.WINNER,
+        homeSourceMatchId: stage === 'QUARTERFINAL' ? null : sources[(slot.matchOrder - 1) * 2]?.matchId,
+        awaySourceMatchId: stage === 'QUARTERFINAL' ? null : sources[(slot.matchOrder - 1) * 2 + 1]?.matchId,
+        homeQualifierZoneId: stage === 'QUARTERFINAL' ? homeZone?.id : null, homeQualifierRank: stage === 'QUARTERFINAL' ? 1 : null,
+        awayQualifierZoneId: stage === 'QUARTERFINAL' ? awayZone?.id : null, awayQualifierRank: stage === 'QUARTERFINAL' ? 2 : null,
+      }));
+      slot.matchId = match.id;
+      await slotsRepository.update(slot.id, { matchId: match.id });
+    }
+    // Existing played zones can qualify immediately when upgrading an old tournament.
+    for (const zone of zones) await this.resolveQualifiers(manager, zone.id);
+  }
+
+  private async resolveQualifiers(manager: EntityManager, zoneId: number) {
+    const repository = manager.getRepository(TournamentMatch);
+    const games = await repository.find({ where: { zoneId }, order: { matchOrder: 'ASC' } });
+    if (!games.length || games.some((game) => game.status !== MatchStatus.PLAYED)) return;
+    const entries = await this.orderedEntries(manager, zoneId);
+    const rows = standings(entries, games);
+    const targets = await repository.find({ where: [{ homeQualifierZoneId: zoneId }, { awayQualifierZoneId: zoneId }] });
+    for (const target of targets) {
+      const home = target.homeQualifierZoneId === zoneId ? rows[(target.homeQualifierRank ?? 1) - 1]?.registrationId ?? null : target.homeRegistrationId;
+      const away = target.awayQualifierZoneId === zoneId ? rows[(target.awayQualifierRank ?? 1) - 1]?.registrationId ?? null : target.awayRegistrationId;
+      if (home === target.homeRegistrationId && away === target.awayRegistrationId) continue;
+      if (target.status === MatchStatus.PLAYED) throw new BadRequestException('No se puede cambiar la clasificación: el cruce siguiente ya tiene resultado.');
+      target.homeRegistrationId = home; target.awayRegistrationId = away;
+      target.status = home && away ? MatchStatus.READY : MatchStatus.PENDING;
+      await repository.save(target);
+    }
   }
 
   private programDate(days: string[], startsAt: string, duration: number, matchesPerDay: number, index: number) {
@@ -221,21 +311,33 @@ export class TournamentsService {
   }
 
   async updateScheduleSlot(id: number, dto: { scheduledAt?: string | null; courtId?: number | null }) {
-    const slot = await this.slots.findOneBy({ id }); if (!slot) throw new NotFoundException('Turno no encontrado');
-    if (dto.scheduledAt !== undefined) slot.scheduledAt = dto.scheduledAt ? new Date(dto.scheduledAt) : null;
-    if (dto.courtId !== undefined) { if (dto.courtId === null) slot.courtId = null; else { if (!(await this.c.findOneBy({ id: dto.courtId }))) throw new NotFoundException('Cancha no encontrada'); slot.courtId = dto.courtId; } }
-    await this.slots.save(slot);
-    const zone = await this.z.findOneBy({ tournamentCategoryId: slot.tournamentCategoryId, name: slot.zoneName });
-    if (zone) await this.m.update({ zoneId: zone.id, matchOrder: slot.matchOrder }, { scheduledAt: slot.scheduledAt });
-    return slot;
+    const slot = await this.slots.findOneBy({ id });
+    if (!slot) throw new NotFoundException('Turno no encontrado');
+    const changes: Partial<TournamentScheduleSlot> = {};
+    if (dto.scheduledAt !== undefined) changes.scheduledAt = dto.scheduledAt ? new Date(dto.scheduledAt) : null;
+    if (dto.courtId !== undefined) {
+      if (dto.courtId !== null && !(await this.c.findOneBy({ id: dto.courtId }))) throw new NotFoundException('Cancha no encontrada');
+      changes.courtId = dto.courtId;
+    }
+    await this.slots.update(id, changes);
+    return { ...slot, ...changes };
   }
 
   async fixture(zoneId: number) {
     return this.withLockedZone(zoneId, async (manager, zone) => {
+      const category = await manager.getRepository(TournamentCategory).findOneBy({ id: zone.tournamentCategoryId });
+      if (!category) throw new NotFoundException('Categoria no encontrada');
+      const program = await this.buildScheduleGrid(manager, category.tournamentId);
+      return program.filter((slot) => slot.match?.zoneId === zoneId).map((slot) => slot.match!);
+    });
+  }
+
+  private async fixtureInManager(manager: EntityManager, zone: Zone) {
+      const zoneId = zone.id;
       const repository = manager.getRepository(TournamentMatch);
       const existing = await repository.find({ where: { zoneId }, relations: { homeRegistration: true, awayRegistration: true }, order: { matchOrder: 'ASC' } });
       // Repeated clicks must not erase scheduled games or results.
-      if (existing.length) return existing;
+      if (existing.length) return this.linkZoneMatches(manager, zone, existing);
       if (![3, 4].includes(zone.capacity)) throw new BadRequestException('El cupo de la zona debe ser de 3 o 4 parejas');
       const entries = await this.orderedEntries(manager, zoneId);
       const positions = new Map(entries.map((entry) => [entry.seed, entry.registrationId]));
@@ -257,25 +359,31 @@ export class TournamentsService {
         await repository.save(repository.create({ zoneId, matchOrder: 3, scheduledAt: scheduledAt(3), homeSource: ParticipantSource.WINNER, homeSourceMatchId: p1.id, awaySource: ParticipantSource.LOSER, awaySourceMatchId: p2.id, status: MatchStatus.PENDING }));
         await repository.save(repository.create({ zoneId, matchOrder: 4, scheduledAt: scheduledAt(4), homeSource: ParticipantSource.WINNER, homeSourceMatchId: p2.id, awaySource: ParticipantSource.LOSER, awaySourceMatchId: p1.id, status: MatchStatus.PENDING }));
       }
-      return repository.find({ where: { zoneId }, relations: { homeRegistration: true, awayRegistration: true }, order: { matchOrder: 'ASC' } });
-    });
+      return this.linkZoneMatches(manager, zone, await repository.find({ where: { zoneId }, relations: { homeRegistration: true, awayRegistration: true }, order: { matchOrder: 'ASC' } }));
   }
 
   async schedule(id: number, scheduledAt: string, user: AuthenticatedUser) {
-    const match = await this.matchWithZone(id);
     this.assertDirectorAccess(user);
-    match.scheduledAt = new Date(scheduledAt);
-    return this.m.save(match);
+    const match = await this.matchWithZone(id);
+    if (match.zoneId) await this.fixture(match.zoneId);
+    const slot = await this.slots.findOneBy({ matchId: id });
+    if (!slot) throw new BadRequestException('El partido no tiene programa asociado');
+    await this.updateScheduleSlot(slot.id, { scheduledAt });
+    return matchView(match, { ...slot, scheduledAt: new Date(scheduledAt) });
   }
 
   async result(id: number, homeScore: number, awayScore: number, user: AuthenticatedUser) {
     this.assertDirectorAccess(user);
     if (homeScore === awayScore) throw new BadRequestException('El partido debe tener ganador');
     const initial = await this.matchWithZone(id);
-    return this.withLockedZone(initial.zoneId, async (manager) => {
+    return this.withLockedMatch(initial, async (manager) => {
       const repository = manager.getRepository(TournamentMatch);
       const match = await repository.findOneBy({ id });
       if (!match) throw new NotFoundException('Partido no encontrado');
+      if (match.status === MatchStatus.PLAYED) {
+        if (match.homeScore === homeScore && match.awayScore === awayScore) return match;
+        throw new BadRequestException('El partido ya tiene un resultado cargado.');
+      }
       if (!match.homeRegistrationId || !match.awayRegistrationId) throw new BadRequestException('El partido no esta listo');
       match.homeScore = homeScore;
       match.awayScore = awayScore;
@@ -283,6 +391,7 @@ export class TournamentsService {
       match.status = MatchStatus.PLAYED;
       await repository.save(match);
       await this.resolveDependents(match, repository);
+      if (match.zoneId) await this.resolveQualifiers(manager, match.zoneId);
       return match;
     });
   }
@@ -293,7 +402,17 @@ export class TournamentsService {
     this.assertDirectorAccess(user);
   }
 
-  matches(zoneId: number) { return this.m.find({ where: { zoneId }, relations: { homeRegistration: true, awayRegistration: true }, order: { matchOrder: 'ASC' } }); }
+  matches(zoneId: number) { return this.fixture(zoneId); }
+
+  private async withLockedMatch<T>(match: TournamentMatch, action: (manager: EntityManager) => Promise<T>) {
+    if (match.zoneId) return this.withLockedZone(match.zoneId, action);
+    const slot = await this.slots.findOneBy({ matchId: match.id });
+    if (!slot) throw new NotFoundException('Partido fuera del programa');
+    return this.slots.manager.transaction(async (manager) => {
+      await manager.getRepository(Tournament).findOne({ where: { id: slot.tournamentId }, lock: { mode: 'pessimistic_write' } });
+      return action(manager);
+    });
+  }
 
   private async matchWithZone(id: number) {
     const match = await this.m.findOne({ where: { id }, relations: { zone: true } });

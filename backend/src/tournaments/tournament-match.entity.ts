@@ -1,4 +1,5 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, OneToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { TournamentScheduleSlot } from './tournament-schedule-slot.entity';
 import { PairRegistration } from '../registrations/pair-registration.entity';
 import { MatchStatus, ParticipantSource } from './tournament.enums';
 import { Zone } from './zone.entity';
@@ -6,8 +7,13 @@ import { Zone } from './zone.entity';
 @Entity('tournament_matches')
 export class TournamentMatch {
   @PrimaryGeneratedColumn() id: number;
-  @Column() zoneId: number;
-  @ManyToOne(() => Zone, { onDelete: 'CASCADE' }) @JoinColumn({ name: 'zoneId' }) zone: Zone;
+  @OneToOne(() => TournamentScheduleSlot, (slot) => slot.match) scheduleSlot: TournamentScheduleSlot | null;
+  @Column({ type: 'integer', nullable: true }) zoneId: number | null;
+  @ManyToOne(() => Zone, { onDelete: 'CASCADE', nullable: true }) @JoinColumn({ name: 'zoneId' }) zone: Zone | null;
+  @Column({ type: 'integer', nullable: true }) homeQualifierZoneId: number | null;
+  @Column({ type: 'integer', nullable: true }) homeQualifierRank: number | null;
+  @Column({ type: 'integer', nullable: true }) awayQualifierZoneId: number | null;
+  @Column({ type: 'integer', nullable: true }) awayQualifierRank: number | null;
   @Column() matchOrder: number;
   @Column({ type: 'enum', enum: MatchStatus, enumName: 'match_status', default: MatchStatus.DRAFT }) status: MatchStatus;
   @Column({ type: 'integer', nullable: true }) homeRegistrationId: number | null;
