@@ -57,13 +57,15 @@ it('redistributes existing slots atomically, updating only courts, and rejects t
   const repositories = new Map<any, any>([
     [Tournament, { findOne: vi.fn(async () => ({ id: 1 })) }],
     [TournamentScheduleSlot, repository], [TournamentMatch, matches],
-    [Zone, { find: vi.fn(async () => [{ name: 'A', tournamentCategoryId: 1, venue }]) }],
+    [Zone, { find: vi.fn(async () => [{ id: 1, name: 'A', tournamentCategoryId: 1, venue }]), findOne: vi.fn() }],
     [Court, { find: vi.fn(async () => [1, 2].map((id) => ({ id, venueId: 1, active: true, venue }))) }],
   ]);
   const manager = { getRepository: (entity: any) => repositories.get(entity) };
   const transaction = vi.fn(async (fn) => fn(manager));
   const service = new TournamentsService({} as never, {} as never, {} as never, {} as never, {} as never, { manager: { transaction } } as never, {} as never, {} as never, {} as never, {} as never);
+  const build = vi.spyOn(service as any, 'buildScheduleGrid').mockResolvedValue([]);
   expect(await service.redistributeCourts(1)).toHaveLength(2);
+  expect(build).toHaveBeenCalledWith(manager, 1);
   expect(transaction).toHaveBeenCalledOnce();
   expect(repository.update.mock.calls).toEqual([[1, { courtId: 1 }], [2, { courtId: 2 }]]);
   repository.update.mockClear();

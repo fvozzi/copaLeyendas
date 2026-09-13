@@ -50,6 +50,15 @@ describe('existing program redistribution', () => {
 });
 
 describe('program court allocation', () => {
+  it('fills new games around existing reservations, including partial time overlaps', () => {
+    const fixed = [{ ...games()[0], tournamentCategoryId: 2, courtId: 1, scheduledAt: new Date(start + 600_000) }, { ...games()[0], tournamentCategoryId: 2, courtId: 2, scheduledAt: new Date(start) }];
+    const before = structuredClone(fixed);
+    const slots = games().slice(0, 3);
+    distributeProgramCourts(slots, [{ ...zones[0], capacity: 3 }], courts.map((court) => ({ ...court, venue })), dateAt, fixed);
+    expect(slots.map((slot) => slot.scheduledAt?.getTime())).toEqual([1, 2, 3].map((i) => start + i * 2_400_000));
+    expect(slots[0].courtId).toBe(2);
+    expect(fixed).toEqual(before);
+  });
   it('uses both active courts concurrently and waits for both opening games before dependent games', () => {
     const slots = games();
     distributeProgramCourts(slots, zones, courts, dateAt);

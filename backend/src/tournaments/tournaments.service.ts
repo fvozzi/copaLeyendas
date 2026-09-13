@@ -229,6 +229,11 @@ export class TournamentsService {
     return this.slots.manager.transaction(async (manager) => {
       const tournament = await manager.getRepository(Tournament).findOne({ where: { id: tournamentId }, lock: { mode: 'pessimistic_write' } });
       if (!tournament) throw new NotFoundException('Torneo no encontrado');
+      const zoneRepository = manager.getRepository(Zone);
+      const zoneLocks = await zoneRepository.find({ where: { tournamentCategory: { tournamentId } }, order: { id: 'ASC' } });
+      for (const zone of zoneLocks) await zoneRepository.findOne({ where: { id: zone.id }, lock: { mode: 'pessimistic_write' } });
+      // The director can add categories/zones without reopening Programa first.
+      await this.buildScheduleGrid(manager, tournamentId);
       const repository = manager.getRepository(TournamentScheduleSlot);
       const slots = (await repository.createQueryBuilder('slot').where('slot.tournamentId = :tournamentId', { tournamentId }).orderBy('slot.sequence', 'ASC').setLock('pessimistic_write').getMany()).filter((slot) => slot.matchId);
       if (!slots.length) throw new BadRequestException('No hay partidos programados para repartir.');
@@ -239,8 +244,14 @@ export class TournamentsService {
       const linked = await repository.find({ where: { tournamentId }, relations: { match: true } });
       for (const slot of slots) slot.match = linked.find((item) => item.id === slot.id)?.match ?? null;
       redistributeExistingCourts(slots, zones, courts);
-      // Updating only courtId preserves match IDs, dates, participants and results.
-      for (const slot of slots) await repository.update(slot.id, { courtId: slot.courtId });
+      const undated = slots.filter((slot) => !slot.scheduledAt);
+      if (undated.length) {
+        const days = this.programDays(tournament);
+        distributeProgramCourts(undated, zones, courts, (venue, index) => this.programDate(days, venue.startsAt, venue.matchDurationMinutes, venue.matchesPerDay, index), slots.filter((slot) => slot.scheduledAt));
+      }
+      // Existing dates remain untouched; fill only dates that were missing.
+      const undatedIds = new Set(undated.map((slot) => slot.id));
+      for (const slot of slots) await repository.update(slot.id, { courtId: slot.courtId, ...(undatedIds.has(slot.id) ? { scheduledAt: slot.scheduledAt } : {}) });
       return programView(await repository.find({ where: { tournamentId }, relations: programRelations, order: { sequence: 'ASC' } }));
     });
   }

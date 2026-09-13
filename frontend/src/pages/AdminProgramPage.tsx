@@ -68,8 +68,10 @@ export function AdminProgramPage() {
   const redistribute = async () => {
     setSaving(true); setError(null); setNotice(null);
     try {
-      setSlots(await redistributeTournamentCourts(tournamentId));
-      setNotice('Partidos repartidos entre las canchas activas de cada sede. Se conservaron los horarios.');
+      const items = await redistributeTournamentCourts(tournamentId);
+      setSlots(items);
+      const withoutDate = items.filter((slot) => !slot.scheduledAt).length;
+      setNotice(`Programa actualizado y partidos repartidos entre las canchas activas. Se conservaron los horarios existentes.${withoutDate ? ` Quedaron ${withoutDate} partidos sin horario: revisá los días de juego y la disponibilidad de las sedes.` : ' Todos los partidos tienen horario.'}`);
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudieron repartir los partidos.'); }
     finally { setSaving(false); }
   };
@@ -136,7 +138,7 @@ export function AdminProgramPage() {
       <details className="program-options"><summary>Opciones</summary><div>
         <Link className="secondary-button" to="/app/canchas/internas">Administrar canchas</Link>
         <button type="button" className="secondary-button" disabled={saving || !slots.length || !tournamentId} onClick={() => void redistribute()}>{saving ? 'Guardando…' : 'Repartir entre canchas'}</button>
-        <small>El reparto respeta la sede de cada zona y conserva los horarios. Las eliminatorias mantienen su sede.</small>
+        <small>Completa los partidos de las zonas nuevas y asigna los horarios faltantes. Respeta la sede de cada zona y conserva los horarios existentes.</small>
       </div></details>
     </div>
     {error && <div className="inline-state" role="alert">{error}</div>}
