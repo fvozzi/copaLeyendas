@@ -8,7 +8,9 @@ La migración `1789948800000-LinkProgramToMatches` vincula los partidos anterior
 
 Con cuatro zonas, los cuartos usan 1.ª A–2.ª B, 1.ª B–2.ª A, 1.ª C–2.ª D y 1.ª D–2.ª C. La clasificación se completa cuando termina la zona, con los mismos criterios de la tabla pública: victorias, diferencia de puntos y puntos a favor. Las semifinales toman las ganadoras de cuartos 1–2 y 3–4; sus ganadoras pasan a la final. Los resultados se pueden cargar desde Programa sobre los mismos partidos.
 
-Los programas existentes no se regeneran ni se renumeran al abrir la vista. Las nuevas zonas agregan partidos pendientes de programación. «Repartir entre canchas» conserva los horarios y solo cambia la cancha de los partidos vinculados.
+Los programas existentes no se regeneran ni se renumeran al abrir la vista. Las nuevas zonas agregan partidos pendientes de programación. «Repartir entre canchas» conserva los horarios y distribuye los partidos de zona según su sede configurada, incluso si antes tenían una cancha de otra sede. Las eliminatorias conservan su sede elegida.
+
+Al guardar una zona con una sede seleccionada, sus partidos pendientes se distribuyen automáticamente en esa sede. Se conservan los IDs, horarios, parejas y resultados; los partidos ya jugados conservan su cancha anterior. Se tienen en cuenta los partidos que ya ocupan las canchas de destino. Si no existe una cancha activa libre en un horario, el cambio se rechaza completo y el formulario muestra el conflicto, sin dejar la zona y los partidos con asignaciones diferentes.
 
 Desplegar backend y frontend. En producción, el inicio del backend aplica la migración cuando `DB_SYNCHRONIZE=false`. La reversión se bloquea si ya existen partidos de eliminatorias, para evitar perderlos.
 

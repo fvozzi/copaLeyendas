@@ -4,14 +4,26 @@ import type { TournamentScheduleSlot } from './tournament-schedule-slot.entity';
 import type { Zone } from './zone.entity';
 import { BadRequestException } from '@nestjs/common';
 
-// Existing programs keep their times and venues; only the court assignment changes.
-export function redistributeExistingCourts(slots: TournamentScheduleSlot[], zones: Zone[], courts: Court[]) {
+// Zone games follow their configured venue. Knockouts retain their chosen venue.
+// Fixed games reserve their courts and times when moving only part of a program.
+export function redistributeExistingCourts(slots: TournamentScheduleSlot[], zones: Zone[], courts: Court[], fixedSlots: TournamentScheduleSlot[] = []) {
   const counts = new Map<number, number>();
   const occupied = new Map<number, { start: number; end: number }[]>();
+  for (const slot of fixedSlots) {
+    const court = courts.find((item) => item.id === slot.courtId);
+    if (!court) continue;
+    counts.set(court.id, (counts.get(court.id) ?? 0) + 1);
+    if (slot.scheduledAt && court.venue) {
+      const start = slot.scheduledAt.getTime();
+      occupied.set(court.id, [...(occupied.get(court.id) ?? []), { start, end: start + court.venue.matchDurationMinutes * 60_000 }]);
+    }
+  }
   for (const slot of [...slots].sort((a, b) => (a.scheduledAt?.getTime() ?? Infinity) - (b.scheduledAt?.getTime() ?? Infinity) || a.sequence - b.sequence)) {
     const originalCourt = courts.find((court) => court.id === slot.courtId);
-    const zone = zones.find((item) => item.tournamentCategoryId === slot.tournamentCategoryId && (slot.stage !== 'ZONE' || item.name === slot.zoneName));
-    const venue = originalCourt?.venue ?? zone?.venue;
+    const zone = slot.stage === 'ZONE' && slot.match?.zoneId
+      ? zones.find((item) => item.id === slot.match!.zoneId)
+      : zones.find((item) => item.tournamentCategoryId === slot.tournamentCategoryId && (slot.stage !== 'ZONE' || item.name === slot.zoneName));
+    const venue = slot.stage === 'ZONE' ? zone?.venue : originalCourt?.venue ?? zone?.venue;
     if (!venue?.active) throw new BadRequestException(`El partido ${slot.sequence} no tiene una sede activa.`);
     const start = slot.scheduledAt?.getTime();
     const end = start === undefined ? undefined : start + venue.matchDurationMinutes * 60_000;

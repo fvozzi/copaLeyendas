@@ -131,13 +131,13 @@ export function AdminProgramPage() {
   return <div className="admin-panel">
     <div className="panel-header"><div><p className="eyebrow">Organización</p><h1>Programa</h1><p className="field-hint">Consultá los partidos por sede y cancha. Podés cambiar la cancha desde cualquier vista.</p></div><Link className="secondary-button" to="/app/canchas/internas">Administrar canchas</Link></div>
     <section className="data-card"><label>Seleccionar torneo<select disabled={saving} value={tournamentId} onChange={(event) => { setTournamentId(Number(event.target.value)); setVenueTab(''); setCourtTab('all'); setCategoryTab(''); }}><option value="0">Seleccionar torneo</option>{tournaments.map((tournament) => <option key={tournament.id} value={tournament.id}>{tournament.name}</option>)}</select></label></section>
-    <section className="data-card"><button type="button" className="secondary-button" disabled={saving || !slots.length || !tournamentId} onClick={() => void redistribute()}>{saving ? 'Guardando…' : 'Repartir entre canchas'}</button><p className="field-hint">Reparte los partidos de este torneo entre las canchas activas de cada sede, manteniendo sus horarios.</p></section>
+    <section className="data-card"><button type="button" className="secondary-button" disabled={saving || !slots.length || !tournamentId} onClick={() => void redistribute()}>{saving ? 'Guardando…' : 'Repartir entre canchas'}</button><p className="field-hint">Reparte los partidos según la sede configurada en cada zona, manteniendo sus horarios. Las eliminatorias conservan su sede asignada.</p></section>
     {error && <div className="inline-state" role="alert">{error}</div>}
     {notice && <div className="inline-state" role="status">{notice}</div>}
     <div className="program-tabs" role="tablist" aria-label="Vistas del programa">{([{ id: 'matches', label: 'Partidos' }, { id: 'venues', label: 'Sedes' }, { id: 'categories', label: 'Categorías' }] as const).map((item) => <button type="button" role="tab" aria-selected={tab === item.id} key={item.id} className={tab === item.id ? 'is-selected' : ''} onClick={() => setTab(item.id)}>{item.label}</button>)}</div>
     {tab === 'matches' && <ProgramTable title="Todos los partidos" slots={[...slots].sort((a, b) => a.sequence - b.sequence)} columns={columns} />}
     {tab === 'venues' && <ProgramSubTabs options={venueOptions} selected={selectedVenue} onSelect={(id) => { setVenueTab(id); setCourtTab('all'); }} ariaLabel="Sedes del programa">
-      {selectedVenue && <section className="data-card"><div className="panel-header"><h2>{venueOptions.find((venue) => venue.id === selectedVenue)?.label}</h2></div>
+      {selectedVenue && <section className="data-card"><div className="panel-header"><div className="program-venue-heading"><h2>{venueOptions.find((venue) => venue.id === selectedVenue)?.label}</h2><VenueAssignments slots={venueSlots} /></div></div>
         <ProgramSubTabs options={courtOptions} selected={selectedCourt} onSelect={setCourtTab} ariaLabel="Canchas de la sede">
           {!venueCourts.length && selectedVenue !== 'unassigned' && <p className="field-hint">Esta sede no tiene canchas activas. Agregalas desde Administrar canchas.</p>}
           <AdminDataGrid rows={venueSlots.filter((slot) => selectedCourt === 'all' || String(slot.courtId) === selectedCourt).sort(bySchedule)} columns={columns} emptyMessage="No hay partidos asignados a esta cancha o sede." />
@@ -156,6 +156,25 @@ export function AdminProgramPage() {
 
 function ProgramTable({ title, slots, columns }: { title: string; slots: TournamentScheduleSlot[]; columns: AdminGridColumn<TournamentScheduleSlot>[] }) {
   return <section className="data-card"><div className="panel-header"><h2>{title}</h2></div><AdminDataGrid rows={slots} emptyMessage="No hay partidos previstos." columns={columns} /></section>;
+}
+
+function VenueAssignments({ slots }: { slots: TournamentScheduleSlot[] }) {
+  const categories = new Map<number, { name: string; zones: Set<string>; stages: Set<string> }>();
+  for (const slot of slots) {
+    const category = categories.get(slot.tournamentCategoryId) ?? { name: slot.tournamentCategory.category.name, zones: new Set<string>(), stages: new Set<string>() };
+    if (slot.stage === 'ZONE') category.zones.add(slot.zoneName.replace(/^zona\s+/i, '').trim());
+    else category.stages.add(slot.stage);
+    categories.set(slot.tournamentCategoryId, category);
+  }
+  if (!categories.size) return <p className="field-hint">Sin categorías ni zonas programadas en esta sede.</p>;
+  const stageNames = [['QUARTERFINAL', 'Cuartos de final'], ['SEMIFINAL', 'Semifinales'], ['FINAL', 'Final']];
+  return <dl className="program-venue-assignments" aria-label="Categorías y zonas de la sede">
+    {[...categories].sort(([, a], [, b]) => a.name.localeCompare(b.name, 'es', { numeric: true })).map(([id, category]) => {
+      const zones = [...category.zones].sort((a, b) => a.localeCompare(b, 'es', { numeric: true }));
+      const description = [zones.length ? `${zones.length === 1 ? 'Zona' : 'Zonas'} ${zones.join(', ')}` : '', ...stageNames.filter(([stage]) => category.stages.has(stage)).map(([, name]) => name)].filter(Boolean).join(' · ');
+      return <div key={id}><dt>{category.name}</dt><dd>{description}</dd></div>;
+    })}
+  </dl>;
 }
 function ProgramSubTabs({ options, selected, onSelect, ariaLabel, children }: { options: { id: string; label: string }[]; selected: string | undefined; onSelect: (id: string) => void; ariaLabel: string; children: ReactNode }) {
   if (!options.length) return <div className="inline-state">No hay datos configurados todavía.</div>;

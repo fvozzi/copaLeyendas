@@ -125,6 +125,32 @@ async function main() {
   assert(smallProgram.every((slot) => slot.scheduledAt && slot.court));
   assert.deepEqual(smallProgram.map((slot) => slot.matchId), zoneFirst.map((match) => match.id));
   assert.equal((await service.scheduleGrid(smallTournament.id)).length, 3);
+  // Changing the zone configuration moves pending real games immediately.
+  const destination = await save(Venue, { name: 'Gure Echea', startsAt: '10:00', matchesPerDay: 80 });
+  const destinationCourt = await save(Court, { name: 'Cancha 1', venueId: destination.id });
+  const beforeMove = (await service.scheduleGrid(smallTournament.id)).map((slot) => ({ id: slot.id, matchId: slot.matchId, time: slot.scheduledAt.toISOString() }));
+  await service.updateZone(smallZone.id, { venueId: destination.id, name: 'Moved A' });
+  let moved = await service.scheduleGrid(smallTournament.id);
+  assert(moved.every((slot) => slot.courtId === destinationCourt.id));
+  assert.deepEqual(moved.map((slot) => ({ id: slot.id, matchId: slot.matchId, time: slot.scheduledAt.toISOString() })), beforeMove);
+  // Repartition repairs stale assignments made before this fix, using stable zone IDs.
+  for (const slot of moved) await ds.getRepository(Slot).update(slot.id, { courtId: courts[0].id });
+  moved = await service.redistributeCourts(smallTournament.id);
+  assert(moved.every((slot) => slot.courtId === destinationCourt.id));
+  // A second zone cannot be silently moved onto an occupied court at the same time.
+  const anotherZone = await save(Zone, { name: 'B', capacity: 3, venueId: venue.id, tournamentCategoryId: smallCategory.id });
+  const otherGames = await service.matches(anotherZone.id);
+  const otherSlot = (await service.scheduleGrid(smallTournament.id)).find((slot) => slot.matchId === otherGames[0].id);
+  await service.updateScheduleSlot(otherSlot.id, { courtId: courts[0].id, scheduledAt: moved[0].scheduledAt.toISOString() });
+  await assert.rejects(() => service.updateZone(anotherZone.id, { venueId: destination.id }), /No hay una cancha activa disponible/);
+  assert.equal((await ds.getRepository(Zone).findOneBy({ id: anotherZone.id })).venueId, venue.id);
+  assert.equal((await ds.getRepository(Slot).findOneBy({ id: otherSlot.id })).courtId, courts[0].id);
+  // Historical played games retain their original court while remaining games move.
+  await ds.getRepository(Match).update(moved[0].matchId, { status: 'PLAYED', homeScore: 25, awayScore: 10 });
+  await service.updateZone(smallZone.id, { venueId: venue.id });
+  const afterPlayed = await service.scheduleGrid(smallTournament.id);
+  assert.equal(afterPlayed.find((slot) => slot.id === moved[0].id).courtId, destinationCourt.id);
+  assert(afterPlayed.filter((slot) => moved.slice(1).some((item) => item.id === slot.id)).every((slot) => slot.court.venueId === venue.id));
   console.log('PASS: migration up/down, legacy schedules, shared IDs, zone rename, both scheduling directions, pair assignment, quarterfinals, semifinals and final.');
 }
 main().catch((error) => { console.error(error.stack); process.exitCode = 1; }).finally(async () => {

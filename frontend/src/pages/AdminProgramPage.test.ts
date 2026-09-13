@@ -38,6 +38,26 @@ it('shows all courts in a venue, including empty ones, and filters their games',
   expect(container.querySelectorAll('tbody tr')).toHaveLength(1);
 });
 
+it('summarizes each category and zone once for the entire venue, including its knockout stages', async () => {
+  const elsewhere = { ...courts[0], id: 9, venueId: 9, venue: { ...venue, id: 9, name: 'Otra sede' } };
+  vi.mocked(redistributeTournamentCourts).mockResolvedValue([
+    slot, { ...slot, id: 11, sequence: 2 },
+    { ...slot, id: 12, sequence: 3, zoneName: 'Zona B', courtId: 2, court: courts[1] },
+    { ...slot, id: 13, sequence: 4, stage: 'QUARTERFINAL', zoneName: 'Cuartos de final' },
+    { ...slot, id: 14, sequence: 5, tournamentCategoryId: 2, tournamentCategory: { category: { name: 'Damas B' } }, zoneName: 'C' } as TournamentScheduleSlot,
+    { ...slot, id: 15, sequence: 6, zoneName: 'D', courtId: elsewhere.id, court: elsewhere },
+  ]);
+  await click('Repartir entre canchas');
+  await click('Sedes');
+  const summary = container.querySelector('[aria-label="Categorías y zonas de la sede"]')!;
+  expect([...summary.querySelectorAll('dt')].map((item) => item.textContent)).toEqual(['Damas A', 'Damas B']);
+  expect([...summary.querySelectorAll('dd')].map((item) => item.textContent)).toEqual(['Zonas A, B · Cuartos de final', 'Zona C']);
+  await click('Cancha 2 (1)');
+  expect(container.querySelector('[aria-label="Categorías y zonas de la sede"]')?.textContent).toBe(summary.textContent);
+  await click('Otra sede');
+  expect(container.querySelector('[aria-label="Categorías y zonas de la sede"]')?.textContent).toBe('Damas AZona D');
+});
+
 it('shows actual pairs and submits results to the real fixture match, not the planning row', async () => {
   const actual = { ...slot, matchId: 500, match: { id: 500, zoneId: 9, matchOrder: 1, status: 'READY', homeRegistration: { playerOneName: 'Ana', playerTwoName: 'Bea', localityName: 'Junin' }, awayRegistration: { playerOneName: 'Carla', playerTwoName: 'Dora', localityName: 'Salta' }, homeScore: null, awayScore: null } } as TournamentScheduleSlot;
   vi.mocked(redistributeTournamentCourts).mockResolvedValue([actual]);

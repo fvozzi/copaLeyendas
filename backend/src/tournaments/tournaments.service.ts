@@ -60,13 +60,35 @@ export class TournamentsService {
   }
   async createZone(dto: { tournamentCategoryId: number; venueId: number; name: string; capacity: number }) { if (!(await this.venues.findOneBy({ id: dto.venueId }))) throw new NotFoundException('Sede no encontrada'); return this.z.save(this.z.create(dto)); }
   async updateZone(id: number, dto: { name?: string; venueId?: number; capacity?: number }) {
-    const zone = await this.z.findOneBy({ id });
-    if (!zone) throw new NotFoundException('Zona no encontrada');
-    if (dto.capacity !== undefined && dto.capacity !== zone.capacity && await this.m.countBy({ zoneId: id })) throw new BadRequestException('No se puede cambiar el cupo de una zona con fixture generado');
-    if (dto.venueId !== undefined) { if (!(await this.venues.findOneBy({ id: dto.venueId }))) throw new NotFoundException('Sede no encontrada'); zone.venueId = dto.venueId; }
-    if (dto.capacity !== undefined) { if (dto.capacity < await this.e.countBy({ zoneId: id })) throw new BadRequestException('El cupo no puede ser menor a las parejas ya asignadas'); zone.capacity = dto.capacity; }
-    if (dto.name !== undefined) zone.name = dto.name.trim();
-    return this.z.save(zone);
+    return this.withLockedZone(id, async (manager, zone) => {
+      const originalName = zone.name;
+      if (dto.capacity !== undefined && dto.capacity !== zone.capacity && await manager.getRepository(TournamentMatch).countBy({ zoneId: id })) throw new BadRequestException('No se puede cambiar el cupo de una zona con fixture generado');
+      if (dto.venueId !== undefined) {
+        const venue = await manager.getRepository(Venue).findOneBy({ id: dto.venueId });
+        if (!venue) throw new NotFoundException('Sede no encontrada');
+        if (!venue.active) throw new BadRequestException('Seleccioná una sede activa.');
+        zone.venueId = venue.id; zone.venue = venue;
+      }
+      if (dto.capacity !== undefined) { if (dto.capacity < await manager.getRepository(ZoneEntry).countBy({ zoneId: id })) throw new BadRequestException('El cupo no puede ser menor a las parejas ya asignadas'); zone.capacity = dto.capacity; }
+      if (dto.name !== undefined) zone.name = dto.name.trim();
+      const category = await manager.getRepository(TournamentCategory).findOneBy({ id: zone.tournamentCategoryId });
+      const repository = manager.getRepository(TournamentScheduleSlot);
+      // The tournament lock also serializes zone edits and redistribution.
+      await repository.createQueryBuilder('slot').where('slot.tournamentId = :tournamentId', { tournamentId: category!.tournamentId }).setLock('pessimistic_write').getMany();
+      const slots = await repository.find({ where: { tournamentId: category!.tournamentId }, relations: { match: true } });
+      const zoneSlots = slots.filter((slot) => slot.stage === 'ZONE' && (slot.match?.zoneId === zone.id || (!slot.matchId && slot.tournamentCategoryId === zone.tournamentCategoryId && slot.zoneName === originalName && slot.matchOrder <= zone.capacity)));
+      const pending = zoneSlots.filter((slot) => slot.match?.status !== MatchStatus.PLAYED);
+      if (dto.venueId !== undefined && pending.length) {
+        const courts = await manager.getRepository(Court).find({ relations: { venue: true }, order: { id: 'ASC' } });
+        // Stable match IDs also cover renamed zones and stale court assignments.
+        for (const slot of pending) slot.zoneName = zone.name;
+        const movingIds = new Set(pending.map((slot) => slot.id));
+        redistributeExistingCourts(pending, [zone], courts, slots.filter((slot) => !movingIds.has(slot.id)));
+        for (const slot of pending) await repository.update(slot.id, { courtId: slot.courtId });
+      }
+      if (dto.name !== undefined) for (const slot of zoneSlots) await repository.update(slot.id, { zoneName: zone.name });
+      return manager.getRepository(Zone).save(zone);
+    });
   }
   addEntry(zoneId: number, registrationId: number) { return this.assignPlace(zoneId, registrationId); }
 
@@ -214,6 +236,8 @@ export class TournamentsService {
       if (played) throw new BadRequestException('El torneo ya tiene resultados cargados. Cambiá las canchas de los partidos pendientes individualmente.');
       const zones = await manager.getRepository(Zone).find({ where: { tournamentCategory: { tournamentId } }, relations: { venue: true }, order: { tournamentCategoryId: 'ASC', name: 'ASC' } });
       const courts = await manager.getRepository(Court).find({ relations: { venue: true }, order: { id: 'ASC' } });
+      const linked = await repository.find({ where: { tournamentId }, relations: { match: true } });
+      for (const slot of slots) slot.match = linked.find((item) => item.id === slot.id)?.match ?? null;
       redistributeExistingCourts(slots, zones, courts);
       // Updating only courtId preserves match IDs, dates, participants and results.
       for (const slot of slots) await repository.update(slot.id, { courtId: slot.courtId });

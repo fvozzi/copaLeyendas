@@ -21,11 +21,27 @@ describe('existing program redistribution', () => {
     expect(slots.filter((slot) => slot.courtId === 2)).toHaveLength(19);
     expect(slots.map(({ courtId: _courtId, ...slot }) => slot)).toEqual(before);
   });
-  it('respects a manually selected venue and avoids overlapping games on the same court', () => {
+  it('keeps a manually selected venue for knockouts and avoids overlapping games on the same court', () => {
     const otherVenue = { ...venue, id: 2 };
-    const slots = [0, 1].map((index) => ({ ...games()[0], sequence: index + 1, courtId: 4, scheduledAt: new Date(start + index * 10 * 60_000) }));
+    const slots = [0, 1].map((index) => ({ ...games()[0], stage: 'QUARTERFINAL', sequence: index + 1, courtId: 4, scheduledAt: new Date(start + index * 10 * 60_000) }));
     redistributeExistingCourts(slots, zones, [...courts.map((court) => ({ ...court, venue: court.venueId === 2 ? otherVenue : venue })), { id: 5, active: true, venueId: 2, venue: otherVenue } as Court]);
     expect(slots.map((slot) => slot.courtId)).toEqual([4, 5]);
+  });
+  it('moves a renamed zone to its current venue instead of retaining its old court venue', () => {
+    const destination = { ...venue, id: 2, name: 'Gure Echea' };
+    const slots = [0, 1].map((index) => ({ ...games()[0], sequence: index + 1, courtId: 1, scheduledAt: dateAt(venue, index), match: { zoneId: 1 } } as TournamentScheduleSlot));
+    redistributeExistingCourts(slots, [{ ...zones[0], name: 'Renamed', venueId: 2, venue: destination }], courts.map((court) => ({ ...court, venue: court.venueId === 2 ? destination : venue })));
+    expect(slots.map((slot) => slot.courtId)).toEqual([4, 4]);
+    expect(slots.map((slot) => slot.scheduledAt)).toEqual([dateAt(venue, 0), dateAt(venue, 1)]);
+  });
+  it('reserves other zones and played games when moving only pending games', () => {
+    const slots = [{ ...games()[0], sequence: 2, courtId: 4, scheduledAt: new Date(start) }];
+    const fixed = [{ ...games()[0], id: 50, courtId: 1, scheduledAt: new Date(start) }];
+    const available = courts.map((court) => ({ ...court, venue }));
+    redistributeExistingCourts(slots, zones, available, fixed);
+    expect(slots[0].courtId).toBe(2);
+    expect(fixed[0].courtId).toBe(1);
+    expect(() => redistributeExistingCourts(slots, zones, available.filter((court) => court.id !== 2), fixed)).toThrow('No hay una cancha activa disponible');
   });
   it('rejects a schedule with insufficient active courts at a given time', () => {
     const slots = [1, 2, 3].map((sequence) => ({ ...games()[0], sequence, courtId: 1, scheduledAt: new Date(start) }));
