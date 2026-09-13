@@ -667,12 +667,17 @@ img {
 .map-node-venue { display: block; font-size: 11px; color: var(--venue-color); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .map-node-meta { font-size: 10px; color: var(--ink-soft); }
 .map-node-action { margin-top: auto; font-size: 10px; font-weight: 700; }
+.map-zone-heading { display: flex; align-items: baseline; gap: 7px; }
+.map-zone-pairs { display: grid; gap: 3px; width: 100%; margin-top: 3px; }
+.map-zone-pair { display: flex; align-items: center; gap: 6px; min-height: 28px; font-size: 11px; line-height: 14px; }
+.map-pair-seed { display: grid; place-items: center; flex: 0 0 18px; height: 18px; border-radius: 4px; background: #173f390c; color: var(--ink-soft); font-size: 10px; }
+.map-pair-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .map-match-heading { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
 .map-match-heading > span { font-size: 10px; color: var(--ink-soft); }
 .map-participant { font-size: 11px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 18px; }
 .map-participant + .map-participant { border-top: 1px solid var(--line); padding-top: 3px; }
 .map-zones-only { padding: 1rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); gap: 1rem; }
-.map-zones-only .map-node { position: relative; min-height: 142px; }
+.map-zones-only .map-node { position: relative; min-height: 244px; }
 .map-zones-only > p { grid-column: 1/-1; margin: 0; }
 .map-zone-places { display: grid; gap: 0.75rem; }
 .map-zone-places > div { display: flex; align-items: end; gap: 0.6rem; }

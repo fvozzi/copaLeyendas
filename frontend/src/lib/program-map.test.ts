@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { categoryGraph, venueColor } from './program-map';
+import { categoryGraph, mapZonePairs, venueColor } from './program-map';
 import { programMapFixture } from '../test/program-map-fixture';
 
 it('connects each zone qualifier and each winning match to the real next match', () => {
@@ -20,4 +20,14 @@ it('filters venue zones while preserving their real paths to the final and stabl
   expect(graph.nodes.filter((node) => node.slot?.stage === 'FINAL')).toHaveLength(2);
   expect(graph.edges.every((edge) => graph.nodes.some((node) => node.id === edge.from) && graph.nodes.some((node) => node.id === edge.to))).toBe(true);
   expect(venueColor(1)).not.toBe(venueColor(2));
+});
+
+it('keeps pair positions and ignores later winners for zones of three and four', () => {
+  const { tournament, slots } = programMapFixture();
+  const zone = tournament.zones[0];
+  const pair = { id: 9, playerOneName: 'Ana', playerTwoName: 'Bea' } as NonNullable<typeof slots[0]['match']>['homeRegistration'];
+  slots[1].match!.awayRegistration = pair;
+  slots[2].match!.homeRegistration = pair;
+  expect(mapZonePairs(zone, slots).map((place) => [place.seed, place.registration?.id ?? null])).toEqual([[1, null], [2, null], [3, null], [4, 9]]);
+  expect(mapZonePairs({ ...zone, capacity: 3 }, slots).map((place) => [place.seed, place.registration?.id ?? null])).toEqual([[1, null], [2, null], [3, 9]]);
 });

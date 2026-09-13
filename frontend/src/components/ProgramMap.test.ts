@@ -36,6 +36,15 @@ it('opens a real match from the graph', async () => {
   await act(async () => (container.querySelector(`[data-map-node="match-${slot.matchId}"]`) as HTMLButtonElement).click());
   expect(onMatch).toHaveBeenCalledWith(slot, 'schedule');
 });
+
+it('lists placeholders and replaces only the assigned pair with player names', async () => {
+  const zoneCard = container.querySelector('[data-map-node="zone-1"]')!;
+  expect([...zoneCard.querySelectorAll('.map-pair-name')].map((item) => item.textContent)).toEqual(['Pareja 1', 'Pareja 2', 'Pareja 3', 'Pareja 4']);
+  fixture.slots[0].match!.awayRegistration = { id: 900, playerOneName: 'Ana Perez', playerTwoName: 'Bea Gomez' } as never;
+  await act(async () => root.render(createElement(ProgramMap, { tournamentId: 1, slots: [...fixture.slots], venues: fixture.venues, busy: false, onChanged, onMatch })));
+  expect([...zoneCard.querySelectorAll('.map-pair-name')].map((item) => item.textContent)).toEqual(['Pareja 1', 'Ana Perez / Bea Gomez', 'Pareja 3', 'Pareja 4']);
+  expect(zoneCard.textContent).toContain('1/4 parejas');
+});
 it('edits a zone and assigns a pair from the map using existing endpoints', async () => {
   await act(async () => (container.querySelector('[data-map-node="zone-1"]') as HTMLButtonElement).click());
   const form = document.querySelector('form')!;

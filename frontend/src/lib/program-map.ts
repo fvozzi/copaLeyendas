@@ -6,6 +6,17 @@ export const roundNames = ['Zonas', 'Cuartos de final', 'Semifinales', 'Final'];
 export interface MapNode { id: string; column: number; zone?: TournamentZone; slot?: TournamentScheduleSlot; }
 export interface MapEdge { from: string; to: string; side: 'home' | 'away'; rank?: number | null; }
 
+export function mapZonePairs(zone: TournamentZone, slots: TournamentScheduleSlot[]) {
+  const games = slots.filter((slot) => slot.match?.zoneId === zone.id);
+  const first = games.find((slot) => slot.match?.matchOrder === 1)?.match;
+  const second = games.find((slot) => slot.match?.matchOrder === 2)?.match;
+  // These are the fixed opening positions, before winners advance to later games.
+  const pairs = zone.capacity === 3
+    ? [first?.homeRegistration, first?.awayRegistration, second?.awayRegistration]
+    : [first?.homeRegistration, first?.awayRegistration, second?.homeRegistration, second?.awayRegistration];
+  return Array.from({ length: zone.capacity }, (_, index) => ({ seed: index + 1, registration: pairs[index] ?? null }));
+}
+
 export function categoryGraph(zones: TournamentZone[], slots: TournamentScheduleSlot[], venueId = 0) {
   const nodes: MapNode[] = [...zones].sort((a, b) => a.name.localeCompare(b.name, 'es', { numeric: true })).map((zone) => ({ id: `zone-${zone.id}`, column: 0, zone }));
   const stages = ['ZONE', 'QUARTERFINAL', 'SEMIFINAL', 'FINAL'];

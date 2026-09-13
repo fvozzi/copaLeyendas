@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
 import { getTournament } from '../lib/api';
-import { categoryGraph, mapParticipant, roundNames, venueColor, type MapNode } from '../lib/program-map';
+import { categoryGraph, mapParticipant, mapZonePairs, roundNames, venueColor, type MapNode } from '../lib/program-map';
 import type { TournamentDetail, TournamentScheduleSlot, TournamentZone, Venue } from '../types';
 import { ProgramZoneEditor } from './ProgramZoneEditor';
 
@@ -68,11 +68,13 @@ function MapBoard({ graph, full, zones, games, zoom, busy, onZone, onMatch }: {
   const columnCount = Math.max(1, ...full.nodes.map((node) => node.column + 1));
   const rowCount = Math.max(1, ...Array.from({ length: columnCount }, (_, column) => full.nodes.filter((node) => node.column === column).length));
   const canvasWidth = columnCount * 280 - 32;
-  const canvasHeight = rowCount * 166 + 42;
+  const rowHeight = 268;
+  const nodeHeight = (node: MapNode) => node.zone ? 244 : 142;
+  const canvasHeight = rowCount * rowHeight + 42;
   const positions = new Map(full.nodes.map((node) => {
     const siblings = full.nodes.filter((item) => item.column === node.column);
     const index = siblings.findIndex((item) => item.id === node.id);
-    return [node.id, { x: node.column * 280 + 12, y: 42 + (index + 0.5) * (rowCount * 166 / siblings.length) - 71 }];
+    return [node.id, { x: node.column * 280 + 12, y: 42 + (index + 0.5) * (rowCount * rowHeight / siblings.length) - nodeHeight(node) / 2 }];
   }));
   // A readable canvas on phones; its own viewport pans without widening the page.
   const scale = (width < 650 ? 0.9 : Math.min(1, width / canvasWidth)) * zoom;
@@ -80,12 +82,16 @@ function MapBoard({ graph, full, zones, games, zoom, busy, onZone, onMatch }: {
     const zone = node.zone;
     const slot = node.slot;
     const zoneGames = zone ? games.filter((game) => game.match?.zoneId === zone.id) : [];
-    const pairs = new Set(zoneGames.flatMap((game) => [game.match?.homeRegistration?.id, game.match?.awayRegistration?.id]).filter(Boolean));
+    const pairs = zone ? mapZonePairs(zone, zoneGames) : [];
     const position = positions.get(node.id)!;
     const venueId = zone?.venueId ?? slot?.court?.venueId;
     return <button type="button" key={node.id} className={`map-node ${zone ? 'map-zone-node' : 'map-match-node'}`} data-map-node={node.id} aria-label={zone ? `Editar zona ${zone.name} de ${zone.tournamentCategory.category.name}` : `${slot?.match?.status === 'PLAYED' ? 'Ver resultado' : 'Editar partido'} P${slot?.sequence}`} disabled={busy}
-      style={{ ...colorStyle(venueId), ...(positioned ? { left: position.x, top: position.y, width: 224, height: 142 } : {}) }} onClick={() => zone ? onZone(zone) : slot && onMatch(slot)}>
-      {zone ? <><span className="map-node-kicker">Zona</span><strong className="map-node-title">{zone.name.replace(/^zona\s+/i, '')}</strong><span className="map-node-venue" title={zone.venue.name}>{zone.venue.name}</span><span className="map-node-meta">{pairs.size}/{zone.capacity} parejas · {zoneGames.length} partidos</span><span className="map-node-action">Editar zona y parejas ↗</span></> : slot && <>
+      style={{ ...colorStyle(venueId), ...(positioned ? { left: position.x, top: position.y, width: 224, height: nodeHeight(node) } : {}) }} onClick={() => zone ? onZone(zone) : slot && onMatch(slot)}>
+      {zone ? <><span className="map-zone-heading"><span className="map-node-kicker">Zona</span><strong className="map-node-title">{zone.name.replace(/^zona\s+/i, '')}</strong></span><span className="map-node-venue" title={zone.venue.name}>{zone.venue.name}</span><span className="map-node-meta">{pairs.filter((pair) => pair.registration).length}/{zone.capacity} parejas · {zoneGames.length} partidos</span>
+        <span className="map-zone-pairs">{pairs.map(({ seed, registration }) => {
+          const label = registration ? `${registration.playerOneName} / ${registration.playerTwoName}` : `Pareja ${seed}`;
+          return <span className="map-zone-pair" key={seed} title={label}><span className="map-pair-seed">{seed}</span><span className="map-pair-name">{label}</span></span>;
+        })}</span><span className="map-node-action">Editar zona y parejas ↗</span></> : slot && <>
         <span className="map-match-heading"><strong>P{slot.sequence}</strong><span>{slot.match?.status === 'PLAYED' ? `${slot.match.homeScore}–${slot.match.awayScore}` : slot.match?.status === 'READY' ? 'Listo' : 'A definir'}</span></span>
         <span className="map-participant" title={mapParticipant(slot, 'home', zones, games)}>{mapParticipant(slot, 'home', zones, games)}</span>
         <span className="map-participant" title={mapParticipant(slot, 'away', zones, games)}>{mapParticipant(slot, 'away', zones, games)}</span>
@@ -108,7 +114,7 @@ function MapBoard({ graph, full, zones, games, zoom, busy, onZone, onMatch }: {
             {graph.edges.map((edge) => {
               const from = positions.get(edge.from)!, to = positions.get(edge.to)!;
               const source = full.nodes.find((node) => node.id === edge.from)!;
-              const x1 = from.x + 224, y1 = from.y + (edge.rank ? edge.rank === 1 ? 57 : 89 : 71);
+              const x1 = from.x + 224, y1 = from.y + (edge.rank ? nodeHeight(source) / 2 + (edge.rank === 1 ? -16 : 16) : 71);
               const x2 = to.x - 3, y2 = to.y + (edge.side === 'home' ? 53 : 79);
               return <g key={`${edge.from}-${edge.to}-${edge.side}`} data-map-edge={`${edge.from}:${edge.to}`}><path d={`M ${x1} ${y1} C ${x1 + 28} ${y1}, ${x2 - 28} ${y2}, ${x2} ${y2}`} fill="none" stroke={venueColor(source.zone?.venueId ?? source.slot?.court?.venueId)} strokeWidth="1.7" opacity="0.8" markerEnd={`url(#${marker})`} />{edge.rank && <text x={x1 + 5} y={y1 - 5}>{edge.rank}.ª</text>}</g>;
             })}
