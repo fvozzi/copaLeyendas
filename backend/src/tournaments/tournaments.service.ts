@@ -15,7 +15,7 @@ import { TournamentScheduleSlot } from './tournament-schedule-slot.entity';
 import { Tournament } from './tournament.entity';
 import { ZoneEntry } from './zone-entry.entity';
 import { Zone } from './zone.entity';
-import { distributeProgramCourts } from './program-courts';
+import { distributeProgramCourts, redistributeExistingCourts } from './program-courts';
 
 @Injectable()
 export class TournamentsService {
@@ -181,6 +181,24 @@ export class TournamentsService {
       await this.slots.save(generated);
     }
     return this.slots.find({ where: { tournamentId }, relations: { court: { venue: true }, tournamentCategory: { category: true } }, order: { sequence: 'ASC' } });
+  }
+
+  async redistributeCourts(tournamentId: number) {
+    return this.slots.manager.transaction(async (manager) => {
+      const tournament = await manager.getRepository(Tournament).findOne({ where: { id: tournamentId }, lock: { mode: 'pessimistic_write' } });
+      if (!tournament) throw new NotFoundException('Torneo no encontrado');
+      const repository = manager.getRepository(TournamentScheduleSlot);
+      const slots = await repository.createQueryBuilder('slot').where('slot.tournamentId = :tournamentId', { tournamentId }).orderBy('slot.sequence', 'ASC').setLock('pessimistic_write').getMany();
+      if (!slots.length) throw new BadRequestException('No hay partidos programados para repartir.');
+      const played = await manager.getRepository(TournamentMatch).count({ where: { zone: { tournamentCategory: { tournamentId } }, status: MatchStatus.PLAYED } });
+      if (played) throw new BadRequestException('El torneo ya tiene resultados cargados. Cambiá las canchas de los partidos pendientes individualmente.');
+      const zones = await manager.getRepository(Zone).find({ where: { tournamentCategory: { tournamentId } }, relations: { venue: true }, order: { tournamentCategoryId: 'ASC', name: 'ASC' } });
+      const courts = await manager.getRepository(Court).find({ relations: { venue: true }, order: { id: 'ASC' } });
+      redistributeExistingCourts(slots, zones, courts);
+      // Updating only courtId preserves match IDs, dates, participants and results.
+      for (const slot of slots) await repository.update(slot.id, { courtId: slot.courtId });
+      return repository.find({ where: { tournamentId }, relations: { court: { venue: true }, tournamentCategory: { category: true } }, order: { sequence: 'ASC' } });
+    });
   }
 
   private programDays(tournament: Tournament) {

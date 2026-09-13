@@ -3,10 +3,10 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AdminProgramPage } from './AdminProgramPage';
-import { getCourts, getVenues, getTournaments, getTournamentScheduleGrid, updateTournamentScheduleSlot } from '../lib/api';
+import { getCourts, getVenues, getTournaments, getTournamentScheduleGrid, updateTournamentScheduleSlot, redistributeTournamentCourts } from '../lib/api';
 import type { Court, Venue, Tournament, TournamentScheduleSlot } from '../types';
 
-vi.mock('../lib/api', () => ({ getCourts: vi.fn(), getVenues: vi.fn(), getTournaments: vi.fn(), getTournamentScheduleGrid: vi.fn(), updateTournamentScheduleSlot: vi.fn() }));
+vi.mock('../lib/api', () => ({ getCourts: vi.fn(), getVenues: vi.fn(), getTournaments: vi.fn(), getTournamentScheduleGrid: vi.fn(), updateTournamentScheduleSlot: vi.fn(), redistributeTournamentCourts: vi.fn() }));
 let root: Root;
 let container: HTMLDivElement;
 const venue = { id: 1, name: 'Club con nombre largo', active: true } as Venue;
@@ -36,6 +36,23 @@ it('shows all courts in a venue, including empty ones, and filters their games',
   expect(container.textContent).toContain('No hay partidos asignados');
   await click('Cancha 1 (1)');
   expect(container.querySelectorAll('tbody tr')).toHaveLength(1);
+});
+
+it('redistributes existing games and refreshes court counts', async () => {
+  vi.mocked(redistributeTournamentCourts).mockResolvedValue([{ ...slot, courtId: 2, court: courts[1] }]);
+  await click('Sedes');
+  await click('Repartir entre canchas');
+  expect(redistributeTournamentCourts).toHaveBeenCalledWith(1);
+  expect(container.querySelector('[aria-label="Canchas de la sede"]')?.textContent).toContain('Cancha 2 (1)');
+  expect(container.querySelector('[role="status"]')?.textContent).toContain('Se conservaron los horarios');
+});
+
+it('keeps existing assignments visible if redistribution fails', async () => {
+  vi.mocked(redistributeTournamentCourts).mockRejectedValue(new Error('No hay una cancha activa disponible'));
+  await click('Sedes');
+  await click('Repartir entre canchas');
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain('No hay una cancha activa disponible');
+  expect(container.querySelector('[aria-label="Canchas de la sede"]')?.textContent).toContain('Cancha 1 (1)');
 });
 
 it('moves a game to an empty court without changing its time and keeps the venue visible', async () => {

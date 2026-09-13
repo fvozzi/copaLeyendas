@@ -21,6 +21,7 @@ export class TournamentsController {
   @Get('zones/:id/matches') async matches(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { await this.s.assertZoneAccess(user, id); return this.s.matches(id); }
   @Get(':id') detail(@Param('id', ParseIntPipe) id: number) { return this.q.detail(id); }
   @Get(':id/schedule-grid') scheduleGrid(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { this.assertDirector(user); return this.s.scheduleGrid(id); }
+  @Post(':id/redistribute-courts') redistributeCourts(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { this.assertDirector(user); return this.s.redistributeCourts(id); }
   @Post() create(@CurrentUser() user: AuthenticatedUser, @Body() dto: { name: string; startsAt?: string; endsAt?: string; playingDays?: string[]; city?: string }) { this.assertDirector(user); return this.s.create(dto); }
   @Patch(':id') update(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: { name?: string; startsAt?: string; endsAt?: string; playingDays?: string[]; city?: string; status?: TournamentStatus }) { this.assertDirector(user); return this.s.update(id, dto); }
   @Post(':id/categories') category(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: { categoryId: number; pointsPerSet?: number; setsToWin?: number; zoneSize?: number }) { this.assertDirector(user); return this.s.addCategory(id, dto); }

@@ -2,6 +2,28 @@ import type { Court } from '../courts/court.entity';
 import type { Venue } from '../courts/venue.entity';
 import type { TournamentScheduleSlot } from './tournament-schedule-slot.entity';
 import type { Zone } from './zone.entity';
+import { BadRequestException } from '@nestjs/common';
+
+// Existing programs keep their times and venues; only the court assignment changes.
+export function redistributeExistingCourts(slots: TournamentScheduleSlot[], zones: Zone[], courts: Court[]) {
+  const counts = new Map<number, number>();
+  const occupied = new Map<number, { start: number; end: number }[]>();
+  for (const slot of [...slots].sort((a, b) => (a.scheduledAt?.getTime() ?? Infinity) - (b.scheduledAt?.getTime() ?? Infinity) || a.sequence - b.sequence)) {
+    const originalCourt = courts.find((court) => court.id === slot.courtId);
+    const zone = zones.find((item) => item.tournamentCategoryId === slot.tournamentCategoryId && (slot.stage !== 'ZONE' || item.name === slot.zoneName));
+    const venue = originalCourt?.venue ?? zone?.venue;
+    if (!venue?.active) throw new BadRequestException(`El partido ${slot.sequence} no tiene una sede activa.`);
+    const start = slot.scheduledAt?.getTime();
+    const end = start === undefined ? undefined : start + venue.matchDurationMinutes * 60_000;
+    const available = courts.filter((court) => court.active && court.venueId === venue.id && (start === undefined || !(occupied.get(court.id) ?? []).some((range) => start < range.end && end! > range.start)))
+      .sort((a, b) => (counts.get(a.id) ?? 0) - (counts.get(b.id) ?? 0) || a.id - b.id);
+    const chosen = available[0];
+    if (!chosen) throw new BadRequestException(`No hay una cancha activa disponible para el partido ${slot.sequence} en ${venue.name}. Revisá las canchas y los horarios.`);
+    slot.courtId = chosen.id;
+    counts.set(chosen.id, (counts.get(chosen.id) ?? 0) + 1);
+    if (start !== undefined) occupied.set(chosen.id, [...(occupied.get(chosen.id) ?? []), { start, end: end! }]);
+  }
+}
 
 // Allocate each court independently, waiting for the games that feed the next round.
 export function distributeProgramCourts(

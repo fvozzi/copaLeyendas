@@ -8,6 +8,8 @@ import { Zone } from './zone.entity';
 import { ZoneEntry } from './zone-entry.entity';
 import { PairRegistration } from '../registrations/pair-registration.entity';
 import { RegistrationStatus } from '../registrations/registration.enums';
+import { Tournament } from './tournament.entity';
+import { Court } from '../courts/court.entity';
 
 vi.mock('./tournament.entity', () => ({ Tournament: class Tournament {} }));
 vi.mock('./tournament-category.entity', () => ({ TournamentCategory: class TournamentCategory {} }));
@@ -49,6 +51,34 @@ it('distributes a new schedule across courts and preserves an existing schedule 
   expect(stored[0].courtId).toBe(2);
   expect(repository.save).toHaveBeenCalledTimes(1);
   expect(repository.delete).toHaveBeenCalledTimes(1);
+});
+
+it('redistributes existing slots atomically, updating only courts, and rejects tournaments with results', async () => {
+  const venue = { id: 1, active: true, matchDurationMinutes: 40 };
+  const slots = [1, 2].map((id) => ({ id, sequence: id, stage: 'ZONE', matchOrder: id, zoneName: 'A', tournamentCategoryId: 1, courtId: 1, scheduledAt: new Date(`2026-11-20T${id === 1 ? '13:00' : '13:40'}:00Z`) }));
+  const query = { where: vi.fn().mockReturnThis(), orderBy: vi.fn().mockReturnThis(), setLock: vi.fn().mockReturnThis(), getMany: vi.fn(async () => slots) };
+  const repository = { createQueryBuilder: vi.fn(() => query), update: vi.fn(), find: vi.fn(async () => slots) };
+  const matches = { count: vi.fn(async () => 0) };
+  const repositories = new Map<any, any>([
+    [Tournament, { findOne: vi.fn(async () => ({ id: 1 })) }],
+    [TournamentScheduleSlot, repository], [TournamentMatch, matches],
+    [Zone, { find: vi.fn(async () => [{ name: 'A', tournamentCategoryId: 1, venue }]) }],
+    [Court, { find: vi.fn(async () => [1, 2].map((id) => ({ id, venueId: 1, active: true, venue }))) }],
+  ]);
+  const manager = { getRepository: (entity: any) => repositories.get(entity) };
+  const transaction = vi.fn(async (fn) => fn(manager));
+  const service = new TournamentsService({} as never, {} as never, {} as never, {} as never, {} as never, { manager: { transaction } } as never, {} as never, {} as never, {} as never, {} as never);
+  expect(await service.redistributeCourts(1)).toBe(slots);
+  expect(transaction).toHaveBeenCalledOnce();
+  expect(repository.update.mock.calls).toEqual([[1, { courtId: 1 }], [2, { courtId: 2 }]]);
+  repository.update.mockClear();
+  matches.count.mockResolvedValue(1);
+  await expect(service.redistributeCourts(1)).rejects.toThrow('resultados cargados');
+  expect(repository.update).not.toHaveBeenCalled();
+  matches.count.mockResolvedValue(0);
+  slots.push({ ...slots[0], id: 3 }, { ...slots[0], id: 4 });
+  await expect(service.redistributeCourts(1)).rejects.toThrow('No hay una cancha activa disponible');
+  expect(repository.update).not.toHaveBeenCalled();
 });
 
 function setup(capacity = 4) {

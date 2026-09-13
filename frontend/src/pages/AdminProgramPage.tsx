@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminDataGrid, type AdminGridColumn } from '../components/AdminDataGrid';
-import { getCourts, getVenues, getTournamentScheduleGrid, getTournaments, updateTournamentScheduleSlot } from '../lib/api';
+import { getCourts, getVenues, getTournamentScheduleGrid, getTournaments, updateTournamentScheduleSlot, redistributeTournamentCourts } from '../lib/api';
 import type { Court, Venue, Tournament, TournamentScheduleSlot } from '../types';
 
 type ProgramTab = 'matches' | 'venues' | 'categories';
@@ -27,6 +27,15 @@ export function AdminProgramPage() {
   const [categoryTab, setCategoryTab] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const redistribute = async () => {
+    setSaving(true); setError(null); setNotice(null);
+    try {
+      setSlots(await redistributeTournamentCourts(tournamentId));
+      setNotice('Partidos repartidos entre las canchas activas de cada sede. Se conservaron los horarios.');
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudieron repartir los partidos.'); }
+    finally { setSaving(false); }
+  };
   useEffect(() => {
     Promise.all([getTournaments(), getCourts(), getVenues()]).then(([items, courtItems, venueItems]) => {
       setTournaments(items); setTournamentId(items[0]?.id ?? 0); setCourts(courtItems); setVenues(venueItems);
@@ -35,6 +44,7 @@ export function AdminProgramPage() {
   useEffect(() => {
     let current = true;
     setSlots([]);
+    setNotice(null);
     if (tournamentId) getTournamentScheduleGrid(tournamentId).then((items) => { if (current) setSlots(items); }).catch((reason: Error) => { if (current) setError(reason.message); });
     return () => { current = false; };
   }, [tournamentId]);
@@ -80,7 +90,9 @@ export function AdminProgramPage() {
   return <div className="admin-panel">
     <div className="panel-header"><div><p className="eyebrow">Organización</p><h1>Programa</h1><p className="field-hint">Consultá los partidos por sede y cancha. Podés cambiar la cancha desde cualquier vista.</p></div><Link className="secondary-button" to="/app/canchas/internas">Administrar canchas</Link></div>
     <section className="data-card"><label>Seleccionar torneo<select disabled={saving} value={tournamentId} onChange={(event) => { setTournamentId(Number(event.target.value)); setVenueTab(''); setCourtTab('all'); setCategoryTab(''); }}><option value="0">Seleccionar torneo</option>{tournaments.map((tournament) => <option key={tournament.id} value={tournament.id}>{tournament.name}</option>)}</select></label></section>
+    <section className="data-card"><button type="button" className="secondary-button" disabled={saving || !slots.length || !tournamentId} onClick={() => void redistribute()}>{saving ? 'Guardando…' : 'Repartir entre canchas'}</button><p className="field-hint">Reparte los partidos de este torneo entre las canchas activas de cada sede, manteniendo sus horarios.</p></section>
     {error && <div className="inline-state" role="alert">{error}</div>}
+    {notice && <div className="inline-state" role="status">{notice}</div>}
     <div className="program-tabs" role="tablist" aria-label="Vistas del programa">{([{ id: 'matches', label: 'Partidos' }, { id: 'venues', label: 'Sedes' }, { id: 'categories', label: 'Categorías' }] as const).map((item) => <button type="button" role="tab" aria-selected={tab === item.id} key={item.id} className={tab === item.id ? 'is-selected' : ''} onClick={() => setTab(item.id)}>{item.label}</button>)}</div>
     {tab === 'matches' && <ProgramTable title="Todos los partidos" slots={[...slots].sort((a, b) => a.sequence - b.sequence)} columns={columns} />}
     {tab === 'venues' && <ProgramSubTabs options={venueOptions} selected={selectedVenue} onSelect={(id) => { setVenueTab(id); setCourtTab('all'); }} ariaLabel="Sedes del programa">
