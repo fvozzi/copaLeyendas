@@ -2,6 +2,10 @@
 
 Programa y Zona usan los mismos partidos. Abrir cualquiera de las vistas crea los partidos pendientes de la zona si aún no existen; después el director asigna las parejas a sus lugares. Programa muestra los nombres, resultados y referencias a los cruces anteriores del fixture. Las zonas de tres parejas tienen tres partidos y las de cuatro mantienen sus cuatro cruces.
 
+La pestaña **Mapa** muestra las zonas y sus conexiones reales con cuartos, semifinales y final, agrupadas por categoría. Los colores identifican las sedes. Los filtros de categoría y sede se combinan; al elegir una sede se conservan los cruces que continúan desde sus zonas hasta la final. El zoom permite ampliar el cuadro y, en celular, se puede desplazar dentro del mapa.
+
+Tocar una zona abre su nombre, sede, lugares para asignar o reemplazar parejas y partidos. Tocar un cruce permite editar cancha y horario, cargar el resultado si está listo o consultar el resultado si ya se jugó. Todas estas acciones usan los mismos registros y validaciones del fixture. El selector de torneo está junto al título; **Opciones** reúne la administración de canchas y el reparto automático.
+
 Cada fila de `tournament_schedule_slots` se vincula mediante `matchId` único al partido de `tournament_matches`. La fila contiene la cancha, fecha y número general; el partido contiene participantes, fuentes y resultados. Todas las vistas leen la fecha y cancha de esa misma fila. La antigua columna de fecha del partido se conserva por compatibilidad de migración, pero no es la fuente utilizada por las vistas ni por las ediciones.
 
 La migración `1789948800000-LinkProgramToMatches` vincula los partidos anteriores sin recrearlos. Si el fixture tenía un horario guardado, se conserva ese horario; en caso contrario se mantiene el de Programa. Se mantienen las canchas, los resultados y las parejas existentes. Las filas antiguas sobrantes de una zona de tres parejas quedan fuera de la vista, sin eliminar registros.

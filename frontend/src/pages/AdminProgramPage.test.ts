@@ -102,3 +102,13 @@ it('moves a game to an empty court without changing its time and keeps the venue
   await click('Cancha 2 (1)');
   expect(container.querySelectorAll('tbody tr')).toHaveLength(1);
 });
+
+it('edits the court and time together from the match dialog', async () => {
+  await click('Horario');
+  const form = document.querySelector('form')!;
+  const court = form.querySelector('select')!;
+  await act(async () => { court.value = '2'; court.dispatchEvent(new Event('change', { bubbles: true })); });
+  await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+  expect(updateTournamentScheduleSlot).toHaveBeenCalledWith(10, { courtId: 2, scheduledAt: new Date(slot.scheduledAt!).toISOString() });
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+});

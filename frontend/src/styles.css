@@ -624,6 +624,74 @@ img {
 .program-venue-assignments dt { font-weight: 700; }
 .program-venue-assignments dd { margin: 0.25rem 0 0; }
 
+.admin-panel.program-page { min-width: 0; gap: 0.85rem; }
+.program-header { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; }
+.program-header h1 { font: 700 2.3rem/1 'Newsreader', serif; margin: 0; }
+.program-header > label { flex: 1; min-width: 12rem; max-width: 30rem; font-size: 0.75rem; color: var(--ink-soft); }
+.program-header select { display: block; width: 100%; padding: 0.5rem 0.75rem; min-height: 40px; font-size: 0.9rem; margin: 0.2rem 0 0; }
+.program-options { position: relative; margin-left: auto; }
+.program-options summary { cursor: pointer; border: 1px solid var(--line); border-radius: 8px; padding: 0.6rem 0.9rem; font-size: 0.85rem; background: var(--white); }
+.program-options > div { position: absolute; z-index: 5; right: 0; top: calc(100% + 0.4rem); width: min(21rem, 85vw); display: grid; gap: 0.65rem; padding: 1rem; background: white; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 30px #12232820; }
+.program-options small { color: var(--ink-soft); line-height: 1.5; }
+.program-page > .program-tabs { margin: 0; flex-wrap: wrap; gap: 0; }
+.program-page > .program-tabs button { padding: 0.65rem 1rem; font-size: 0.9rem; }
+.program-map { min-width: 0; display: grid; gap: 0.9rem; }
+.map-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 0.8rem; }
+.map-controls label { display: grid; gap: 0.25rem; min-width: 10rem; font-size: 0.75rem; color: var(--ink-soft); }
+.map-controls select { padding: 0.5rem 0.7rem; min-height: 40px; font-size: 0.85rem; }
+.map-count { padding-bottom: 0.6rem; color: var(--ink-soft); font-size: 0.8rem; }
+.map-zoom { margin-left: auto; display: flex; align-items: center; gap: 0.2rem; font-size: 0.8rem; }
+.map-zoom button { min-width: 36px; min-height: 40px; padding: 0.4rem 0.55rem; background: white; border: 1px solid var(--line); }
+.map-zoom span { min-width: 3rem; text-align: center; }
+.map-legend { display: flex; gap: 0.5rem 1rem; flex-wrap: wrap; font-size: 0.75rem; }
+.map-legend span { display: inline-flex; gap: 0.4rem; align-items: center; }
+.map-legend i { width: 10px; height: 10px; border-radius: 3px; }
+.map-filter-note, .map-pan-hint { font-size: 0.75rem; color: var(--ink-soft); margin: 0; }
+.map-pan-hint { display: none; padding: 0.5rem 0.85rem; }
+.map-category { min-width: 0; overflow: hidden; background: #ffffffc9; border: 1px solid var(--line); border-radius: 12px; }
+.map-category-title { display: flex; align-items: center; flex-wrap: wrap; gap: 0.6rem; justify-content: space-between; padding: 0.75rem 1rem; border-bottom: 1px solid var(--line); }
+.map-category-title h2 { font-size: 1rem; margin: 0; }
+.map-category-title > span { font-size: 0.75rem; color: var(--ink-soft); }
+.map-viewport { max-width: 100%; overflow: auto; cursor: grab; overscroll-behavior-x: contain; background-image: radial-gradient(#173f3914 1px, transparent 1px); background-size: 18px 18px; }
+.map-viewport:active { cursor: grabbing; }
+.map-canvas { position: relative; transform-origin: top left; }
+.map-scaled-area { position: relative; }
+.map-round-title { position: absolute; top: 10px; font-size: 11px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.07em; }
+.map-edges { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+.map-edges text { font-size: 10px; fill: var(--ink-soft); }
+.map-node { position: absolute; display: flex; flex-direction: column; gap: 5px; padding: 11px 13px; border: 1px solid var(--line); border-left: 4px solid var(--venue-color); background: white; text-align: left; color: var(--ink); box-shadow: 0 2px 8px #12232808; border-radius: 8px; overflow: hidden; }
+.map-node:hover { transform: none; box-shadow: 0 3px 14px #12232820; border-color: var(--venue-color); }
+.map-node:focus-visible { outline: 3px solid var(--venue-color); outline-offset: 3px; }
+.map-node-kicker { font-size: 10px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.08em; color: var(--venue-color); }
+.map-node-title { font-size: 21px; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.map-node-venue { display: block; font-size: 11px; color: var(--venue-color); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.map-node-meta { font-size: 10px; color: var(--ink-soft); }
+.map-node-action { margin-top: auto; font-size: 10px; font-weight: 700; }
+.map-match-heading { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+.map-match-heading > span { font-size: 10px; color: var(--ink-soft); }
+.map-participant { font-size: 11px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 18px; }
+.map-participant + .map-participant { border-top: 1px solid var(--line); padding-top: 3px; }
+.map-zones-only { padding: 1rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); gap: 1rem; }
+.map-zones-only .map-node { position: relative; min-height: 142px; }
+.map-zones-only > p { grid-column: 1/-1; margin: 0; }
+.map-zone-places { display: grid; gap: 0.75rem; }
+.map-zone-places > div { display: flex; align-items: end; gap: 0.6rem; }
+.map-zone-places label { flex: 1; min-width: 0; }
+.map-zone-places select { display: block; width: 100%; }
+.map-zone-games { display: grid; gap: 0.5rem; }
+.map-zone-games > div { display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap; padding: 0.65rem 0; border-bottom: 1px solid var(--line); }
+.map-zone-games span { font-size: 0.8rem; }
+@media (max-width: 700px) {
+  .program-header { gap: 0.6rem; }
+  .program-header h1 { font-size: 1.9rem; }
+  .program-header > label { order: 3; flex-basis: 100%; max-width: none; }
+  .program-page > .program-tabs button { padding: 0.6rem 0.65rem; font-size: 0.8rem; }
+  .map-controls label { flex: 1 1 calc(50% - 0.4rem); min-width: 0; }
+  .map-controls select { width: 100%; min-width: 0; }
+  .map-count { flex: 1; }
+  .map-pan-hint { display: block; }
+}
+
 .tournament-zone-grid,
 .court-public-grid {
   display: grid;

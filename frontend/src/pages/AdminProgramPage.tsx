@@ -2,10 +2,11 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminDataGrid, type AdminGridColumn } from '../components/AdminDataGrid';
 import { AdminDialog } from '../components/AdminDialog';
+import { ProgramMap } from '../components/ProgramMap';
 import { getCourts, getVenues, getTournamentScheduleGrid, getTournaments, updateTournamentScheduleSlot, redistributeTournamentCourts, saveMatchResult } from '../lib/api';
 import type { Court, Venue, Tournament, TournamentScheduleSlot } from '../types';
 
-type ProgramTab = 'matches' | 'venues' | 'categories';
+type ProgramTab = 'matches' | 'venues' | 'categories' | 'map';
 const bySchedule = (left: TournamentScheduleSlot, right: TournamentScheduleSlot) => (left.scheduledAt ?? '9999').localeCompare(right.scheduledAt ?? '9999') || left.sequence - right.sequence;
 const matchLabel = (slot: TournamentScheduleSlot, allSlots: TournamentScheduleSlot[]) => {
   if (slot.match) {
@@ -48,9 +49,10 @@ export function AdminProgramPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ slot: TournamentScheduleSlot; kind: 'schedule' | 'result' } | null>(null);
   const [date, setDate] = useState('');
+  const [editingCourt, setEditingCourt] = useState(0);
   const [scores, setScores] = useState({ home: 25, away: 0 });
   const editMatch = (slot: TournamentScheduleSlot, kind: 'schedule' | 'result') => {
-    setError(null); setEditing({ slot, kind }); setScores({ home: 25, away: 0 });
+    setError(null); setEditing({ slot, kind }); setScores({ home: slot.match?.homeScore ?? 25, away: slot.match?.awayScore ?? 0 }); setEditingCourt(slot.courtId ?? 0);
     setDate(slot.scheduledAt ? new Date(new Date(slot.scheduledAt).getTime() - new Date(slot.scheduledAt).getTimezoneOffset() * 60_000).toISOString().slice(0, 16) : '');
   };
   const saveMatch = async (event: React.FormEvent) => {
@@ -58,7 +60,7 @@ export function AdminProgramPage() {
     setSaving(true); setError(null);
     try {
       if (editing.kind === 'result' && editing.slot.matchId) await saveMatchResult(editing.slot.matchId, scores.home, scores.away);
-      else await updateTournamentScheduleSlot(editing.slot.id, { scheduledAt: new Date(date).toISOString() });
+      else await updateTournamentScheduleSlot(editing.slot.id, { scheduledAt: date ? new Date(date).toISOString() : null, courtId: editingCourt || null });
       setSlots(await getTournamentScheduleGrid(tournamentId)); setEditing(null);
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo guardar el partido.'); }
     finally { setSaving(false); }
@@ -128,13 +130,19 @@ export function AdminProgramPage() {
   }, {});
   const categoryOptions = Object.keys(byCategory).sort().map((name) => ({ id: name, label: name }));
   const selectedCategory = byCategory[categoryTab] ? categoryTab : categoryOptions[0]?.id;
-  return <div className="admin-panel">
-    <div className="panel-header"><div><p className="eyebrow">Organización</p><h1>Programa</h1><p className="field-hint">Consultá los partidos por sede y cancha. Podés cambiar la cancha desde cualquier vista.</p></div><Link className="secondary-button" to="/app/canchas/internas">Administrar canchas</Link></div>
-    <section className="data-card"><label>Seleccionar torneo<select disabled={saving} value={tournamentId} onChange={(event) => { setTournamentId(Number(event.target.value)); setVenueTab(''); setCourtTab('all'); setCategoryTab(''); }}><option value="0">Seleccionar torneo</option>{tournaments.map((tournament) => <option key={tournament.id} value={tournament.id}>{tournament.name}</option>)}</select></label></section>
-    <section className="data-card"><button type="button" className="secondary-button" disabled={saving || !slots.length || !tournamentId} onClick={() => void redistribute()}>{saving ? 'Guardando…' : 'Repartir entre canchas'}</button><p className="field-hint">Reparte los partidos según la sede configurada en cada zona, manteniendo sus horarios. Las eliminatorias conservan su sede asignada.</p></section>
+  return <div className="admin-panel program-page">
+    <div className="program-header"><h1>Programa</h1>
+      <label>Torneo<select aria-label="Seleccionar torneo" disabled={saving} value={tournamentId} onChange={(event) => { setTournamentId(Number(event.target.value)); setVenueTab(''); setCourtTab('all'); setCategoryTab(''); }}><option value="0">Seleccionar torneo</option>{tournaments.map((tournament) => <option key={tournament.id} value={tournament.id}>{tournament.name}</option>)}</select></label>
+      <details className="program-options"><summary>Opciones</summary><div>
+        <Link className="secondary-button" to="/app/canchas/internas">Administrar canchas</Link>
+        <button type="button" className="secondary-button" disabled={saving || !slots.length || !tournamentId} onClick={() => void redistribute()}>{saving ? 'Guardando…' : 'Repartir entre canchas'}</button>
+        <small>El reparto respeta la sede de cada zona y conserva los horarios. Las eliminatorias mantienen su sede.</small>
+      </div></details>
+    </div>
     {error && <div className="inline-state" role="alert">{error}</div>}
     {notice && <div className="inline-state" role="status">{notice}</div>}
-    <div className="program-tabs" role="tablist" aria-label="Vistas del programa">{([{ id: 'matches', label: 'Partidos' }, { id: 'venues', label: 'Sedes' }, { id: 'categories', label: 'Categorías' }] as const).map((item) => <button type="button" role="tab" aria-selected={tab === item.id} key={item.id} className={tab === item.id ? 'is-selected' : ''} onClick={() => setTab(item.id)}>{item.label}</button>)}</div>
+    <div className="program-tabs" role="tablist" aria-label="Vistas del programa">{([{ id: 'matches', label: 'Partidos' }, { id: 'venues', label: 'Sedes' }, { id: 'categories', label: 'Categorías' }, { id: 'map', label: 'Mapa' }] as const).map((item) => <button type="button" role="tab" aria-selected={tab === item.id} key={item.id} className={tab === item.id ? 'is-selected' : ''} onClick={() => setTab(item.id)}>{item.label}</button>)}</div>
+    {tab === 'map' && tournamentId > 0 && <ProgramMap key={tournamentId} tournamentId={tournamentId} slots={slots} venues={venues} busy={saving} onChanged={async () => setSlots(await getTournamentScheduleGrid(tournamentId))} onMatch={editMatch} />}
     {tab === 'matches' && <ProgramTable title="Todos los partidos" slots={[...slots].sort((a, b) => a.sequence - b.sequence)} columns={columns} />}
     {tab === 'venues' && <ProgramSubTabs options={venueOptions} selected={selectedVenue} onSelect={(id) => { setVenueTab(id); setCourtTab('all'); }} ariaLabel="Sedes del programa">
       {selectedVenue && <section className="data-card"><div className="panel-header"><div className="program-venue-heading"><h2>{venueOptions.find((venue) => venue.id === selectedVenue)?.label}</h2><VenueAssignments slots={venueSlots} /></div></div>
@@ -148,8 +156,9 @@ export function AdminProgramPage() {
     {tournamentId > 0 && !slots.length && <div className="inline-state">Agregá categorías y zonas al torneo para generar el programa.</div>}
     {editing && <AdminDialog title={`${editing.kind === 'result' ? 'Resultado' : 'Horario'} P${editing.slot.sequence}`} onClose={() => { if (!saving) setEditing(null); }}><form className="editor-form" onSubmit={saveMatch}>
       {error && <div className="inline-state span-2" role="alert">{error}</div>}
-      {editing.kind === 'schedule' ? <label>Fecha y hora<input type="datetime-local" value={date} onChange={(event) => setDate(event.target.value)} required /></label> : <><label>Local<input type="number" min="0" value={scores.home} onChange={(event) => setScores({ ...scores, home: Number(event.target.value) })} required /></label><label>Visitante<input type="number" min="0" value={scores.away} onChange={(event) => setScores({ ...scores, away: Number(event.target.value) })} required /></label></>}
-      <div className="span-2 form-actions"><button className="primary-button" disabled={saving}>Guardar</button></div>
+      <p className="field-hint span-2">{editing.slot.tournamentCategory.category.name} · {editing.slot.zoneName}<br />{matchLabel(editing.slot, slots)}</p>
+      {editing.kind === 'schedule' ? <><label>Fecha y hora<input type="datetime-local" value={date} onChange={(event) => setDate(event.target.value)} /></label><label>Cancha<select value={editingCourt} onChange={(event) => setEditingCourt(Number(event.target.value))}><option value="0">Sin asignar</option>{knownVenues.map((venue) => <optgroup key={venue.id} label={venue.name}>{knownCourts.filter((court) => court.venueId === venue.id && ((court.active && venue.active) || court.id === editingCourt)).map((court) => <option key={court.id} value={court.id} disabled={!court.active || !venue.active}>{court.name}{court.active && venue.active ? '' : ' (inactiva)'}</option>)}</optgroup>)}</select></label></> : <><label>Local<input type="number" min="0" value={scores.home} disabled={editing.slot.match?.status === 'PLAYED'} onChange={(event) => setScores({ ...scores, home: Number(event.target.value) })} required /></label><label>Visitante<input type="number" min="0" value={scores.away} disabled={editing.slot.match?.status === 'PLAYED'} onChange={(event) => setScores({ ...scores, away: Number(event.target.value) })} required /></label></>}
+      {editing.slot.match?.status !== 'PLAYED' && <div className="span-2 form-actions"><button className="primary-button" disabled={saving}>Guardar</button>{editing.kind === 'schedule' && editing.slot.match?.status === 'READY' && <button type="button" className="secondary-button" disabled={saving} onClick={() => editMatch(editing.slot, 'result')}>Cargar resultado</button>}</div>}
     </form></AdminDialog>}
   </div>;
 }
