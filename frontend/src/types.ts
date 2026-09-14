@@ -285,6 +285,10 @@ export interface TournamentDetail extends Tournament { categories: TournamentCat
 export interface TournamentMatch { id: number; zoneId?: number | null; sequence?: number | null; homeQualifierZoneId?: number | null; awayQualifierZoneId?: number | null; homeQualifierRank?: number | null; awayQualifierRank?: number | null; matchOrder: number; status: string; court?: Court | null; homeRegistration: PairRegistration | null; awayRegistration: PairRegistration | null; homeSource?: 'DIRECT' | 'WINNER' | 'LOSER'; awaySource?: 'DIRECT' | 'WINNER' | 'LOSER'; homeSourceMatchId?: number | null; awaySourceMatchId?: number | null; homeScore: number | null; awayScore: number | null; scheduledAt: string | null; }
 export interface ZoneEntry { id: number; seed: number; registration: PairRegistration; }
 export interface ZoneDetail extends TournamentZone { entries: ZoneEntry[]; }
+
+export interface ProgramScenarioRule { categoryId: number; stage: 'ZONE' | 'QUARTERFINAL' | 'SEMIFINAL' | 'FINAL'; zoneId?: number; matchOrder?: number; venueId: number; courtId?: number | null; day: 'MAIN' | 'FINALS'; }
+export interface ProgramScenario { mainDay: string; finalsDay: string; interleaveCategories: boolean; rules: ProgramScenarioRule[]; baseVersion?: string; }
+export interface ProgramScenarioPreview { baseVersion: string; slots: TournamentScheduleSlot[]; warnings: { sequence: number; message: string }[]; }
 export interface PublicStanding { registration: PairRegistration; played: number; wins: number; losses: number; pointsFor: number; pointsAgainst: number; tablePoints: number; }
 export interface PublicTournamentZone { id: number; name: string; category: string; venue: Venue; court?: Court; standings: PublicStanding[]; matches: TournamentMatch[]; }
 export interface PublicTournament extends Tournament { zones: PublicTournamentZone[]; }

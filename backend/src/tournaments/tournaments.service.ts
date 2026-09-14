@@ -18,6 +18,9 @@ import { Zone } from './zone.entity';
 import { distributeProgramCourts, redistributeExistingCourts } from './program-courts';
 import { matchView, programRelations, programView } from './program-view';
 import { standings } from './zone-standings';
+import { createHash } from 'node:crypto';
+import type { ProgramScenarioDto } from './program-scenario.dto';
+import { simulateProgram } from './program-scenario';
 
 @Injectable()
 export class TournamentsService {
@@ -254,6 +257,39 @@ export class TournamentsService {
       for (const slot of slots) await repository.update(slot.id, { courtId: slot.courtId, ...(undatedIds.has(slot.id) ? { scheduledAt: slot.scheduledAt } : {}) });
       return programView(await repository.find({ where: { tournamentId }, relations: programRelations, order: { sequence: 'ASC' } }));
     });
+  }
+
+  async scenario(tournamentId: number, config: ProgramScenarioDto, apply = false) {
+    const runner = this.slots.manager.connection.createQueryRunner();
+    await runner.connect(); await runner.startTransaction();
+    try {
+      const manager = runner.manager;
+      const tournament = await manager.getRepository(Tournament).findOne({ where: { id: tournamentId }, lock: { mode: 'pessimistic_write' } });
+      if (!tournament) throw new NotFoundException('Torneo no encontrado');
+      const zoneRepo = manager.getRepository(Zone), slotRepo = manager.getRepository(TournamentScheduleSlot);
+      const zones = await zoneRepo.find({ where: { tournamentCategory: { tournamentId } }, relations: { venue: true, tournamentCategory: true }, order: { id: 'ASC' } });
+      for (const zone of zones) await zoneRepo.findOne({ where: { id: zone.id }, lock: { mode: 'pessimistic_write' } });
+      const courts = await manager.getRepository(Court).find({ relations: { venue: true }, order: { id: 'ASC' } });
+      await slotRepo.createQueryBuilder('slot').where('slot.tournamentId = :tournamentId', { tournamentId }).setLock('pessimistic_write').getMany();
+      const before = await slotRepo.find({ where: { tournamentId }, relations: programRelations, order: { sequence: 'ASC' } });
+      if (before.some((slot) => slot.match?.status === MatchStatus.PLAYED)) throw new BadRequestException('El torneo ya tiene resultados cargados. Editá los partidos pendientes individualmente.');
+      const { baseVersion: _version, ...settings } = config;
+      const baseVersion = createHash('sha256').update(JSON.stringify({ tournament, zones, courts, before, settings })).digest('hex');
+      if (apply && config.baseVersion !== baseVersion) throw new BadRequestException('El programa o la configuración cambiaron desde la vista previa. Volvé a calcular el escenario.');
+      await this.buildScheduleGrid(manager, tournamentId);
+      const slots = (await slotRepo.find({ where: { tournamentId }, relations: programRelations, order: { sequence: 'ASC' } })).filter((slot) => slot.matchId);
+      if (slots.some((slot) => slot.match?.status === MatchStatus.PLAYED)) throw new BadRequestException('El torneo ya tiene resultados cargados. Editá los partidos pendientes individualmente.');
+      const result = simulateProgram(slots, zones, courts, config);
+      if (apply) {
+        if (result.warnings.length) throw new BadRequestException('Hay partidos sin horario. Ajustá el escenario antes de aplicarlo.');
+        for (const slot of result.slots) await slotRepo.update(slot.id, { courtId: slot.courtId, scheduledAt: slot.scheduledAt });
+        for (const rule of config.rules.filter((rule) => rule.stage === 'ZONE')) await zoneRepo.update(rule.zoneId!, { venueId: rule.venueId });
+        await manager.getRepository(Tournament).update(tournamentId, { playingDays: [...new Set([...this.programDays(tournament), config.mainDay, config.finalsDay])].sort() });
+        await runner.commitTransaction();
+      } else await runner.rollbackTransaction();
+      return { baseVersion, slots: programView(result.slots), warnings: result.warnings };
+    } catch (error) { if (runner.isTransactionActive) await runner.rollbackTransaction(); throw error; }
+    finally { await runner.release(); }
   }
 
   private programDays(tournament: Tournament) {

@@ -1,4 +1,5 @@
 import type {
+  ProgramScenario, ProgramScenarioPreview,
   BackupOverview, BackupSettings, DatabaseBackup,
   AccessGrantPayload,
   AccessGrantStatusPayload,
@@ -311,6 +312,8 @@ export function updateTournamentZone(id: number, payload: { name: string; venueI
 export function divideTournamentZones(id: number) { return request(`/tournaments/categories/${id}/divide-zones`, { method: 'POST' }, true); }
 export function getTournamentScheduleGrid(id: number) { return request<TournamentScheduleSlot[]>(`/tournaments/${id}/schedule-grid`, {}, true); }
 export function redistributeTournamentCourts(id: number) { return request<TournamentScheduleSlot[]>(`/tournaments/${id}/redistribute-courts`, { method: 'POST' }, true); }
+export function previewProgramScenario(id: number, payload: ProgramScenario) { return request<ProgramScenarioPreview>(`/tournaments/${id}/program-scenario/preview`, { method: 'POST', body: JSON.stringify(payload) }, true); }
+export function applyProgramScenario(id: number, payload: ProgramScenario) { return request<ProgramScenarioPreview>(`/tournaments/${id}/program-scenario/apply`, { method: 'POST', body: JSON.stringify(payload) }, true); }
 export function updateTournamentScheduleSlot(id: number, payload: { scheduledAt?: string | null; courtId?: number | null }) { return request<TournamentScheduleSlot>(`/tournaments/schedule-slots/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true); }
 export function getZoneMatches(id: number) { return request<TournamentMatch[]>(`/tournaments/zones/${id}/matches`, {}, true); }
 export function generateZoneFixture(id: number) { return request<TournamentMatch[]>(`/tournaments/zones/${id}/fixture`, { method: 'POST' }, true); }

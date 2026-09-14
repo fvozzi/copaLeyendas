@@ -6,6 +6,7 @@ import { UserRole } from '../auth/user.entity';
 import { TournamentQueryService } from './tournament-query.service';
 import { TournamentStatus } from './tournament.enums';
 import { TournamentsService } from './tournaments.service';
+import { ProgramScenarioDto } from './program-scenario.dto';
 
 class ScheduleMatchDto { @IsDateString() scheduledAt: string; }
 class ResultDto { @IsInt() homeScore: number; @IsInt() awayScore: number; }
@@ -22,6 +23,8 @@ export class TournamentsController {
   @Get(':id') detail(@Param('id', ParseIntPipe) id: number) { return this.q.detail(id); }
   @Get(':id/schedule-grid') scheduleGrid(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { this.assertDirector(user); return this.s.scheduleGrid(id); }
   @Post(':id/redistribute-courts') redistributeCourts(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { this.assertDirector(user); return this.s.redistributeCourts(id); }
+  @Post(':id/program-scenario/preview') previewScenario(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: ProgramScenarioDto) { this.assertDirector(user); return this.s.scenario(id, dto); }
+  @Post(':id/program-scenario/apply') applyScenario(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: ProgramScenarioDto) { this.assertDirector(user); return this.s.scenario(id, dto, true); }
   @Post() create(@CurrentUser() user: AuthenticatedUser, @Body() dto: { name: string; startsAt?: string; endsAt?: string; playingDays?: string[]; city?: string }) { this.assertDirector(user); return this.s.create(dto); }
   @Patch(':id') update(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: { name?: string; startsAt?: string; endsAt?: string; playingDays?: string[]; city?: string; status?: TournamentStatus }) { this.assertDirector(user); return this.s.update(id, dto); }
   @Post(':id/categories') category(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: { categoryId: number; pointsPerSet?: number; setsToWin?: number; zoneSize?: number }) { this.assertDirector(user); return this.s.addCategory(id, dto); }

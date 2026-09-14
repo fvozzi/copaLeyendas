@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { AdminDataGrid, type AdminGridColumn } from '../components/AdminDataGrid';
 import { AdminDialog } from '../components/AdminDialog';
 import { ProgramMap } from '../components/ProgramMap';
+import { ProgramScenarioDialog } from '../components/ProgramScenarioDialog';
 import { getCourts, getVenues, getTournamentScheduleGrid, getTournaments, updateTournamentScheduleSlot, redistributeTournamentCourts, saveMatchResult } from '../lib/api';
 import type { Court, Venue, Tournament, TournamentScheduleSlot } from '../types';
 
@@ -45,6 +46,8 @@ export function AdminProgramPage() {
   const [courtTab, setCourtTab] = useState('all');
   const [categoryTab, setCategoryTab] = useState('');
   const [saving, setSaving] = useState(false);
+  const [scenarioOpen, setScenarioOpen] = useState(false);
+  const [mapRevision, setMapRevision] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ slot: TournamentScheduleSlot; kind: 'schedule' | 'result' } | null>(null);
@@ -137,14 +140,16 @@ export function AdminProgramPage() {
       <label>Torneo<select aria-label="Seleccionar torneo" disabled={saving} value={tournamentId} onChange={(event) => { setTournamentId(Number(event.target.value)); setVenueTab(''); setCourtTab('all'); setCategoryTab(''); }}><option value="0">Seleccionar torneo</option>{tournaments.map((tournament) => <option key={tournament.id} value={tournament.id}>{tournament.name}</option>)}</select></label>
       <details className="program-options"><summary>Opciones</summary><div>
         <Link className="secondary-button" to="/app/canchas/internas">Administrar canchas</Link>
-        <button type="button" className="secondary-button" disabled={saving || !slots.length || !tournamentId} onClick={() => void redistribute()}>{saving ? 'Guardando…' : 'Repartir entre canchas'}</button>
-        <small>Completa los partidos de las zonas nuevas y asigna los horarios faltantes. Respeta la sede de cada zona y conserva los horarios existentes.</small>
+        <button type="button" className="secondary-button" disabled={saving || !tournamentId} onClick={() => setScenarioOpen(true)}>Repartir entre canchas</button>
+        <small>Configurá días, sedes y canchas, y probá los horarios antes de aplicar.</small>
+        <button type="button" className="inline-link" disabled={saving || !tournamentId} onClick={() => void redistribute()}>{saving ? 'Guardando…' : 'Completar sin cambiar horarios'}</button>
       </div></details>
     </div>
     {error && <div className="inline-state" role="alert">{error}</div>}
     {notice && <div className="inline-state" role="status">{notice}</div>}
     <div className="program-tabs" role="tablist" aria-label="Vistas del programa">{([{ id: 'matches', label: 'Partidos' }, { id: 'venues', label: 'Sedes' }, { id: 'categories', label: 'Categorías' }, { id: 'map', label: 'Mapa' }] as const).map((item) => <button type="button" role="tab" aria-selected={tab === item.id} key={item.id} className={tab === item.id ? 'is-selected' : ''} onClick={() => setTab(item.id)}>{item.label}</button>)}</div>
-    {tab === 'map' && tournamentId > 0 && <ProgramMap key={tournamentId} tournamentId={tournamentId} slots={slots} venues={venues} busy={saving} onChanged={async () => setSlots(await getTournamentScheduleGrid(tournamentId))} onMatch={editMatch} />}
+    {tab === 'map' && tournamentId > 0 && <ProgramMap key={`${tournamentId}-${mapRevision}`} tournamentId={tournamentId} slots={slots} venues={venues} busy={saving} onChanged={async () => setSlots(await getTournamentScheduleGrid(tournamentId))} onMatch={editMatch} />}
+    {scenarioOpen && <ProgramScenarioDialog tournamentId={tournamentId} courts={courts} venues={venues} onClose={() => setScenarioOpen(false)} onApplied={(items) => { setSlots(items); setScenarioOpen(false); setMapRevision((value) => value + 1); setNotice('Escenario aplicado: sedes, canchas y horarios actualizados.'); }} />}
     {tab === 'matches' && <ProgramTable title="Todos los partidos" slots={[...slots].sort((a, b) => a.sequence - b.sequence)} columns={columns} />}
     {tab === 'venues' && <ProgramSubTabs options={venueOptions} selected={selectedVenue} onSelect={(id) => { setVenueTab(id); setCourtTab('all'); }} ariaLabel="Sedes del programa">
       {selectedVenue && <section className="data-card"><div className="panel-header"><div className="program-venue-heading"><h2>{venueOptions.find((venue) => venue.id === selectedVenue)?.label}</h2><VenueAssignments slots={venueSlots} /></div></div>

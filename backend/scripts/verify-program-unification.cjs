@@ -114,6 +114,50 @@ async function main() {
   await service.result(final.matchId, 25, 10, director); // Retried submission is harmless.
   await assert.rejects(() => service.result(final.matchId, 10, 25, director), /ya tiene un resultado/);
   assert.equal((await service.scheduleGrid(tournament.id)).find((slot) => slot.stage === 'FINAL').match.status, 'PLAYED');
+  // Preview a new four-zone, three-pair category against an existing real program.
+  const scenarioTournament = await save(Tournament, { name: 'Scenario test', playingDays: ['2026-11-20', '2026-11-21'] });
+  const scenarioZones = [], scenarioCategories = [];
+  const addScenarioCategory = async (capacity) => {
+    const cat = await save(Category, { name: `Scenario ${scenarioCategories.length}` });
+    const tc = await save(TournamentCategory, { tournamentId: scenarioTournament.id, categoryId: cat.id, zoneSize: capacity });
+    scenarioCategories.push(tc);
+    for (const name of ['A', 'B', 'C', 'D']) scenarioZones.push(await save(Zone, { name, capacity, venueId: venue.id, tournamentCategoryId: tc.id }));
+    return tc;
+  };
+  await addScenarioCategory(4);
+  await service.scheduleGrid(scenarioTournament.id);
+  const snapshotScenario = () => ds.query('SELECT * FROM tournament_schedule_slots WHERE "tournamentId"=$1 ORDER BY id', [scenarioTournament.id]);
+  const originalScenario = await snapshotScenario();
+  const newCategory = await addScenarioCategory(3);
+  const scenario = { mainDay: '2026-11-20', finalsDay: '2026-11-21', interleaveCategories: true, rules: [
+    ...scenarioZones.map((z) => ({ categoryId: z.tournamentCategoryId, stage: 'ZONE', zoneId: z.id, venueId: venue.id, courtId: null, day: 'MAIN' })),
+    ...scenarioCategories.flatMap((cat) => ['QUARTERFINAL', 'SEMIFINAL', 'FINAL'].map((stage) => ({ categoryId: cat.id, stage, venueId: venue.id, courtId: null, day: stage === 'QUARTERFINAL' ? 'MAIN' : 'FINALS' }))),
+  ] };
+  const simulation = await service.scenario(scenarioTournament.id, scenario);
+  assert.equal(simulation.slots.length, 42);
+  assert.equal(simulation.slots.filter((s) => s.tournamentCategoryId === newCategory.id && s.stage === 'ZONE').length, 12);
+  assert.equal(simulation.warnings.length, 0);
+  assert.deepEqual(await snapshotScenario(), originalScenario, 'Preview must not persist generated matches or scheduling');
+  const appliedScenario = await service.scenario(scenarioTournament.id, { ...scenario, baseVersion: simulation.baseVersion }, true);
+  assert.equal(appliedScenario.slots.length, 42);
+  assert(appliedScenario.slots.every((s) => s.matchId && s.courtId && s.scheduledAt));
+  assert(appliedScenario.slots.filter((s) => ['SEMIFINAL','FINAL'].includes(s.stage)).every((s) => s.scheduledAt.toISOString().startsWith('2026-11-21')));
+  assert.deepEqual(appliedScenario.slots.filter((s) => originalScenario.some((o) => o.id === s.id)).map((s) => s.matchId), originalScenario.map((s) => s.matchId));
+  await assert.rejects(() => service.scenario(scenarioTournament.id, { ...scenario, baseVersion: simulation.baseVersion }, true), /cambiaron/);
+  const currentSimulation = await service.scenario(scenarioTournament.id, scenario);
+  await assert.rejects(() => service.scenario(scenarioTournament.id, { ...scenario, interleaveCategories: false, baseVersion: currentSimulation.baseVersion }, true), /cambiaron/);
+  const beforeRepartition = await snapshotScenario();
+  const laterCategory = await addScenarioCategory(3);
+  const withNewGames = await service.redistributeCourts(scenarioTournament.id);
+  assert.equal(withNewGames.filter((s) => s.tournamentCategoryId === laterCategory.id).length, 19);
+  assert(withNewGames.every((s) => s.matchId && s.courtId && s.scheduledAt));
+  for (const old of beforeRepartition) assert.equal(withNewGames.find((s) => s.id === old.id).scheduledAt.toISOString(), old.scheduledAt.toISOString());
+  assert.equal((await service.redistributeCourts(scenarioTournament.id)).length, 61, 'Repartition is idempotent');
+  const chronological = [...withNewGames].sort((a,b) => a.scheduledAt - b.scheduledAt);
+  for (const court of courts) {
+    const games = chronological.filter((s) => s.courtId === court.id);
+    for (let i=1;i<games.length;i++) assert(games[i].scheduledAt - games[i-1].scheduledAt >= venue.matchDurationMinutes*60_000, 'No court overlaps');
+  }
   const smallTournament = await save(Tournament, { name: 'Three-pair test', playingDays: ['2026-11-20'] });
   const smallCategory = await save(TournamentCategory, { tournamentId: smallTournament.id, categoryId: category.id });
   const smallZone = await save(Zone, { name: 'A', capacity: 3, venueId: venue.id, tournamentCategoryId: smallCategory.id });
