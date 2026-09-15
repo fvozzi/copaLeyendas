@@ -23,6 +23,25 @@ it('interleaves categories on a shared court, preserves inputs, and supports con
   expect(chronological(simulateProgram(slots, zones, courts, { ...config, interleaveCategories: false }).slots)).toEqual([1, 1, 1, 2, 2, 2]);
   expect(slots).toEqual(before);
 });
+
+it('balances sequential games across available courts even when both are free at the next start', () => {
+  const { slots, zones, courts, config } = fixture();
+  const rules = config.rules.slice(0, 1).map((rule) => ({ ...rule, courtId: null }));
+  const result = simulateProgram(slots.filter((slot) => slot.tournamentCategoryId === 1), zones, courts, { ...config, rules });
+  expect(result.warnings).toEqual([]);
+  expect(result.slots.map((slot) => slot.courtId)).toEqual([1, 2, 1]);
+  const inactive = courts.map((court) => ({ ...court, active: court.id === 1 }));
+  expect(simulateProgram(slots.filter((slot) => slot.tournamentCategoryId === 1), zones, inactive, { ...config, rules }).slots.every((slot) => slot.courtId === 1)).toBe(true);
+});
+
+it('uses both courts in parallel for unrestricted zones while honoring a fixed court', () => {
+  const { slots, zones, courts, config } = fixture();
+  const result = simulateProgram(slots, zones, courts, { ...config, rules: config.rules.map((rule) => ({ ...rule, courtId: null })) });
+  expect(result.warnings).toEqual([]);
+  expect(courts.map((court) => result.slots.filter((slot) => slot.courtId === court.id).length)).toEqual([3, 3]);
+  expect(result.slots.find((slot) => slot.sequence === 11)!.scheduledAt).toEqual(result.slots.find((slot) => slot.sequence === 21)!.scheduledAt);
+  expect(simulateProgram(slots, zones, courts, config).slots.every((slot) => slot.courtId === 1)).toBe(true);
+});
 it('respects finals day, venue, court and real source matches; reports impossible chronology', () => {
   const { slots, zones, courts, config } = fixture();
   courts.push({ ...courts[0], id: 3, venueId: 2, venue: { ...courts[0].venue, id: 2, name: 'GEBA' } });

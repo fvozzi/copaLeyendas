@@ -29,10 +29,20 @@ it('loads every zone and knockout stage and applies only after preview', async (
   await act(async () => { semi.value = 'FINALS'; semi.dispatchEvent(new Event('change', { bubbles: true })); });
   await click('Calcular vista previa');
   expect(previewProgramScenario).toHaveBeenCalledWith(1, expect.objectContaining({ mainDay: '2026-11-20', finalsDay: '2026-11-21', rules: expect.arrayContaining([expect.objectContaining({ categoryId: 1, stage: 'SEMIFINAL', day: 'FINALS' })]) }));
+  expect(vi.mocked(previewProgramScenario).mock.calls[0][1].rules.every((rule) => rule.courtId === null)).toBe(true);
   expect(applyProgramScenario).not.toHaveBeenCalled();
   await click('Aplicar escenario');
   expect(applyProgramScenario).toHaveBeenCalledWith(1, expect.objectContaining({ baseVersion: result.baseVersion }));
   expect(onApplied).toHaveBeenCalledWith(fixture.slots);
+});
+
+it('allows explicitly fixing a court without locking the other zones and knockout games', async () => {
+  const court = container.querySelector<HTMLSelectElement>('[aria-label="Cancha: Damas A · Zona A"]')!;
+  expect(court.value).toBe('0');
+  await act(async () => { court.value = '1'; court.dispatchEvent(new Event('change', { bubbles: true })); });
+  await click('Calcular vista previa');
+  const rules = vi.mocked(previewProgramScenario).mock.calls[0][1].rules;
+  expect(rules.filter((rule) => rule.courtId !== null)).toEqual([expect.objectContaining({ stage: 'ZONE', categoryId: 1, courtId: 1 })]);
 });
 it('invalidates the preview when a setting changes and keeps all rules when filtering', async () => {
   const filter = container.querySelector<HTMLSelectElement>('[aria-label="Categoría del escenario"]')!;

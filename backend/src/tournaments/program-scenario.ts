@@ -104,6 +104,10 @@ export function simulateProgram(slots: TournamentScheduleSlot[], zones: Zone[], 
       return plannedDay > day;
     });
     const clashes = (court: Court, start: number, end: number) => (occupied.get(court.id) ?? []).filter((r) => r.id !== chosen.id && start < r.end && end > r.start);
+    const courtLoad = (court: Court, start: number) => {
+      const dayStart = Math.floor((start - 3 * 3_600_000) / 86_400_000) * 86_400_000 + 3 * 3_600_000;
+      return (occupied.get(court.id) ?? []).filter((r) => r.start >= dayStart && r.start < dayStart + 86_400_000).length;
+    };
     const candidates = fixed ? (fixed.start >= earliest && fixed.end <= latestEnd(chosen) && !clashes(fixed.court, fixed.start, fixed.end).length ? [fixed] : []) : eligible.map((court) => {
       if (!Number.isFinite(earliest) || wrongDay) return null;
       // Planned turns are a reference, not a hard stop. Extend the schedule, jumping
@@ -116,7 +120,7 @@ export function simulateProgram(slots: TournamentScheduleSlot[], zones: Zone[], 
         start = startOfDay + Math.ceil((Math.max(...collisions.map((r) => r.end)) - startOfDay) / duration) * duration;
       }
       return null;
-    }).filter((c): c is NonNullable<typeof c> => c !== null).sort((a, b) => a.start - b.start || a.court.id - b.court.id);
+    }).filter((c): c is NonNullable<typeof c> => c !== null).sort((a, b) => a.start - b.start || courtLoad(a.court, a.start) - courtLoad(b.court, b.start) || a.court.id - b.court.id);
     const candidate = candidates[0];
     if (candidate) {
       chosen.court = candidate.court; chosen.courtId = candidate.court.id; chosen.scheduledAt = new Date(candidate.start);

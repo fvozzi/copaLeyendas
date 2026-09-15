@@ -32,9 +32,8 @@ export function ProgramScenarioDialog({ tournamentId, courts, venues, onClose, o
         const zones = data.zones.filter((zone) => zone.tournamentCategoryId === category.id).sort((a, b) => a.name.localeCompare(b.name, 'es', { numeric: true }));
         for (const zone of zones) {
           const games = slots.filter((slot) => slot.match?.zoneId === zone.id);
-          const ids = [...new Set(games.map((slot) => slot.courtId).filter(Boolean))];
-          const courtId = ids.length === 1 && courts.find((court) => court.id === ids[0])?.venueId === zone.venueId ? ids[0] : null;
-          rules.push({ categoryId: category.id, stage: 'ZONE', zoneId: zone.id, venueId: zone.venueId, courtId, day: finalsDay !== mainDay && games.length > 0 && games.every((game) => dayOf(game.scheduledAt) === finalsDay) ? 'FINALS' : 'MAIN' });
+          // Existing assignments are the result of an earlier program, not court restrictions.
+          rules.push({ categoryId: category.id, stage: 'ZONE', zoneId: zone.id, venueId: zone.venueId, courtId: null, day: finalsDay !== mainDay && games.length > 0 && games.every((game) => dayOf(game.scheduledAt) === finalsDay) ? 'FINALS' : 'MAIN' });
         }
         for (const stage of ['QUARTERFINAL', 'SEMIFINAL', 'FINAL'] as const) {
           const games = slots.filter((slot) => slot.tournamentCategoryId === category.id && slot.stage === stage);
@@ -44,7 +43,7 @@ export function ProgramScenarioDialog({ tournamentId, courts, venues, onClose, o
             const game = games.find((slot) => slot.matchOrder === matchOrder);
             const venueId = game?.court?.venueId ?? zones[0]?.venueId ?? venues.find((venue) => venue.active)?.id ?? 0;
             const recordedDay = dayOf(game?.scheduledAt);
-            rules.push({ categoryId: category.id, stage, matchOrder, venueId, courtId: game?.courtId ?? null, day: recordedDay ? finalsDay !== mainDay && recordedDay === finalsDay ? 'FINALS' : 'MAIN' : stage === 'QUARTERFINAL' ? 'MAIN' : 'FINALS' });
+            rules.push({ categoryId: category.id, stage, matchOrder, venueId, courtId: null, day: recordedDay ? finalsDay !== mainDay && recordedDay === finalsDay ? 'FINALS' : 'MAIN' : stage === 'QUARTERFINAL' ? 'MAIN' : 'FINALS' });
           }
         }
       }
@@ -78,7 +77,7 @@ export function ProgramScenarioDialog({ tournamentId, courts, venues, onClose, o
       {step === 'config' ? <>
         <div className="scenario-days"><label>Día principal<input type="date" value={config.mainDay} disabled={busy} onChange={(event) => change({ ...config, mainDay: event.target.value })} /></label><label>Día de finales<input type="date" min={config.mainDay} value={config.finalsDay} disabled={busy} onChange={(event) => change({ ...config, finalsDay: event.target.value })} /></label></div>
         <label className="scenario-interleave"><input type="checkbox" checked={config.interleaveCategories} disabled={busy} onChange={(event) => change({ ...config, interleaveCategories: event.target.checked })} />Intercalar partidos por categoría en cada sede</label>
-        <p className="field-hint">Se respetan los cruces previos, la duración y los turnos diarios configurados en cada sede. Podés pasar cualquier etapa al día de finales.</p>
+        <p className="field-hint">Se reparte entre todas las canchas activas de cada sede. Podés fijar una cancha en cada zona o cruce. Se respetan los partidos previos y su duración; los turnos diarios son una referencia.</p>
         {!!config.overrides?.length && <p className="field-hint">Hay {config.overrides.length} horarios manuales que se conservan al recalcular. <button className="inline-link" disabled={busy} onClick={() => change({ ...config, overrides: [] })}>Quitar horarios manuales</button></p>}
         <div className="scenario-filters"><label>Categoría<select aria-label="Categoría del escenario" value={categoryFilter} onChange={(event) => setCategoryFilter(Number(event.target.value))}><option value={0}>Todas</option>{detail.categories.map((category) => <option key={category.id} value={category.id}>{category.category.name}</option>)}</select></label><label>Sede<select aria-label="Sede del escenario" value={venueFilter} onChange={(event) => setVenueFilter(Number(event.target.value))}><option value={0}>Todas</option>{venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}</select></label></div>
         <p className="field-hint">Los filtros solo cambian lo que ves. Se calcula el torneo completo.</p>
