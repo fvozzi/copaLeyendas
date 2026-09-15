@@ -284,7 +284,8 @@ export class TournamentsService {
         if (result.warnings.length) throw new BadRequestException('Hay partidos sin horario. Ajustá el escenario antes de aplicarlo.');
         for (const slot of result.slots) await slotRepo.update(slot.id, { courtId: slot.courtId, scheduledAt: slot.scheduledAt });
         for (const rule of config.rules.filter((rule) => rule.stage === 'ZONE')) await zoneRepo.update(rule.zoneId!, { venueId: rule.venueId });
-        await manager.getRepository(Tournament).update(tournamentId, { playingDays: [...new Set([...this.programDays(tournament), config.mainDay, config.finalsDay])].sort() });
+        const assignedDays = result.slots.flatMap((slot) => slot.scheduledAt ? [new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' }).format(slot.scheduledAt)] : []);
+        await manager.getRepository(Tournament).update(tournamentId, { playingDays: [...new Set([...this.programDays(tournament), config.mainDay, config.finalsDay, ...assignedDays])].sort() });
         await runner.commitTransaction();
       } else await runner.rollbackTransaction();
       return { baseVersion, slots: programView(result.slots), warnings: result.warnings };

@@ -132,12 +132,18 @@ export class RegistrationsService {
       throw new NotFoundException('Access grant not found');
     }
 
-    if (grant.status === RegistrationAccessGrantStatus.USED) {
-      throw new BadRequestException('Used token cannot change status');
+    if (dto.status === RegistrationAccessGrantStatus.USED) {
+      throw new BadRequestException('El token se marca usado al recibir la inscripción');
     }
 
-    grant.status = dto.status;
-    return this.accessGrantsRepository.save(grant);
+    if (grant.status === RegistrationAccessGrantStatus.USED && dto.status !== RegistrationAccessGrantStatus.ACTIVE) {
+      throw new BadRequestException('Un token usado solo puede rehabilitarse para rectificar');
+    }
+    const updated = await this.accessGrantsRepository.update(
+      { id, status: grant.status }, { status: dto.status },
+    );
+    if (!updated.affected) throw new BadRequestException('El token cambió de estado. Actualizá la página');
+    return { ...grant, status: dto.status };
   }
 
   async sendAccessGrantTokenByWhatsApp(id: number, siteUrl: string) {
@@ -201,6 +207,10 @@ export class RegistrationsService {
 
   async getPublicAccessGrant(token: string) {
     const grant = await this.findAccessGrantByToken(token);
+    // Only an explicitly reopened token may expose the previously submitted form.
+    const registration = grant.status === RegistrationAccessGrantStatus.ACTIVE
+      ? await this.registrationsRepository.findOne({ where: { accessGrantId: grant.id } })
+      : null;
 
     return {
       id: grant.id,
@@ -213,117 +223,139 @@ export class RegistrationsService {
       contactName: grant.contactName,
       contactEmail: grant.contactEmail,
       contactPhone: grant.contactPhone,
-      notes: grant.notes,
       feeWaived: grant.feeWaived,
       paymentDeferredUntilConfirmed: grant.paymentDeferredUntilConfirmed,
       status: grant.status,
       enabled: grant.status === RegistrationAccessGrantStatus.ACTIVE,
+      registration: registration ? publicRegistrationDraft(registration) : null,
     };
   }
 
   async createPublic(dto: CreatePublicRegistrationDto, files: RegistrationFiles = {}) {
     ensurePaymentProofDir();
     const { paymentProof, playerOnePhoto, playerTwoPhoto, playerThreePhoto } = files;
-    const grant = await this.findAccessGrantByToken(dto.accessToken);
-
-    if (grant.status !== RegistrationAccessGrantStatus.ACTIVE) {
-      this.cleanupUploadedFiles(files);
-      throw new BadRequestException('Token no disponible para nuevas inscripciones');
-    }
-
-    const existingCount = await this.registrationsRepository.count({
-      where: { accessGrantId: grant.id },
-    });
-
-    if (existingCount > 0) {
-      this.cleanupUploadedFiles(files);
-      throw new BadRequestException('Este token ya fue utilizado');
-    }
-
-    if (!dto.tournamentAvailabilityConfirmed) {
-      this.cleanupUploadedFiles(files);
-      throw new BadRequestException('Debe confirmar disponibilidad para las fechas del torneo');
-    }
-
-    if (dto.heardAboutSource === HeardAboutSource.OTHER && !dto.heardAboutOtherText?.trim()) {
-      this.cleanupUploadedFiles(files);
-      throw new BadRequestException('Debe indicar como se entero del evento');
-    }
-
-    if (!grant.feeWaived && !grant.paymentDeferredUntilConfirmed && !paymentProof) {
-      this.cleanupUploadedFiles(files);
-      throw new BadRequestException('Debe adjuntar el comprobante de pago');
-    }
-
-    const drivePhotos = await this.uploadPlayerPhotos(files, dto);
-    const activeTournament = await this.tournamentsRepository.findOne({ where: { status: TournamentStatus.ACTIVE }, order: { startsAt: 'ASC', id: 'ASC' } });
-    const registration = this.registrationsRepository.create({
-      accessGrantId: grant.id,
-      categoryId: grant.categoryId,
-      localityName: grant.localityName,
-      provinceName: grant.provinceName,
-      clubName: grant.clubName,
-      heardAboutSource: dto.heardAboutSource,
-      heardAboutOtherText: normalizeOptional(dto.heardAboutOtherText),
-      tournamentAvailabilityConfirmed: dto.tournamentAvailabilityConfirmed,
-      representingText: dto.representingText.trim(),
-      contactEmail: normalizeOptional(dto.contactEmail),
-      feeWaived: grant.feeWaived,
-      feePerPlayer: activeTournament?.feePerPlayer ?? 15000,
-      paymentDeferredUntilConfirmed: grant.paymentDeferredUntilConfirmed,
-      playerOneName: dto.playerOneName.trim(),
-      playerOneDni: dto.playerOneDni.trim(),
-      playerOneBirthDate: dto.playerOneBirthDate,
-      playerOnePhone: dto.playerOnePhone.trim(),
-      playerOneInstagram: normalizeOptional(dto.playerOneInstagram),
-      playerOneShirtSize: dto.playerOneShirtSize,
-      playerOneHasCommercialAgreement: dto.playerOneHasCommercialAgreement,
-      playerOneCommercialAgreementDetails: normalizeOptional(dto.playerOneCommercialAgreementDetails),
-      playerOnePhotoStoredName: drivePhotos.playerOne ?? playerOnePhoto?.filename ?? null,
-      playerOnePhotoOriginalName: playerOnePhoto?.originalname ?? null,
-      playerOnePhotoMimeType: playerOnePhoto?.mimetype ?? null,
-      playerOnePhotoSizeBytes: playerOnePhoto?.size ?? null,
-      playerTwoName: dto.playerTwoName.trim(),
-      playerTwoDni: dto.playerTwoDni.trim(),
-      playerTwoBirthDate: dto.playerTwoBirthDate,
-      playerTwoPhone: dto.playerTwoPhone.trim(),
-      playerTwoInstagram: normalizeOptional(dto.playerTwoInstagram),
-      playerTwoShirtSize: dto.playerTwoShirtSize,
-      playerTwoHasCommercialAgreement: dto.playerTwoHasCommercialAgreement,
-      playerTwoCommercialAgreementDetails: normalizeOptional(dto.playerTwoCommercialAgreementDetails),
-      playerTwoPhotoStoredName: drivePhotos.playerTwo ?? playerTwoPhoto?.filename ?? null,
-      playerTwoPhotoOriginalName: playerTwoPhoto?.originalname ?? null,
-      playerTwoPhotoMimeType: playerTwoPhoto?.mimetype ?? null,
-      playerTwoPhotoSizeBytes: playerTwoPhoto?.size ?? null,
-      playerThreeName: normalizeOptional(dto.playerThreeName),
-      playerThreeDni: normalizeOptional(dto.playerThreeDni),
-      playerThreeBirthDate: normalizeOptional(dto.playerThreeBirthDate),
-      playerThreePhone: normalizeOptional(dto.playerThreePhone),
-      playerThreeInstagram: normalizeOptional(dto.playerThreeInstagram),
-      playerThreeShirtSize: dto.playerThreeName?.trim() ? dto.playerThreeShirtSize ?? null : null,
-      playerThreeHasCommercialAgreement: dto.playerThreeHasCommercialAgreement ?? false,
-      playerThreeCommercialAgreementDetails: normalizeOptional(dto.playerThreeCommercialAgreementDetails),
-      playerThreePhotoStoredName: drivePhotos.playerThree ?? playerThreePhoto?.filename ?? null,
-      playerThreePhotoOriginalName: playerThreePhoto?.originalname ?? null,
-      playerThreePhotoMimeType: playerThreePhoto?.mimetype ?? null,
-      playerThreePhotoSizeBytes: playerThreePhoto?.size ?? null,
-      paymentProofStoredName: paymentProof?.filename ?? null,
-      paymentProofOriginalName: paymentProof?.originalname ?? null,
-      paymentProofMimeType: paymentProof?.mimetype ?? null,
-      paymentProofSizeBytes: paymentProof?.size ?? null,
-      status: grant.paymentDeferredUntilConfirmed ? RegistrationStatus.WAITLIST : RegistrationStatus.RECEIVED,
-      adminNotes: null,
-    });
-
-    const saved = await this.registrationsRepository.manager.transaction(async (manager) => {
-      const consumed = await manager.update(RegistrationAccessGrant,
-        { id: grant.id, status: RegistrationAccessGrantStatus.ACTIVE },
-        { status: RegistrationAccessGrantStatus.USED, consumedAt: new Date() });
-      if (!consumed.affected) throw new BadRequestException('Token no disponible para nuevas inscripciones');
-      return manager.save(PairRegistration, registration);
-    });
+    const replacedFiles: string[] = [];
+    let drivePhotos: { playerOne?: string | null; playerTwo?: string | null; playerThree?: string | null } = {};
+    let correcting = false;
+    let saved: PairRegistration;
     try {
-      await this.playersService.syncRegistrationPlayers(saved);
+      saved = await this.registrationsRepository.manager.transaction(async (manager) => {
+        const grant = await manager.findOne(RegistrationAccessGrant, {
+          where: { token: dto.accessToken.trim().toUpperCase() },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!grant || grant.status !== RegistrationAccessGrantStatus.ACTIVE) {
+          throw new BadRequestException('Token no disponible para enviar la inscripcion');
+        }
+        const existing = await manager.findOne(PairRegistration, {
+          where: { accessGrantId: grant.id }, lock: { mode: 'pessimistic_write' },
+        });
+        correcting = Boolean(existing);
+        if (!dto.tournamentAvailabilityConfirmed) {
+          throw new BadRequestException('Debe confirmar disponibilidad para las fechas del torneo');
+        }
+
+        if (dto.heardAboutSource === HeardAboutSource.OTHER && !dto.heardAboutOtherText?.trim()) {
+          throw new BadRequestException('Debe indicar como se entero del evento');
+        }
+
+        if (!grant.feeWaived && !grant.paymentDeferredUntilConfirmed && !paymentProof && !existing?.paymentProofStoredName) {
+          throw new BadRequestException('Debe adjuntar el comprobante de pago');
+        }
+
+        const submittedDnis = [dto.playerOneDni.trim(), dto.playerTwoDni.trim(), dto.playerThreeName?.trim() ? dto.playerThreeDni?.trim() : null].filter(Boolean);
+        if (new Set(submittedDnis).size !== submittedDnis.length) throw new BadRequestException('Las jugadoras deben tener DNI diferentes');
+        if (playerThreePhoto && !dto.playerThreeName?.trim()) throw new BadRequestException('Debe completar los datos de la suplente antes de adjuntar su foto');
+        drivePhotos = await this.uploadPlayerPhotos(files, dto);
+        const activeTournament = await this.tournamentsRepository.findOne({ where: { status: TournamentStatus.ACTIVE }, order: { startsAt: 'ASC', id: 'ASC' } });
+        const registration = this.registrationsRepository.create({
+          ...existing,
+          accessGrantId: grant.id,
+          categoryId: grant.categoryId,
+          localityName: grant.localityName,
+          provinceName: grant.provinceName,
+          clubName: grant.clubName,
+          heardAboutSource: dto.heardAboutSource,
+          heardAboutOtherText: normalizeOptional(dto.heardAboutOtherText),
+          tournamentAvailabilityConfirmed: dto.tournamentAvailabilityConfirmed,
+          representingText: dto.representingText.trim(),
+          contactEmail: normalizeOptional(dto.contactEmail),
+          feeWaived: existing?.feeWaived ?? grant.feeWaived,
+          feePerPlayer: existing?.feePerPlayer ?? activeTournament?.feePerPlayer ?? 15000,
+          paymentDeferredUntilConfirmed: existing?.paymentDeferredUntilConfirmed ?? grant.paymentDeferredUntilConfirmed,
+          playerOneName: dto.playerOneName.trim(),
+          playerOneDni: dto.playerOneDni.trim(),
+          playerOneBirthDate: dto.playerOneBirthDate,
+          playerOnePhone: dto.playerOnePhone.trim(),
+          playerOneInstagram: normalizeOptional(dto.playerOneInstagram),
+          playerOneShirtSize: dto.playerOneShirtSize,
+          playerOneHasCommercialAgreement: dto.playerOneHasCommercialAgreement,
+          playerOneCommercialAgreementDetails: normalizeOptional(dto.playerOneCommercialAgreementDetails),
+          playerOnePhotoStoredName: drivePhotos.playerOne ?? playerOnePhoto?.filename ?? existing?.playerOnePhotoStoredName ?? null,
+          playerOnePhotoOriginalName: playerOnePhoto?.originalname ?? existing?.playerOnePhotoOriginalName ?? null,
+          playerOnePhotoMimeType: playerOnePhoto?.mimetype ?? existing?.playerOnePhotoMimeType ?? null,
+          playerOnePhotoSizeBytes: playerOnePhoto?.size ?? existing?.playerOnePhotoSizeBytes ?? null,
+          playerTwoName: dto.playerTwoName.trim(),
+          playerTwoDni: dto.playerTwoDni.trim(),
+          playerTwoBirthDate: dto.playerTwoBirthDate,
+          playerTwoPhone: dto.playerTwoPhone.trim(),
+          playerTwoInstagram: normalizeOptional(dto.playerTwoInstagram),
+          playerTwoShirtSize: dto.playerTwoShirtSize,
+          playerTwoHasCommercialAgreement: dto.playerTwoHasCommercialAgreement,
+          playerTwoCommercialAgreementDetails: normalizeOptional(dto.playerTwoCommercialAgreementDetails),
+          playerTwoPhotoStoredName: drivePhotos.playerTwo ?? playerTwoPhoto?.filename ?? existing?.playerTwoPhotoStoredName ?? null,
+          playerTwoPhotoOriginalName: playerTwoPhoto?.originalname ?? existing?.playerTwoPhotoOriginalName ?? null,
+          playerTwoPhotoMimeType: playerTwoPhoto?.mimetype ?? existing?.playerTwoPhotoMimeType ?? null,
+          playerTwoPhotoSizeBytes: playerTwoPhoto?.size ?? existing?.playerTwoPhotoSizeBytes ?? null,
+          playerThreeName: normalizeOptional(dto.playerThreeName),
+          playerThreeDni: normalizeOptional(dto.playerThreeDni),
+          playerThreeBirthDate: normalizeOptional(dto.playerThreeBirthDate),
+          playerThreePhone: normalizeOptional(dto.playerThreePhone),
+          playerThreeInstagram: normalizeOptional(dto.playerThreeInstagram),
+          playerThreeShirtSize: dto.playerThreeName?.trim() ? dto.playerThreeShirtSize ?? null : null,
+          playerThreeHasCommercialAgreement: dto.playerThreeHasCommercialAgreement ?? false,
+          playerThreeCommercialAgreementDetails: normalizeOptional(dto.playerThreeCommercialAgreementDetails),
+          playerThreePhotoStoredName: drivePhotos.playerThree ?? playerThreePhoto?.filename ?? existing?.playerThreePhotoStoredName ?? null,
+          playerThreePhotoOriginalName: playerThreePhoto?.originalname ?? existing?.playerThreePhotoOriginalName ?? null,
+          playerThreePhotoMimeType: playerThreePhoto?.mimetype ?? existing?.playerThreePhotoMimeType ?? null,
+          playerThreePhotoSizeBytes: playerThreePhoto?.size ?? existing?.playerThreePhotoSizeBytes ?? null,
+          paymentProofStoredName: paymentProof?.filename ?? existing?.paymentProofStoredName ?? null,
+          paymentProofOriginalName: paymentProof?.originalname ?? existing?.paymentProofOriginalName ?? null,
+          paymentProofMimeType: paymentProof?.mimetype ?? existing?.paymentProofMimeType ?? null,
+          paymentProofSizeBytes: paymentProof?.size ?? existing?.paymentProofSizeBytes ?? null,
+          status: existing?.status ?? (grant.paymentDeferredUntilConfirmed ? RegistrationStatus.WAITLIST : RegistrationStatus.RECEIVED),
+          adminNotes: existing?.adminNotes ?? null,
+        });
+
+        if (!registration.playerThreeName) {
+          registration.playerThreeDni = null;
+          registration.playerThreeBirthDate = null;
+          registration.playerThreePhone = null;
+          registration.playerThreeInstagram = null;
+          registration.playerThreeHasCommercialAgreement = false;
+          registration.playerThreeCommercialAgreementDetails = null;
+          registration.playerThreePhotoStoredName = null;
+          registration.playerThreePhotoOriginalName = null;
+          registration.playerThreePhotoMimeType = null;
+          registration.playerThreePhotoSizeBytes = null;
+        }
+        for (const field of ['paymentProofStoredName', 'playerOnePhotoStoredName', 'playerTwoPhotoStoredName', 'playerThreePhotoStoredName'] as const) {
+          if (existing?.[field] && existing[field] !== registration[field]) replacedFiles.push(existing[field]!);
+        }
+        await manager.update(RegistrationAccessGrant, { id: grant.id },
+          { status: RegistrationAccessGrantStatus.USED, consumedAt: new Date() });
+        const result = await manager.save(PairRegistration, registration);
+        if (existing) await this.playersService.syncRegistrationPlayers(result, { manager, previous: existing });
+        return result;
+      });
+    } catch (error) {
+      this.cleanupUploadedFiles(files);
+      for (const storedName of Object.values(drivePhotos)) if (storedName) this.cleanupStoredPaymentProof(storedName);
+      throw error;
+    }
+    replacedFiles.forEach((storedName) => this.cleanupStoredPaymentProof(storedName));
+    try {
+      if (!correcting) await this.playersService.syncRegistrationPlayers(saved);
     } catch {
       // The players list retries this synchronization from the saved registrations.
       this.logger.warn(`Inscripcion ${saved.id} recibida; sincronizacion de jugadoras pendiente`);
@@ -332,7 +364,7 @@ export class RegistrationsService {
     return {
       id: saved.id,
       status: saved.status,
-      message: 'Inscripcion recibida',
+      message: correcting ? 'Inscripci\u00f3n actualizada con \u00e9xito.' : 'Inscripci\u00f3n realizada con \u00e9xito.',
     };
   }
 
@@ -511,6 +543,21 @@ export class RegistrationsService {
       throw new BadRequestException(error instanceof Error ? `No se pudieron guardar las fotos: ${error.message}` : 'No se pudieron guardar las fotos en Google Drive');
     }
   }
+}
+
+function publicRegistrationDraft(registration: PairRegistration) {
+  const fields: Record<string, string | boolean> = {};
+  for (const key of ['heardAboutSource', 'heardAboutOtherText', 'tournamentAvailabilityConfirmed', 'representingText', 'contactEmail'] as const) {
+    fields[key] = registration[key] ?? '';
+  }
+  const photos: Record<string, string | null> = {};
+  for (const prefix of ['playerOne', 'playerTwo', 'playerThree'] as const) {
+    for (const suffix of ['Name', 'Dni', 'BirthDate', 'Phone', 'Instagram', 'ShirtSize', 'HasCommercialAgreement', 'CommercialAgreementDetails'] as const) {
+      fields[`${prefix}${suffix}`] = registration[`${prefix}${suffix}`] ?? (suffix === 'ShirtSize' ? 'M' : suffix === 'HasCommercialAgreement' ? false : '');
+    }
+    photos[prefix] = registration[`${prefix}PhotoStoredName`] ? registration[`${prefix}PhotoOriginalName`] || 'Foto cargada' : null;
+  }
+  return { fields, photos, paymentProofName: registration.paymentProofStoredName ? registration.paymentProofOriginalName || 'Comprobante cargado' : null };
 }
 
 function normalizeOptional(value?: string | null) {

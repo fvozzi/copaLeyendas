@@ -2,7 +2,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getPublicRegistrationAccess } from '../lib/api';
+import { createPublicRegistration, getPublicRegistrationAccess } from '../lib/api';
 import type { PublicAccessGrant } from '../types';
 import { RegistrationPage } from './RegistrationPage';
 
@@ -38,6 +38,36 @@ async function renderPage(path = '/inscripcion?token=COPA-TEST') {
 }
 
 describe('registration form', () => {
+  it('loads a correction, adds a substitute and submits without uploading the saved files again', async () => {
+    vi.mocked(getPublicRegistrationAccess).mockResolvedValue({ ...grant, feeWaived: false, registration: {
+      fields: { representingText: 'Junín', heardAboutSource: 'CLUB', contactEmail: 'team@example.com',
+        playerOneName: 'Jugadora Uno', playerOneDni: '11111111', playerOneBirthDate: '1980-01-01', playerOnePhone: '1111111111', playerOneShirtSize: 'L', playerOneHasCommercialAgreement: true, playerOneCommercialAgreementDetails: 'Dabber',
+        playerTwoName: 'Jugadora Dos', playerTwoDni: '22222222', playerTwoBirthDate: '1981-01-01', playerTwoPhone: '2222222222',
+      }, photos: { playerOne: 'uno.jpg', playerTwo: 'dos.jpg', playerThree: null }, paymentProofName: 'pago.pdf',
+    } });
+    vi.mocked(createPublicRegistration).mockResolvedValue({ id: 42, status: 'CONFIRMED', message: 'Inscripción actualizada con éxito.' });
+    await renderPage();
+    expect(container.textContent).toContain('Rectificar inscripción');
+    expect(container.textContent).toContain('Foto cargada: uno.jpg');
+    expect(container.textContent).toContain('Comprobante cargado: pago.pdf');
+    const sections = container.querySelectorAll('.player-card');
+    const playerSections = sections.length ? sections : Array.from(container.querySelectorAll('.form-section')).filter((section) => section.querySelector('.player-photo-field'));
+    const firstInputs = playerSections[0].querySelectorAll('input');
+    expect(firstInputs[0].value).toBe('Jugadora Uno');
+    expect(playerSections[0].querySelector('select')?.value).toBe('L');
+    expect(playerSections[0].querySelectorAll<HTMLInputElement>('.player-agreement-options input')[1].checked).toBe(true);
+    const inputs = playerSections[2].querySelectorAll('input');
+    for (const [index, value] of ['Suplente Nueva', '33333333', '1982-01-01', '3333333333'].entries()) {
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(inputs[index], value);
+        inputs[index].dispatchEvent(new Event('input', { bubbles: true }));
+      });
+    }
+    await act(async () => container.querySelector('.registration-form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+    expect(createPublicRegistration).toHaveBeenCalledWith(expect.objectContaining({ accessToken: 'COPA-TEST', playerOneName: 'Jugadora Uno', playerOneShirtSize: 'L', playerThreeName: 'Suplente Nueva', playerThreeDni: '33333333', paymentProof: undefined, playerOnePhoto: undefined }));
+    expect(container.textContent).toContain('Inscripción actualizada con éxito.');
+  });
+
   it('hides token validation after opening a valid link and allows changing it', async () => {
     await renderPage();
     expect(getPublicRegistrationAccess).toHaveBeenCalledWith('COPA-TEST');

@@ -55,3 +55,32 @@ it('allows different venues and days for individual quarterfinals in the same ca
   expect(result.warnings).toEqual([]);
   expect(result.slots.filter((s) => s.stage === 'QUARTERFINAL').map((s) => [s.court?.venueId, s.scheduledAt?.toISOString().slice(0, 10)])).toEqual([[1, '2026-11-20'], [2, '2026-11-21']]);
 });
+
+it('reserves manual times before automatic allocation and honors them outside automatic turns', () => {
+  const { slots, zones, courts, config } = fixture();
+  courts.forEach((court) => { court.venue = { ...court.venue, matchesPerDay: 1 }; });
+  config.overrides = slots.map((slot, index) => ({ sequence: slot.sequence, courtId: 1, scheduledAt: new Date(Date.parse('2026-11-20T14:00:00Z') + index * 40 * 60_000).toISOString() }));
+  const result = simulateProgram(slots, zones, courts, config);
+  expect(result.warnings).toEqual([]);
+  expect(result.slots.map((slot) => slot.scheduledAt?.toISOString())).toEqual(config.overrides.map((o) => o.scheduledAt));
+});
+
+it('schedules predecessors before a fixed manual match and keeps its court free', () => {
+  const { slots, zones, courts, config } = fixture();
+  config.overrides = [{ sequence: 13, courtId: 1, scheduledAt: '2026-11-20T14:20:00Z' }];
+  const result = simulateProgram(slots, zones, courts, config);
+  expect(result.warnings).toEqual([]);
+  expect(result.slots.find((s) => s.sequence === 13)?.scheduledAt?.toISOString()).toBe('2026-11-20T14:20:00.000Z');
+  expect(result.slots.find((s) => s.sequence === 12)?.scheduledAt?.toISOString()).toBe('2026-11-20T13:40:00.000Z');
+  expect(new Set(result.slots.map((s) => `${s.courtId}:${s.scheduledAt}`)).size).toBe(6);
+});
+
+it('identifies colliding manual matches and names the missing predecessors', () => {
+  const { slots, zones, courts, config } = fixture();
+  config.overrides = [11, 21].map((sequence) => ({ sequence, courtId: 1, scheduledAt: '2026-11-20T13:00:00Z' }));
+  const result = simulateProgram(slots, zones, courts, config);
+  expect(result.warnings.find((w) => w.sequence === 11)?.message).toContain('superpone con P21');
+  expect(result.warnings.find((w) => w.sequence === 12)?.message).toContain('P11');
+  expect(result.slots.find((s) => s.sequence === 11)?.courtId).toBe(1);
+  expect(result.slots.find((s) => s.sequence === 11)?.scheduledAt).toBeNull();
+});

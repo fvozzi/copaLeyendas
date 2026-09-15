@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { AdminDialog } from './AdminDialog';
+import { ProgramScenarioPreviewTable } from './ProgramScenarioPreview';
 import { applyProgramScenario, getTournament, getTournamentScheduleGrid, previewProgramScenario } from '../lib/api';
 import type { Court, ProgramScenario, ProgramScenarioPreview, ProgramScenarioRule, TournamentDetail, TournamentScheduleSlot, Venue } from '../types';
 
 const stageNames = { ZONE: 'Partidos de zona', QUARTERFINAL: 'Cuartos de final', SEMIFINAL: 'Semifinales', FINAL: 'Final' };
 const dayOf = (value?: string | null) => value ? new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' }).format(new Date(value)) : '';
-const timeOf = (value?: string | null) => value ? new Date(value).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }) : 'Sin horario';
 const keyOf = (rule: ProgramScenarioRule) => `${rule.categoryId}-${rule.stage}-${rule.stage === 'ZONE' ? rule.zoneId : rule.matchOrder ?? ''}`;
 
 export function ProgramScenarioDialog({ tournamentId, courts, venues, onClose, onApplied }: {
@@ -14,6 +14,8 @@ export function ProgramScenarioDialog({ tournamentId, courts, venues, onClose, o
   const [detail, setDetail] = useState<TournamentDetail | null>(null);
   const [config, setConfig] = useState<ProgramScenario | null>(null);
   const [preview, setPreview] = useState<ProgramScenarioPreview | null>(null);
+  const [previewStale, setPreviewStale] = useState(false);
+  const [editingTime, setEditingTime] = useState(false);
   const [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState(0), [venueFilter, setVenueFilter] = useState(0);
   const [step, setStep] = useState<'config' | 'preview'>('config');
@@ -50,17 +52,17 @@ export function ProgramScenarioDialog({ tournamentId, courts, venues, onClose, o
     }).catch((reason: Error) => { if (current) setError(reason.message); });
     return () => { current = false; };
   }, [tournamentId]);
-  const change = (next: ProgramScenario) => { setConfig(next); setPreview(null); setError(null); };
+  const change = (next: ProgramScenario) => { setConfig(next); setPreview(null); setEditingTime(false); setError(null); };
   const changeRule = (key: string, patch: Partial<ProgramScenarioRule>) => { if (config) change({ ...config, rules: config.rules.map((rule) => keyOf(rule) === key ? { ...rule, ...patch } : rule) }); };
-  const calculate = async () => {
-    if (!config) return;
-    setBusy(true); setError(null);
-    try { setPreview(await previewProgramScenario(tournamentId, config)); setStep('preview'); }
+  const calculate = async (settings = config) => {
+    if (!settings) return;
+    setBusy(true); setError(null); setPreviewStale(true);
+    try { setPreview(await previewProgramScenario(tournamentId, settings)); setPreviewStale(false); setStep('preview'); }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo calcular el escenario.'); }
     finally { setBusy(false); }
   };
   const apply = async () => {
-    if (!config || !preview || preview.warnings.length) return;
+    if (!config || !preview || previewStale || editingTime || preview.warnings.length) return;
     setBusy(true); setError(null);
     try { const result = await applyProgramScenario(tournamentId, { ...config, baseVersion: preview.baseVersion }); onApplied(result.slots); }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo aplicar el escenario.'); setPreview(null); setStep('config'); }
@@ -72,11 +74,12 @@ export function ProgramScenarioDialog({ tournamentId, courts, venues, onClose, o
     {error && <div className="inline-state" role="alert">{error}</div>}
     {!config || !detail ? !error && <p>Cargando categorías, zonas y canchas…</p> : <>
       <p className="field-hint">Probá distintos escenarios. La vista previa no cambia los horarios; al aplicar se guardan las canchas, las sedes de las zonas y los nuevos horarios.</p>
-      <div className="scenario-steps"><button className={step === 'config' ? 'is-selected' : ''} disabled={busy} onClick={() => setStep('config')}>1. Configuración</button><button className={step === 'preview' ? 'is-selected' : ''} disabled={!preview || busy} onClick={() => setStep('preview')}>2. Vista previa</button></div>
+      <div className="scenario-steps"><button className={step === 'config' ? 'is-selected' : ''} disabled={busy} onClick={() => { setEditingTime(false); setStep('config'); }}>1. Configuración</button><button className={step === 'preview' ? 'is-selected' : ''} disabled={!preview || busy} onClick={() => setStep('preview')}>2. Vista previa</button></div>
       {step === 'config' ? <>
         <div className="scenario-days"><label>Día principal<input type="date" value={config.mainDay} disabled={busy} onChange={(event) => change({ ...config, mainDay: event.target.value })} /></label><label>Día de finales<input type="date" min={config.mainDay} value={config.finalsDay} disabled={busy} onChange={(event) => change({ ...config, finalsDay: event.target.value })} /></label></div>
         <label className="scenario-interleave"><input type="checkbox" checked={config.interleaveCategories} disabled={busy} onChange={(event) => change({ ...config, interleaveCategories: event.target.checked })} />Intercalar partidos por categoría en cada sede</label>
         <p className="field-hint">Se respetan los cruces previos, la duración y los turnos diarios configurados en cada sede. Podés pasar cualquier etapa al día de finales.</p>
+        {!!config.overrides?.length && <p className="field-hint">Hay {config.overrides.length} horarios manuales que se conservan al recalcular. <button className="inline-link" disabled={busy} onClick={() => change({ ...config, overrides: [] })}>Quitar horarios manuales</button></p>}
         <div className="scenario-filters"><label>Categoría<select aria-label="Categoría del escenario" value={categoryFilter} onChange={(event) => setCategoryFilter(Number(event.target.value))}><option value={0}>Todas</option>{detail.categories.map((category) => <option key={category.id} value={category.id}>{category.category.name}</option>)}</select></label><label>Sede<select aria-label="Sede del escenario" value={venueFilter} onChange={(event) => setVenueFilter(Number(event.target.value))}><option value={0}>Todas</option>{venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}</select></label></div>
         <p className="field-hint">Los filtros solo cambian lo que ves. Se calcula el torneo completo.</p>
         {Object.entries(stageNames).map(([stage, title]) => <section key={stage} className="scenario-stage"><h3>{title}</h3>
@@ -93,19 +96,11 @@ export function ProgramScenarioDialog({ tournamentId, courts, venues, onClose, o
         </section>)}
       </> : preview && <>
         <div className="scenario-preview-summary" role="status"><strong>{preview.slots.length} partidos</strong><span>{preview.slots.length - preview.warnings.length} con horario</span><span>{preview.warnings.length} sin horario</span></div>
-        {preview.warnings.length > 0 && <div className="inline-state" role="alert">Hay partidos que no entran. Cambiá los días o las canchas para poder aplicar el escenario.<ul>{preview.warnings.map((warning) => <li key={warning.sequence}>P{warning.sequence}: {warning.message}</li>)}</ul></div>}
-        <PreviewSchedule slots={preview.slots} />
+        {preview.warnings.length > 0 && <div className="inline-state scenario-notice" role="alert">{preview.warnings.length === 1 ? 'Hay 1 partido sin horario válido.' : `Hay ${preview.warnings.length} partidos sin horario válido.`} Abajo se muestran la sede prevista y el motivo. Usá «Editar horario» para corregirlos.</div>}
+        {previewStale && !busy && <p className="field-hint">Los cambios necesitan una nueva vista previa antes de aplicar.</p>}
+        <ProgramScenarioPreviewTable key={preview.baseVersion} preview={preview} config={config} courts={courts} venues={venues} busy={busy} onEditing={setEditingTime} onOverride={(sequence, value) => { const overrides = (config.overrides ?? []).filter((o) => o.sequence !== sequence); if (value) overrides.push(value); const settings = { ...config, overrides }; setConfig(settings); void calculate(settings); }} />
       </>}
-      <div className="scenario-footer">{step === 'preview' && <button className="secondary-button" disabled={busy} onClick={() => setStep('config')}>Ajustar escenario</button>}<button className="secondary-button" disabled={busy || !config.mainDay || !config.finalsDay || !config.rules.length} onClick={() => void calculate()}>{busy ? 'Procesando…' : preview ? 'Recalcular' : 'Calcular vista previa'}</button>{preview && step === 'preview' && <button className="primary-button" disabled={busy || preview.warnings.length > 0} onClick={() => void apply()}>Aplicar escenario</button>}</div>
+      <div className="scenario-footer">{step === 'preview' && <button className="secondary-button" disabled={busy} onClick={() => { setEditingTime(false); setStep('config'); }}>Ajustar escenario</button>}<button className="secondary-button" disabled={busy || editingTime || !config.mainDay || !config.finalsDay || !config.rules.length} onClick={() => void calculate()}>{busy ? 'Procesando…' : preview ? 'Recalcular' : 'Calcular vista previa'}</button>{preview && step === 'preview' && <button className="primary-button" disabled={busy || editingTime || previewStale || preview.warnings.length > 0} onClick={() => void apply()}>Aplicar escenario</button>}</div>
     </>}
   </div></AdminDialog>;
-}
-
-function PreviewSchedule({ slots }: { slots: TournamentScheduleSlot[] }) {
-  const groups = new Map<string, TournamentScheduleSlot[]>();
-  for (const slot of [...slots].sort((a, b) => (a.scheduledAt ?? '9999').localeCompare(b.scheduledAt ?? '9999') || a.sequence - b.sequence)) {
-    const key = `${dayOf(slot.scheduledAt) || 'Sin fecha'} · ${slot.court?.venue?.name ?? 'Sin cancha'}`;
-    groups.set(key, [...(groups.get(key) ?? []), slot]);
-  }
-  return <div className="scenario-preview">{[...groups].map(([key, games]) => <section className="scenario-stage" key={key}><h3>{key}</h3><p className="field-hint">{games.length} partidos · Desde {timeOf(games[0].scheduledAt)} hasta {games[games.length - 1].scheduledAt ? timeOf(new Date(new Date(games[games.length - 1].scheduledAt!).getTime() + (games[games.length - 1].court?.venue?.matchDurationMinutes ?? 40) * 60_000).toISOString()) : 'sin definir'}</p><details><summary>Ver partidos y canchas</summary>{games.map((slot) => <div className="scenario-preview-game" key={slot.id}><strong>{timeOf(slot.scheduledAt)}</strong><span>{slot.court?.name ?? 'Sin cancha'}</span><span>P{slot.sequence} · {slot.tournamentCategory.category.name}<small>{slot.stage === 'ZONE' ? `Zona ${slot.zoneName}` : stageNames[slot.stage]} · Partido {slot.matchOrder}</small></span></div>)}</details></section>)}</div>;
 }

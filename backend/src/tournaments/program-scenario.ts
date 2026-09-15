@@ -42,9 +42,36 @@ export function simulateProgram(slots: TournamentScheduleSlot[], zones: Zone[], 
     });
     return [slot.id, deps];
   }));
+  const manual = new Map<number, { court: Court; start: number; end: number }>();
+  for (const override of config.overrides ?? []) {
+    const slot = items.find((item) => item.sequence === override.sequence);
+    const court = courts.find((item) => item.id === override.courtId && item.active && item.venue?.active);
+    const start = Date.parse(override.scheduledAt);
+    if (!slot || !court || !Number.isFinite(start) || manual.has(slot.id)) throw new BadRequestException('Revisá el partido, la cancha y la fecha del horario manual.');
+    manual.set(slot.id, { court, start, end: start + court.venue.matchDurationMinutes * 60_000 });
+  }
+  const durationOf = (slot: TournamentScheduleSlot) => {
+    const rule = ruleFor(slot);
+    const venue = manual.get(slot.id)?.court.venue ?? courts.find((c) => c.venueId === rule.venueId && c.active && c.venue.active)!.venue;
+    if (!Number.isInteger(venue.matchDurationMinutes) || venue.matchDurationMinutes < 1) throw new BadRequestException(`Revisá la duración de los partidos de ${venue.name}.`);
+    return venue.matchDurationMinutes * 60_000;
+  };
+  items.forEach(durationOf);
+  // Leave enough time for every manually fixed downstream match.
+  const deadlines = new Map<number, number>();
+  const latestEnd = (slot: TournamentScheduleSlot, path = new Set<number>()): number => {
+    if (path.has(slot.id)) throw new BadRequestException('Los cruces contienen una dependencia circular. Revisá el fixture.');
+    if (deadlines.has(slot.id)) return deadlines.get(slot.id)!;
+    const nextPath = new Set(path).add(slot.id);
+    const children = items.filter((item) => dependencies.get(item.id)!.some((dep) => dep.id === slot.id));
+    const deadline = Math.min(Infinity, ...children.map((child) => manual.get(child.id)?.start ?? latestEnd(child, nextPath) - durationOf(child)));
+    deadlines.set(slot.id, deadline); return deadline;
+  };
+  items.forEach((slot) => latestEnd(slot));
   const pending = new Set(items), completed = new Set<number>();
   const ends = new Map<number, number>();
-  const occupied = new Map<number, { start: number; end: number }[]>();
+  const occupied = new Map<number, { start: number; end: number; id: number }[]>();
+  for (const [id, reservation] of manual) occupied.set(reservation.court.id, [...(occupied.get(reservation.court.id) ?? []), { ...reservation, id }]);
   const categoryCounts = new Map<string, number>();
   const warnings: { sequence: number; message: string }[] = [];
   while (pending.size) {
@@ -54,22 +81,24 @@ export function simulateProgram(slots: TournamentScheduleSlot[], zones: Zone[], 
       const ar = ruleFor(a), br = ruleFor(b);
       const dayA = ar.day === 'MAIN' ? config.mainDay : config.finalsDay, dayB = br.day === 'MAIN' ? config.mainDay : config.finalsDay;
       const fairness = config.interleaveCategories ? (categoryCounts.get(`${ar.venueId}:${dayA}:${ar.categoryId}`) ?? 0) - (categoryCounts.get(`${br.venueId}:${dayB}:${br.categoryId}`) ?? 0) : ar.categoryId - br.categoryId;
-      return dayA.localeCompare(dayB) || ar.venueId - br.venueId || fairness || stages.indexOf(a.stage) - stages.indexOf(b.stage) || a.matchOrder - b.matchOrder || a.sequence - b.sequence;
+      return dayA.localeCompare(dayB) || ar.venueId - br.venueId || latestEnd(a) - latestEnd(b) || fairness || stages.indexOf(a.stage) - stages.indexOf(b.stage) || a.matchOrder - b.matchOrder || a.sequence - b.sequence;
     })[0];
     const rule = ruleFor(chosen), deps = dependencies.get(chosen.id)!;
     const day = rule.day === 'MAIN' ? config.mainDay : config.finalsDay;
     const eligible = courts.filter((c) => c.active && c.venue?.active && c.venueId === rule.venueId && (!rule.courtId || rule.courtId === c.id));
-    const venue = eligible[0].venue;
+    const fixed = manual.get(chosen.id);
+    const venue = fixed?.court.venue ?? eligible[0].venue;
     if (!Number.isInteger(venue.matchDurationMinutes) || venue.matchDurationMinutes < 1 || !Number.isInteger(venue.matchesPerDay) || venue.matchesPerDay < 1 || venue.matchesPerDay > 1440) throw new BadRequestException(`Revisá la duración y los turnos diarios de ${venue.name}.`);
     const earliest = Math.max(0, ...deps.map((d) => ends.get(d.id) ?? Infinity));
     const startOfDay = Date.parse(`${day}T${venue.startsAt.slice(0, 5)}:00-03:00`);
     if (!Number.isFinite(startOfDay)) throw new BadRequestException(`Revisá la hora de inicio de ${venue.name}.`);
     const nextDay = Date.parse(`${day}T00:00:00-03:00`) + 86_400_000;
     const duration = venue.matchDurationMinutes * 60_000;
-    const candidates = eligible.map((court) => {
+    const clashes = (court: Court, start: number, end: number) => (occupied.get(court.id) ?? []).filter((r) => r.id !== chosen.id && start < r.end && end > r.start);
+    const candidates = fixed ? (fixed.start >= earliest && fixed.end <= latestEnd(chosen) && !clashes(fixed.court, fixed.start, fixed.end).length ? [fixed] : []) : eligible.map((court) => {
       for (let index = 0; index < venue.matchesPerDay; index++) {
         const start = startOfDay + index * duration, end = start + duration;
-        if (start < earliest || end > nextDay || (occupied.get(court.id) ?? []).some((r) => start < r.end && end > r.start)) continue;
+        if (start < earliest || end > nextDay || end > latestEnd(chosen) || clashes(court, start, end).length) continue;
         return { court, start, end };
       }
       return null;
@@ -78,8 +107,20 @@ export function simulateProgram(slots: TournamentScheduleSlot[], zones: Zone[], 
     if (candidate) {
       chosen.court = candidate.court; chosen.courtId = candidate.court.id; chosen.scheduledAt = new Date(candidate.start);
       ends.set(chosen.id, candidate.end);
-      occupied.set(candidate.court.id, [...(occupied.get(candidate.court.id) ?? []), { start: candidate.start, end: candidate.end }]);
-    } else warnings.push({ sequence: chosen.sequence, message: earliest === Infinity ? 'Un partido previo quedó sin horario.' : `No entra en ${venue.name} el ${day}. Revisá el día, la cancha o los turnos disponibles.` });
+      if (!fixed) occupied.set(candidate.court.id, [...(occupied.get(candidate.court.id) ?? []), { start: candidate.start, end: candidate.end, id: chosen.id }]);
+    } else {
+      // Keep the chosen court visible even when it has no valid time yet.
+      chosen.court = fixed?.court ?? (rule.courtId ? eligible[0] : null);
+      chosen.courtId = chosen.court?.id ?? null;
+      const blocked = deps.filter((dep) => !ends.has(dep.id)).map((dep) => `P${dep.sequence}`);
+      const collisions = fixed ? clashes(fixed.court, fixed.start, fixed.end).map((r) => `P${items.find((s) => s.id === r.id)!.sequence}`) : [];
+      const message = collisions.length ? `El horario manual se superpone con ${collisions.join(', ')} en ${venue.name}, ${fixed!.court.name}.`
+        : blocked.length ? `Primero corregí el horario de ${blocked.join(', ')}.`
+        : fixed && fixed.start < earliest ? `El horario manual es anterior al final de ${deps.map((dep) => `P${dep.sequence}`).join(', ')}.`
+        : latestEnd(chosen) < Infinity ? 'Debe terminar antes del horario manual de un cruce siguiente.'
+        : `Sede configurada: ${venue.name}. No hay un turno automático libre el ${day} (${venue.matchesPerDay} turnos por cancha, desde ${venue.startsAt.slice(0, 5)}). Podés fijar un horario manual o cambiar el día o la cancha.`;
+      warnings.push({ sequence: chosen.sequence, message });
+    }
     const countKey = `${rule.venueId}:${day}:${rule.categoryId}`;
     categoryCounts.set(countKey, (categoryCounts.get(countKey) ?? 0) + 1);
     pending.delete(chosen); completed.add(chosen.id);

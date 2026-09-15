@@ -49,7 +49,32 @@ it('invalidates the preview when a setting changes and keeps all rules when filt
 it('shows capacity problems and prevents applying an incomplete scenario', async () => {
   vi.mocked(previewProgramScenario).mockResolvedValue({ ...result, warnings: [{ sequence: 1, message: 'No entra en la sede ese día.' }] });
   await click('Calcular vista previa');
-  expect(container.querySelector('[role="alert"]')?.textContent).toContain('No entra en la sede');
+  expect(container.querySelector('.scenario-match-warning')?.textContent).toContain('No entra en la sede');
   expect(button('Aplicar escenario').disabled).toBe(true);
   expect(applyProgramScenario).not.toHaveBeenCalled();
+});
+
+it('shows pending games with their planned venue and recalculates a manual time before applying', async () => {
+  vi.mocked(previewProgramScenario).mockResolvedValueOnce({ ...result, slots: result.slots.map((slot) => slot.sequence === 1 ? { ...slot, scheduledAt: null, courtId: null, court: null } : slot), warnings: [{ sequence: 1, message: 'No hay un turno libre.' }] });
+  await click('Calcular vista previa');
+  expect(container.querySelectorAll('.scenario-match-row')).toHaveLength(1);
+  expect(container.querySelector('#scenario-match-1')?.textContent).toContain('Ciudad de Buenos Aires');
+  expect(container.querySelector('#scenario-match-1')?.textContent).toContain('Sin horario válido');
+  await click('Editar horario');
+  const form = container.querySelector('form')!;
+  await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+  expect(vi.mocked(previewProgramScenario).mock.calls[1][1].overrides).toEqual([{ sequence: 1, courtId: 1, scheduledAt: '2026-11-20T13:00:00.000Z' }]);
+  expect(applyProgramScenario).not.toHaveBeenCalled();
+  await click('Aplicar escenario');
+  expect(applyProgramScenario).toHaveBeenCalledWith(1, expect.objectContaining({ overrides: expect.arrayContaining([expect.objectContaining({ sequence: 1, courtId: 1 })]) }));
+});
+
+it('disables applying the old preview if recalculating a manual change fails', async () => {
+  await click('Calcular vista previa');
+  await act(async () => (container.querySelector('#scenario-match-1 button') as HTMLButtonElement).click());
+  expect(button('Aplicar escenario').disabled).toBe(true);
+  vi.mocked(previewProgramScenario).mockRejectedValueOnce(new Error('No se pudo recalcular.'));
+  await act(async () => container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+  expect(button('Aplicar escenario').disabled).toBe(true);
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain('No se pudo recalcular');
 });

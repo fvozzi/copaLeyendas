@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Matches, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, Matches, Min, ValidateNested } from 'class-validator';
 
 export class ProgramScenarioRuleDto {
   @IsInt() @Min(1) categoryId: number;
@@ -10,10 +10,16 @@ export class ProgramScenarioRuleDto {
   @IsOptional() @IsInt() @Min(1) courtId?: number | null;
   @IsIn(['MAIN', 'FINALS']) day: 'MAIN' | 'FINALS';
 }
+export class ProgramMatchOverrideDto {
+  @IsInt() @Min(1) sequence: number;
+  @IsInt() @Min(1) courtId: number;
+  @IsDateString() @Matches(/(?:Z|[+-]\d{2}:\d{2})$/) scheduledAt: string;
+}
 export class ProgramScenarioDto {
   @Matches(/^\d{4}-\d{2}-\d{2}$/) mainDay: string;
   @Matches(/^\d{4}-\d{2}-\d{2}$/) finalsDay: string;
   @IsBoolean() interleaveCategories: boolean;
   @IsArray() @ArrayMinSize(1) @ArrayMaxSize(2000) @ValidateNested({ each: true }) @Type(() => ProgramScenarioRuleDto) rules: ProgramScenarioRuleDto[];
   @IsOptional() @IsString() @Matches(/^[a-f0-9]{64}$/) baseVersion?: string;
+  @IsOptional() @IsArray() @ArrayMaxSize(2000) @ValidateNested({ each: true }) @Type(() => ProgramMatchOverrideDto) overrides?: ProgramMatchOverrideDto[];
 }

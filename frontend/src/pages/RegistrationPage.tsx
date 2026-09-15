@@ -121,11 +121,16 @@ export function RegistrationPage() {
       }
 
       setAccess(result);
-      setForm((current) => ({
-        ...current,
-        accessToken: result.token,
+      setForm({
+        ...initialForm,
         representingText: `${result.localityName}, ${result.provinceName}`,
-      }));
+        ...result.registration?.fields,
+        accessToken: result.token,
+      });
+      setPaymentProof(null);
+      setPlayerPhotos(initialPlayerPhotos);
+      setPhotoMessages(initialPhotoMessages);
+      setFieldErrors({});
     } catch (reason) {
       setAccess(null);
       setError(reason instanceof Error ? reason.message : 'No se pudo validar el token.');
@@ -149,7 +154,7 @@ export function RegistrationPage() {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
-    const errors = validateRegistration(form, paymentProof, access?.feeWaived ?? false);
+    const errors = validateRegistration(form, paymentProof, Boolean(access?.feeWaived || access?.paymentDeferredUntilConfirmed || access?.registration?.paymentProofName));
     if (Object.keys(errors).length) {
       setFieldErrors(errors);
       setError('Revisa los campos marcados para continuar.');
@@ -181,7 +186,7 @@ export function RegistrationPage() {
         playerThreeCommercialAgreementDetails: form.playerThreeCommercialAgreementDetails?.trim() || undefined,
       });
 
-      setSuccessMessage('Inscripción realizada con éxito.');
+      setSuccessMessage(result.message);
       resetForm();
     } catch (reason) {
       const message = reason instanceof Error ? reason.message : 'No se pudo enviar la inscripcion.';
@@ -190,7 +195,7 @@ export function RegistrationPage() {
         return;
       }
       setFieldErrors(validationErrorsFromMessage(message));
-      setError('No se pudo enviar la inscripcion. Revisa los campos marcados.');
+      setError(message);
     } finally {
       setSubmitting(false);
     }
@@ -245,6 +250,7 @@ export function RegistrationPage() {
           </section>
 
           <form className="registration-form registration-form-wide" onSubmit={handleSubmit} noValidate>
+            {access.registration ? <div className="form-section span-2" role="status"><h3>Rectificar inscripción</h3><p>Dirección habilitó este enlace para corregir los datos o agregar una suplente. Las fotos y el comprobante ya cargados se conservan si no los reemplazás. Al guardar, el token vuelve a quedar usado.</p></div> : null}
             <div className="form-section span-2">
               <h3>Confirmaciones</h3>
               <label>
@@ -314,6 +320,7 @@ export function RegistrationPage() {
               shirtSize={form.playerOneShirtSize}
               required
               photo={playerPhotos.playerOne}
+              existingPhotoName={access.registration?.photos.playerOne}
               photoMessage={photoMessages.playerOne}
               onPhotoChange={(file) => handlePlayerPhoto('playerOne', file)}
               hasCommercialAgreement={form.playerOneHasCommercialAgreement}
@@ -334,6 +341,7 @@ export function RegistrationPage() {
               shirtSize={form.playerTwoShirtSize}
               required
               photo={playerPhotos.playerTwo}
+              existingPhotoName={access.registration?.photos.playerTwo}
               photoMessage={photoMessages.playerTwo}
               onPhotoChange={(file) => handlePlayerPhoto('playerTwo', file)}
               hasCommercialAgreement={form.playerTwoHasCommercialAgreement}
@@ -344,7 +352,7 @@ export function RegistrationPage() {
             />
 
             <PlayerFields
-              title="Jugadora 3"
+              title="Jugadora 3 / suplente"
               optionalCaption="Si la hubiera"
               fieldPrefix="playerThree"
               name={form.playerThreeName ?? ''}
@@ -354,6 +362,7 @@ export function RegistrationPage() {
               instagram={form.playerThreeInstagram ?? ''}
               shirtSize={(form.playerThreeShirtSize ?? 'M') as ShirtSize}
               photo={playerPhotos.playerThree}
+              existingPhotoName={access.registration?.photos.playerThree}
               photoMessage={photoMessages.playerThree}
               onPhotoChange={(file) => handlePlayerPhoto('playerThree', file)}
               hasCommercialAgreement={form.playerThreeHasCommercialAgreement ?? false}
@@ -395,7 +404,7 @@ export function RegistrationPage() {
                     Transferir al alias `copaleyendas`, titular Renato Jose Meritano, Uala Bank.
                   </p>
                   <label className="span-2">
-                    Subir captura del comprobante de pago
+                    {access.registration?.paymentProofName ? `Comprobante cargado: ${access.registration.paymentProofName}. Reemplazar (opcional)` : 'Subir captura del comprobante de pago'}
                     <input
                       type="file"
                       accept="image/*,.pdf"
@@ -409,7 +418,7 @@ export function RegistrationPage() {
 
             <div className="span-2 form-actions">
               <button type="submit" className="primary-button" disabled={submitting}>
-                {submitting ? 'Enviando...' : 'Enviar inscripcion'}
+                {submitting ? 'Enviando...' : access.registration ? 'Guardar rectificación' : 'Enviar inscripcion'}
               </button>
             </div>
           </form>
@@ -420,6 +429,7 @@ export function RegistrationPage() {
 }
 
 function PlayerFields(props: {
+  existingPhotoName?: string | null;
   title: string;
   optionalCaption?: string;
   name: string;
@@ -559,6 +569,7 @@ function PlayerFields(props: {
           <input ref={fileInput} type="file" accept="image/*" hidden aria-label={`Archivo de foto: ${props.title}`} onChange={selectPhoto} />
           {showCamera ? <input ref={cameraInput} type="file" accept="image/*" capture="environment" hidden aria-label={`Cámara: ${props.title}`} onChange={selectPhoto} /> : null}
           {props.photo ? <small className="field-hint">{props.photo.name}</small> : null}
+          {!props.photo && props.existingPhotoName ? <small className="field-hint">Foto cargada: {props.existingPhotoName}. Se conserva si no seleccionás otra.</small> : null}
           <small className="field-hint">Sube una imagen para que te presentemos en redes como pelotari. La optimizamos automaticamente antes de enviarla.</small>
           {props.photoMessage ? <small className="field-hint" role="status">{props.photoMessage}</small> : null}
           <FieldError message={fieldError('Photo')} />

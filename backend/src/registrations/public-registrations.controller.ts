@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { extname } from 'node:path';
-import { BadRequestException, Body, Controller, Get, Param, Post, UploadedFiles, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Header, Param, Post, UploadedFiles, UseInterceptors } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { CreatePublicRegistrationDto } from './dto/create-public-registration.dto';
@@ -12,6 +12,7 @@ export class PublicRegistrationsController {
   constructor(private readonly registrationsService: RegistrationsService) {}
 
   @Get('access/:token')
+  @Header('Cache-Control', 'no-store')
   getAccessToken(@Param('token') token: string) {
     return this.registrationsService.getPublicAccessGrant(token);
   }

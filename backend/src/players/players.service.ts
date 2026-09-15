@@ -4,7 +4,7 @@ import { basename, join } from 'node:path';
 import { GoogleDrivePhotoStorageService } from '../registrations/google-drive-photo-storage.service';
 import { resolvePaymentProofDir } from '../registrations/payment-proof-storage';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, Repository } from 'typeorm';
+import { Brackets, EntityManager, Not, Repository } from 'typeorm';
 import { Locality } from '../localities/locality.entity';
 import { PairRegistration } from '../registrations/pair-registration.entity';
 import { CreatePlayerDto } from './dto/create-player.dto';
@@ -46,7 +46,7 @@ export class PlayersService {
     const player = await this.getById(id);
     const registrations = await this.registrationsRepository.find({
       where: [{ playerOneDni: player.dni }, { playerTwoDni: player.dni }, { playerThreeDni: player.dni }],
-      order: { createdAt: 'ASC', id: 'ASC' },
+      order: { updatedAt: 'ASC', id: 'ASC' },
     });
     const photo = registeredPhotos(registrations).get(player.dni.trim());
     if (!photo) throw new NotFoundException('La jugadora no tiene foto');
@@ -118,7 +118,7 @@ export class PlayersService {
 
   private async importRegisteredPlayers() {
     const registrations = await this.registrationsRepository.find({
-      order: { createdAt: 'ASC', id: 'ASC' },
+      order: { updatedAt: 'ASC', id: 'ASC' },
     });
 
     for (const registration of registrations) {
@@ -127,7 +127,8 @@ export class PlayersService {
     return registrations;
   }
 
-  async syncRegistrationPlayers(registration: PairRegistration) {
+  async syncRegistrationPlayers(registration: PairRegistration, correction?: { manager: EntityManager; previous: PairRegistration }) {
+    if (correction) return this.correctRegistrationPlayers(registration, correction.previous, correction.manager);
     const locality = await this.findOrCreateLocality(
       registration.localityName,
       registration.provinceName,
@@ -181,6 +182,32 @@ export class PlayersService {
     }
   }
 
+  private async correctRegistrationPlayers(registration: PairRegistration, previous: PairRegistration, manager: EntityManager) {
+    const localities = manager.getRepository(Locality);
+    const players = manager.getRepository(Player);
+    let locality = await localities.findOne({ where: { name: registration.localityName, provinceName: registration.provinceName } });
+    if (!locality) locality = await localities.save(localities.create({ name: registration.localityName, provinceName: registration.provinceName, active: true }));
+    const prefixes = ['playerOne', 'playerTwo', 'playerThree'] as const;
+    const currentDnis = prefixes.map((prefix) => registration[`${prefix}Dni`]?.trim()).filter(Boolean);
+    for (const prefix of prefixes) {
+      const dni = registration[`${prefix}Dni`]?.trim();
+      const name = registration[`${prefix}Name`]?.trim();
+      if (!dni || !name) continue;
+      let player = await players.findOne({ where: { dni } });
+      const oldDni = previous[`${prefix}Dni`]?.trim();
+      // A corrected DNI keeps its player ID unless that identity is still used elsewhere.
+      if (!player && oldDni && oldDni !== dni && !currentDnis.includes(oldDni)) {
+        const otherRegistrations = await manager.count(PairRegistration, { where: prefixes.map((key) => ({ id: Not(registration.id), [`${key}Dni`]: oldDni })) });
+        if (!otherRegistrations) player = await players.findOne({ where: { dni: oldDni } });
+      }
+      await players.save(players.create({
+        ...player, dni, fullName: name, localityId: locality.id,
+        birthDate: registration[`${prefix}BirthDate`], phone: registration[`${prefix}Phone`],
+        instagram: registration[`${prefix}Instagram`], shirtSize: registration[`${prefix}ShirtSize`],
+      }));
+    }
+  }
+
   private async findOrCreateLocality(name: string, provinceName: string) {
     const existing = await this.localitiesRepository.findOne({
       where: { name, provinceName },
@@ -200,7 +227,7 @@ function normalizeOptional(value?: string | null) {
 
 function registeredAgreements(registrations: PairRegistration[]) {
   const agreements = new Map<string, { hasCommercialAgreement: boolean | null; commercialAgreementDetails: string | null }>();
-  // Registrations arrive oldest first, so the latest declaration for each DNI wins.
+  // Order by last update, so a rectification is the latest declaration for that DNI.
   for (const registration of registrations) {
     for (const prefix of ['playerOne', 'playerTwo', 'playerThree'] as const) {
       const dni = registration[`${prefix}Dni`]?.trim();

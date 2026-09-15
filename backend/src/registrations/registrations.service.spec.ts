@@ -2,6 +2,7 @@ import { BadGatewayException, BadRequestException, Logger } from '@nestjs/common
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CreatePublicRegistrationDto } from './dto/create-public-registration.dto';
 import { RegistrationAccessGrant } from './registration-access-grant.entity';
+import { PairRegistration } from './pair-registration.entity';
 import { RegistrationAccessGrantStatus, RegistrationStatus } from './registration.enums';
 import { RegistrationsService } from './registrations.service';
 
@@ -23,10 +24,12 @@ function setup() {
   };
   const grants = { findOne: vi.fn().mockResolvedValue(grant), update: vi.fn().mockResolvedValue({ affected: 1 }) };
   const manager = {
+    findOne: vi.fn(async (entity) => entity === RegistrationAccessGrant ? grant : null),
     update: vi.fn().mockResolvedValue({ affected: 1 }),
     save: vi.fn(async (_entity, registration) => ({ ...registration, id: 10 })),
   };
   const registrations = {
+    findOne: vi.fn().mockResolvedValue(null),
     count: vi.fn().mockResolvedValue(0), create: vi.fn((value) => value),
     manager: { transaction: vi.fn(async (callback) => callback(manager)) },
   };
@@ -84,16 +87,63 @@ describe('registration tracking', () => {
     await expect(service.createPublic(registrationDto)).resolves.toMatchObject({ id: 10, status: RegistrationStatus.RECEIVED });
     expect(registrations.manager.transaction).toHaveBeenCalledOnce();
     expect(manager.update).toHaveBeenCalledWith(RegistrationAccessGrant,
-      { id: 7, status: RegistrationAccessGrantStatus.ACTIVE },
+      { id: 7 },
       { status: RegistrationAccessGrantStatus.USED, consumedAt: expect.any(Date) });
     expect(manager.save).toHaveBeenCalledOnce();
   });
 
   it('does not save a second registration when another request has consumed the token', async () => {
     const { service, manager, players } = setup();
-    manager.update.mockResolvedValue({ affected: 0 });
+    manager.findOne.mockResolvedValue({ status: RegistrationAccessGrantStatus.USED } as never);
     await expect(service.createPublic(registrationDto)).rejects.toThrow(BadRequestException);
     expect(manager.save).not.toHaveBeenCalled();
     expect(players.syncRegistrationPlayers).not.toHaveBeenCalled();
+  });
+
+  it('lets Direction reopen a used token without clearing its previous usage', async () => {
+    const { service, grant, grants } = setup();
+    grant.status = RegistrationAccessGrantStatus.USED;
+    expect(await service.updateAccessGrantStatus(7, { status: RegistrationAccessGrantStatus.ACTIVE })).toMatchObject({ status: 'ACTIVE' });
+    expect(grants.update).toHaveBeenCalledWith({ id: 7, status: 'USED' }, { status: 'ACTIVE' });
+    await expect(service.updateAccessGrantStatus(7, { status: RegistrationAccessGrantStatus.USED })).rejects.toThrow(BadRequestException);
+  });
+
+  it('only returns editable data while the token is enabled, without internal notes or storage identifiers', async () => {
+    const { service, grant, registrations } = setup();
+    registrations.findOne.mockResolvedValue({ ...registrationDto, adminNotes: 'Private', paymentProofStoredName: 'secret.pdf', paymentProofOriginalName: 'pago.pdf', playerOnePhotoStoredName: 'drive:secret', playerOnePhotoOriginalName: 'foto.jpg' });
+    const access = await service.getPublicAccessGrant(grant.token);
+    expect(access.registration?.fields.playerOneName).toBe('Uno');
+    expect(access.registration?.photos.playerOne).toBe('foto.jpg');
+    expect(access.registration?.paymentProofName).toBe('pago.pdf');
+    expect(JSON.stringify(access)).not.toMatch(/Private|secret|adminNotes|StoredName/);
+    for (const status of [RegistrationAccessGrantStatus.USED, RegistrationAccessGrantStatus.REVOKED]) {
+      grant.status = status;
+      expect((await service.getPublicAccessGrant(grant.token)).registration).toBeNull();
+    }
+  });
+
+  it('updates the same registration, preserves confirmation and files, and adds the substitute', async () => {
+    const { service, grant, manager, players } = setup();
+    grant.feeWaived = false;
+    const previous = { ...registrationDto, id: 42, status: RegistrationStatus.CONFIRMED, adminNotes: 'Reviewed', feePerPlayer: 12000, paymentProofStoredName: 'pago.pdf', playerOnePhotoStoredName: 'drive:old' };
+    manager.findOne.mockImplementation(async (entity) => (entity === RegistrationAccessGrant ? grant : previous) as never);
+    const dto = { ...registrationDto, playerOneName: 'Nombre corregido', playerThreeName: 'Suplente', playerThreeDni: '33333333' };
+    const result = await service.createPublic(dto);
+    expect(result.message).toContain('actualizada');
+    expect(manager.save).toHaveBeenCalledWith(PairRegistration, expect.objectContaining({ id: 42, status: 'CONFIRMED', adminNotes: 'Reviewed', feePerPlayer: 12000, paymentProofStoredName: 'pago.pdf', playerOnePhotoStoredName: 'drive:old', playerOneName: 'Nombre corregido', playerThreeName: 'Suplente' }));
+    expect(players.syncRegistrationPlayers).toHaveBeenCalledWith(expect.anything(), { manager, previous });
+  });
+
+  it('aborts a correction if synchronizing the players fails', async () => {
+    const { service, grant, manager, players } = setup();
+    manager.findOne.mockImplementation(async (entity) => (entity === RegistrationAccessGrant ? grant : { ...registrationDto, id: 42 }) as never);
+    players.syncRegistrationPlayers.mockRejectedValue(new Error('Sync failed'));
+    await expect(service.createPublic(registrationDto)).rejects.toThrow('Sync failed');
+  });
+
+  it('rejects duplicate players before consuming the token', async () => {
+    const { service, manager } = setup();
+    await expect(service.createPublic({ ...registrationDto, playerTwoDni: registrationDto.playerOneDni })).rejects.toThrow('DNI diferentes');
+    expect(manager.update).not.toHaveBeenCalled();
   });
 });

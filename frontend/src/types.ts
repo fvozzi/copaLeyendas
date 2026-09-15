@@ -117,11 +117,15 @@ export interface PublicAccessGrant {
   contactName: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
-  notes: string | null;
   feeWaived: boolean;
   paymentDeferredUntilConfirmed: boolean;
   status: AccessGrantStatus;
   enabled: boolean;
+  registration?: {
+    fields: Partial<PublicRegistrationPayload>;
+    photos: Record<'playerOne' | 'playerTwo' | 'playerThree', string | null>;
+    paymentProofName: string | null;
+  } | null;
 }
 
 export interface PairRegistration {
@@ -287,7 +291,8 @@ export interface ZoneEntry { id: number; seed: number; registration: PairRegistr
 export interface ZoneDetail extends TournamentZone { entries: ZoneEntry[]; }
 
 export interface ProgramScenarioRule { categoryId: number; stage: 'ZONE' | 'QUARTERFINAL' | 'SEMIFINAL' | 'FINAL'; zoneId?: number; matchOrder?: number; venueId: number; courtId?: number | null; day: 'MAIN' | 'FINALS'; }
-export interface ProgramScenario { mainDay: string; finalsDay: string; interleaveCategories: boolean; rules: ProgramScenarioRule[]; baseVersion?: string; }
+export interface ProgramMatchOverride { sequence: number; courtId: number; scheduledAt: string; }
+export interface ProgramScenario { mainDay: string; finalsDay: string; interleaveCategories: boolean; rules: ProgramScenarioRule[]; baseVersion?: string; overrides?: ProgramMatchOverride[]; }
 export interface ProgramScenarioPreview { baseVersion: string; slots: TournamentScheduleSlot[]; warnings: { sequence: number; message: string }[]; }
 export interface PublicStanding { registration: PairRegistration; played: number; wins: number; losses: number; pointsFor: number; pointsAgainst: number; tablePoints: number; }
 export interface PublicTournamentZone { id: number; name: string; category: string; venue: Venue; court?: Court; standings: PublicStanding[]; matches: TournamentMatch[]; }
