@@ -161,6 +161,20 @@ async function main() {
   assert(conflictPreview.warnings.some((w) => w.message.includes('superpone')));
   await assert.rejects(() => service.scenario(scenarioTournament.id, { ...conflicting, baseVersion: conflictPreview.baseVersion }, true), /Hay partidos sin horario/);
   assert.deepEqual(await snapshotScenario(), afterManual, 'A conflicting manual scenario cannot change the saved program');
+  await ds.getRepository(Venue).update(venue.id, { matchesPerDay: 1 });
+  const overflowPreview = await service.scenario(scenarioTournament.id, scenario);
+  assert.equal(overflowPreview.warnings.length, 0);
+  assert(overflowPreview.capacityWarnings.length > 0);
+  assert(overflowPreview.slots.every((slot) => slot.scheduledAt && slot.courtId));
+  await service.scenario(scenarioTournament.id, { ...scenario, baseVersion: overflowPreview.baseVersion }, true);
+  const overflowSaved = await service.scheduleGrid(scenarioTournament.id);
+  assert(overflowSaved.some((slot) => slot.capacityWarning), 'Capacity colors survive applying and reloading');
+  for (const final of overflowSaved.filter((slot) => slot.stage === 'FINAL')) {
+    const semifinals = overflowSaved.filter((slot) => slot.stage === 'SEMIFINAL' && slot.tournamentCategoryId === final.tournamentCategoryId);
+    assert.equal(semifinals.length, 2);
+    for (const semi of semifinals) assert(final.scheduledAt.getTime() >= semi.scheduledAt.getTime() + semi.court.venue.matchDurationMinutes * 60_000);
+  }
+  await ds.getRepository(Venue).update(venue.id, { matchesPerDay: 80 });
   const beforeRepartition = await snapshotScenario();
   const laterCategory = await addScenarioCategory(3);
   const withNewGames = await service.redistributeCourts(scenarioTournament.id);

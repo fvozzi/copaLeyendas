@@ -712,6 +712,11 @@ img {
 .scenario-match-filters > label { min-width: 0; }
 .scenario-match-row { padding: 0.8rem; border: 1px solid var(--line); border-radius: 8px; background: white; min-width: 0; }
 .scenario-match-row.has-warning { border-left: 4px solid #ce6a38; }
+.scenario-match-row.over-capacity { background: #fff8dc; border-left: 4px solid #b58200; }
+.scenario-capacity-notice { background: #fff8dc; color: #624800; padding: 0.8rem; border-radius: 8px; }
+.scenario-capacity-message { color: #624800; font-size: 0.8rem; padding-top: 0.5rem; }
+.program-capacity-warning { display: block; color: #624800; font-size: 0.8rem; }
+.program-page tr:has(.program-capacity-warning) { background: #fff8dc; }
 .scenario-match-row .scenario-preview-game { grid-template-columns: 4rem 1.2fr 1fr auto; border: 0; }
 .scenario-match-row button { font-size: 0.8rem; padding: 0.5rem 0.65rem; }
 .scenario-match-warning { color: #973f1d; font-size: 0.8rem; padding-top: 0.5rem; }

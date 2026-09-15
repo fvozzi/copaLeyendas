@@ -1,5 +1,6 @@
 import type { TournamentMatch } from './tournament-match.entity';
 import type { TournamentScheduleSlot } from './tournament-schedule-slot.entity';
+import { programCapacityWarnings } from './program-capacity';
 
 export const programRelations = { court: { venue: true }, tournamentCategory: { category: true }, match: { zone: true, homeRegistration: true, awayRegistration: true } } as const;
 
@@ -9,9 +10,11 @@ export function matchView(match: TournamentMatch, slot = match.scheduleSlot) {
 }
 
 export function programView(slots: TournamentScheduleSlot[]) {
+  const capacity = new Map(programCapacityWarnings(slots).map((warning) => [warning.sequence, warning.message]));
   // A legacy fourth planning row for a three-pair zone is not a real game.
   return slots.filter((slot) => slot.stage !== 'ZONE' || slot.matchId).map((slot) => ({
     ...slot, zoneName: slot.match?.zone?.name ?? slot.zoneName,
+    capacityWarning: capacity.get(slot.sequence) ?? null,
     match: slot.match ? matchView(slot.match, slot) : null,
   }));
 }

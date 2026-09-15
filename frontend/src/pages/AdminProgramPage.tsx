@@ -122,7 +122,7 @@ export function AdminProgramPage() {
       </select>
       <small className="field-hint">{slot.court?.venue?.name ?? 'Sede a definir'}</small>
     </div> },
-    { label: 'Horario', render: (slot) => slot.scheduledAt ? new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(slot.scheduledAt)) : 'A definir' },
+    { label: 'Horario', render: (slot) => <>{slot.scheduledAt ? new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(slot.scheduledAt)) : 'A definir'}{slot.capacityWarning && <small className="program-capacity-warning" title={slot.capacityWarning}>Fuera de lo previsto</small>}</> },
     { label: 'Gestión', render: (slot) => <div className="list-actions">
       {slot.match?.zoneId && <Link to={`/app/zonas/${slot.match.zoneId}`}>Asignar parejas / ver zona</Link>}
       {slot.match?.status !== 'PLAYED' && <button type="button" className="inline-link" disabled={saving} onClick={() => editMatch(slot, 'schedule')}>Horario</button>}

@@ -3,6 +3,7 @@ import type { ProgramScenarioDto, ProgramScenarioRuleDto } from './program-scena
 import type { TournamentScheduleSlot } from './tournament-schedule-slot.entity';
 import type { Zone } from './zone.entity';
 import type { Court } from '../courts/court.entity';
+import { programCapacityWarnings } from './program-capacity';
 
 const stages = ['ZONE', 'QUARTERFINAL', 'SEMIFINAL', 'FINAL'];
 export const scenarioRuleKey = (rule: Pick<ProgramScenarioRuleDto, 'categoryId' | 'stage' | 'zoneId' | 'matchOrder'>) => `${rule.categoryId}:${rule.stage}:${rule.stage === 'ZONE' ? rule.zoneId : rule.matchOrder ?? ''}`;
@@ -37,6 +38,9 @@ export function simulateProgram(slots: TournamentScheduleSlot[], zones: Zone[], 
     const deps = items.filter((other) => {
       if (other.id === slot.id) return false;
       if (sources.includes(other.matchId) || (other.stage === 'ZONE' && qualifiers.includes(other.match?.zoneId))) return true;
+      // The final must wait for BOTH semifinals, including partially linked legacy fixtures.
+      if (slot.stage === 'FINAL' && other.stage === 'SEMIFINAL' && other.tournamentCategoryId === slot.tournamentCategoryId) return true;
+      if (slot.stage === 'SEMIFINAL' && sources.length < 2 && other.stage === 'QUARTERFINAL' && other.tournamentCategoryId === slot.tournamentCategoryId) return [slot.matchOrder * 2 - 1, slot.matchOrder * 2].includes(other.matchOrder);
       if (slot.stage === 'ZONE') return other.match?.zoneId === zone?.id && other.stage === 'ZONE' && other.matchOrder < slot.matchOrder && (zone?.capacity === 3 || slot.matchOrder > 2 && other.matchOrder <= 2);
       return !sources.length && !qualifiers.length && other.tournamentCategoryId === slot.tournamentCategoryId && stages.indexOf(other.stage) === stages.indexOf(slot.stage) - 1;
     });
@@ -74,6 +78,7 @@ export function simulateProgram(slots: TournamentScheduleSlot[], zones: Zone[], 
   for (const [id, reservation] of manual) occupied.set(reservation.court.id, [...(occupied.get(reservation.court.id) ?? []), { ...reservation, id }]);
   const categoryCounts = new Map<string, number>();
   const warnings: { sequence: number; message: string }[] = [];
+  const capacityWarnings: { sequence: number; message: string }[] = [];
   while (pending.size) {
     const ready = [...pending].filter((s) => dependencies.get(s.id)!.every((d) => completed.has(d.id)));
     if (!ready.length) throw new BadRequestException('Los cruces contienen una dependencia circular. Revisá el fixture.');
@@ -81,7 +86,7 @@ export function simulateProgram(slots: TournamentScheduleSlot[], zones: Zone[], 
       const ar = ruleFor(a), br = ruleFor(b);
       const dayA = ar.day === 'MAIN' ? config.mainDay : config.finalsDay, dayB = br.day === 'MAIN' ? config.mainDay : config.finalsDay;
       const fairness = config.interleaveCategories ? (categoryCounts.get(`${ar.venueId}:${dayA}:${ar.categoryId}`) ?? 0) - (categoryCounts.get(`${br.venueId}:${dayB}:${br.categoryId}`) ?? 0) : ar.categoryId - br.categoryId;
-      return dayA.localeCompare(dayB) || ar.venueId - br.venueId || latestEnd(a) - latestEnd(b) || fairness || stages.indexOf(a.stage) - stages.indexOf(b.stage) || a.matchOrder - b.matchOrder || a.sequence - b.sequence;
+      return latestEnd(a) - latestEnd(b) || dayA.localeCompare(dayB) || ar.venueId - br.venueId || fairness || stages.indexOf(a.stage) - stages.indexOf(b.stage) || a.matchOrder - b.matchOrder || a.sequence - b.sequence;
     })[0];
     const rule = ruleFor(chosen), deps = dependencies.get(chosen.id)!;
     const day = rule.day === 'MAIN' ? config.mainDay : config.finalsDay;
@@ -92,14 +97,23 @@ export function simulateProgram(slots: TournamentScheduleSlot[], zones: Zone[], 
     const earliest = Math.max(0, ...deps.map((d) => ends.get(d.id) ?? Infinity));
     const startOfDay = Date.parse(`${day}T${venue.startsAt.slice(0, 5)}:00-03:00`);
     if (!Number.isFinite(startOfDay)) throw new BadRequestException(`Revisá la hora de inicio de ${venue.name}.`);
-    const nextDay = Date.parse(`${day}T00:00:00-03:00`) + 86_400_000;
     const duration = venue.matchDurationMinutes * 60_000;
+    const wrongDay = !fixed && deps.some((dep) => {
+      const depRule = ruleFor(dep);
+      const plannedDay = manual.has(dep.id) ? new Date(manual.get(dep.id)!.start - 3 * 3_600_000).toISOString().slice(0, 10) : depRule.day === 'MAIN' ? config.mainDay : config.finalsDay;
+      return plannedDay > day;
+    });
     const clashes = (court: Court, start: number, end: number) => (occupied.get(court.id) ?? []).filter((r) => r.id !== chosen.id && start < r.end && end > r.start);
     const candidates = fixed ? (fixed.start >= earliest && fixed.end <= latestEnd(chosen) && !clashes(fixed.court, fixed.start, fixed.end).length ? [fixed] : []) : eligible.map((court) => {
-      for (let index = 0; index < venue.matchesPerDay; index++) {
-        const start = startOfDay + index * duration, end = start + duration;
-        if (start < earliest || end > nextDay || end > latestEnd(chosen) || clashes(court, start, end).length) continue;
-        return { court, start, end };
+      if (!Number.isFinite(earliest) || wrongDay) return null;
+      // Planned turns are a reference, not a hard stop. Extend the schedule, jumping
+      // over reservations, while preserving dependencies and any fixed downstream time.
+      let start = startOfDay + Math.max(0, Math.ceil((earliest - startOfDay) / duration)) * duration;
+      while (start + duration <= latestEnd(chosen)) {
+        const end = start + duration;
+        const collisions = clashes(court, start, end);
+        if (!collisions.length) return { court, start, end };
+        start = startOfDay + Math.ceil((Math.max(...collisions.map((r) => r.end)) - startOfDay) / duration) * duration;
       }
       return null;
     }).filter((c): c is NonNullable<typeof c> => c !== null).sort((a, b) => a.start - b.start || a.court.id - b.court.id);
@@ -108,6 +122,9 @@ export function simulateProgram(slots: TournamentScheduleSlot[], zones: Zone[], 
       chosen.court = candidate.court; chosen.courtId = candidate.court.id; chosen.scheduledAt = new Date(candidate.start);
       ends.set(chosen.id, candidate.end);
       if (!fixed) occupied.set(candidate.court.id, [...(occupied.get(candidate.court.id) ?? []), { start: candidate.start, end: candidate.end, id: chosen.id }]);
+      const plannedDay = fixed ? new Date(candidate.start - 3 * 3_600_000).toISOString().slice(0, 10) : day;
+      const plannedEnd = Date.parse(`${plannedDay}T${venue.startsAt.slice(0, 5)}:00-03:00`) + venue.matchesPerDay * duration;
+      if (candidate.end > plannedEnd) capacityWarnings.push({ sequence: chosen.sequence, message: `Supera los ${venue.matchesPerDay} turnos previstos por cancha en ${venue.name} para el ${plannedDay}. Se asignó horario igualmente; revisá la hora de cierre.` });
     } else {
       // Keep the chosen court visible even when it has no valid time yet.
       chosen.court = fixed?.court ?? (rule.courtId ? eligible[0] : null);
@@ -117,6 +134,7 @@ export function simulateProgram(slots: TournamentScheduleSlot[], zones: Zone[], 
       const message = collisions.length ? `El horario manual se superpone con ${collisions.join(', ')} en ${venue.name}, ${fixed!.court.name}.`
         : blocked.length ? `Primero corregí el horario de ${blocked.join(', ')}.`
         : fixed && fixed.start < earliest ? `El horario manual es anterior al final de ${deps.map((dep) => `P${dep.sequence}`).join(', ')}.`
+        : wrongDay ? 'Un cruce previo está configurado para un día posterior. Revisá los días de las etapas.'
         : latestEnd(chosen) < Infinity ? 'Debe terminar antes del horario manual de un cruce siguiente.'
         : `Sede configurada: ${venue.name}. No hay un turno automático libre el ${day} (${venue.matchesPerDay} turnos por cancha, desde ${venue.startsAt.slice(0, 5)}). Podés fijar un horario manual o cambiar el día o la cancha.`;
       warnings.push({ sequence: chosen.sequence, message });
@@ -125,5 +143,6 @@ export function simulateProgram(slots: TournamentScheduleSlot[], zones: Zone[], 
     categoryCounts.set(countKey, (categoryCounts.get(countKey) ?? 0) + 1);
     pending.delete(chosen); completed.add(chosen.id);
   }
-  return { slots: items, warnings };
+  for (const warning of programCapacityWarnings(items)) if (!capacityWarnings.some((item) => item.sequence === warning.sequence)) capacityWarnings.push(warning);
+  return { slots: items, warnings, capacityWarnings };
 }

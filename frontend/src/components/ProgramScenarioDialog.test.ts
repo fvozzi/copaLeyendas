@@ -46,12 +46,24 @@ it('invalidates the preview when a setting changes and keeps all rules when filt
   await click('Calcular vista previa');
   expect(vi.mocked(previewProgramScenario).mock.calls[1][1].interleaveCategories).toBe(true);
 });
-it('shows capacity problems and prevents applying an incomplete scenario', async () => {
+it('shows invalid times and prevents applying an incomplete scenario', async () => {
   vi.mocked(previewProgramScenario).mockResolvedValue({ ...result, warnings: [{ sequence: 1, message: 'No entra en la sede ese día.' }] });
   await click('Calcular vista previa');
   expect(container.querySelector('.scenario-match-warning')?.textContent).toContain('No entra en la sede');
   expect(button('Aplicar escenario').disabled).toBe(true);
   expect(applyProgramScenario).not.toHaveBeenCalled();
+});
+
+it('colors excess games, keeps their times visible and allows applying the full scenario', async () => {
+  vi.mocked(previewProgramScenario).mockResolvedValue({ ...result, capacityWarnings: [{ sequence: 1, message: 'Supera los 16 turnos previstos.' }] });
+  await click('Calcular vista previa');
+  expect(container.querySelector('#scenario-match-1')?.classList.contains('over-capacity')).toBe(true);
+  expect(container.querySelector('#scenario-match-1')?.textContent).toContain('Supera los 16 turnos');
+  expect(container.querySelectorAll('.scenario-match-row')).toHaveLength(result.slots.length);
+  expect(container.querySelector('.scenario-preview-summary')?.textContent).toContain('1 fuera de lo previsto');
+  expect(button('Aplicar escenario').disabled).toBe(false);
+  await click('Aplicar escenario');
+  expect(applyProgramScenario).toHaveBeenCalledOnce();
 });
 
 it('shows pending games with their planned venue and recalculates a manual time before applying', async () => {

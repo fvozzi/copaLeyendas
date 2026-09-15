@@ -95,7 +95,8 @@ export function ProgramScenarioDialog({ tournamentId, courts, venues, onClose, o
           })}
         </section>)}
       </> : preview && <>
-        <div className="scenario-preview-summary" role="status"><strong>{preview.slots.length} partidos</strong><span>{preview.slots.length - preview.warnings.length} con horario</span><span>{preview.warnings.length} sin horario</span></div>
+        <div className="scenario-preview-summary" role="status"><strong>{preview.slots.length} partidos</strong><span>{preview.slots.filter((slot) => slot.scheduledAt).length} con horario</span><span>{preview.slots.filter((slot) => !slot.scheduledAt).length} sin horario</span><span>{preview.capacityWarnings?.length ?? 0} fuera de lo previsto</span></div>
+        {!!preview.capacityWarnings?.length && <p className="scenario-capacity-notice" role="status">Amarillo: partidos con horario que exceden los turnos previstos. Podés aplicar el escenario igualmente. Revisá hasta qué hora se juega en cada sede.</p>}
         {preview.warnings.length > 0 && <div className="inline-state scenario-notice" role="alert">{preview.warnings.length === 1 ? 'Hay 1 partido sin horario válido.' : `Hay ${preview.warnings.length} partidos sin horario válido.`} Abajo se muestran la sede prevista y el motivo. Usá «Editar horario» para corregirlos.</div>}
         {previewStale && !busy && <p className="field-hint">Los cambios necesitan una nueva vista previa antes de aplicar.</p>}
         <ProgramScenarioPreviewTable key={preview.baseVersion} preview={preview} config={config} courts={courts} venues={venues} busy={busy} onEditing={setEditingTime} onOverride={(sequence, value) => { const overrides = (config.overrides ?? []).filter((o) => o.sequence !== sequence); if (value) overrides.push(value); const settings = { ...config, overrides }; setConfig(settings); void calculate(settings); }} />

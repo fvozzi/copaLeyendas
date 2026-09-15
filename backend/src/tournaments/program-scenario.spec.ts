@@ -35,13 +35,49 @@ it('respects finals day, venue, court and real source matches; reports impossibl
   const impossible = { ...config, rules: config.rules.map((r) => ({ ...r, day: r.stage === 'ZONE' ? 'FINALS' as const : 'MAIN' as const })) };
   expect(simulateProgram(slots, zones, courts, impossible).warnings).toHaveLength(1);
 });
-it('reports capacity exhaustion and rejects mismatched courts and missing rules', () => {
+it('extends beyond planned capacity and rejects mismatched courts and missing rules', () => {
   const { slots, zones, courts, config } = fixture();
   courts.forEach((court) => { court.venue = { ...court.venue, matchesPerDay: 1 }; });
   const result = simulateProgram(slots, zones, courts, config);
-  expect(result.warnings).toHaveLength(5);
+  expect(result.warnings).toHaveLength(0);
+  expect(result.capacityWarnings).toHaveLength(5);
+  expect(result.slots.every((slot) => slot.scheduledAt && slot.courtId)).toBe(true);
   expect(() => simulateProgram(slots, zones, courts, { ...config, rules: config.rules.slice(1) })).toThrow('Falta configurar');
   expect(() => simulateProgram(slots, zones, courts, { ...config, rules: config.rules.map((r) => ({ ...r, courtId: 99 })) })).toThrow('cancha activa');
+});
+
+it('schedules both semifinals before a final even when only one source is linked', () => {
+  const { slots, zones, courts, config } = fixture();
+  courts.forEach((court) => { court.venue = { ...court.venue, matchesPerDay: 1 }; });
+  for (const order of [1, 2]) {
+    slots.push({ ...slots[0], id: 100 + order, matchId: 100 + order, sequence: 100 + order, stage: 'SEMIFINAL', matchOrder: order, match: { ...slots[0].match!, zoneId: null, homeSourceMatchId: order === 1 ? 13 : 23 } });
+    config.rules.push({ categoryId: 1, stage: 'SEMIFINAL', matchOrder: order, venueId: 1, courtId: 1, day: 'MAIN' });
+  }
+  slots.push({ ...slots[0], id: 103, matchId: 103, sequence: 103, stage: 'FINAL', matchOrder: 1, match: { ...slots[0].match!, zoneId: null, homeSourceMatchId: 101 } });
+  config.rules.push({ categoryId: 1, stage: 'FINAL', venueId: 1, courtId: 1, day: 'MAIN' });
+  config.overrides = [{ sequence: 103, courtId: 1, scheduledAt: '2026-11-20T20:00:00Z' }];
+  const result = simulateProgram(slots, zones, courts, config);
+  expect(result.warnings).toEqual([]);
+  const final = result.slots.find((s) => s.sequence === 103)!;
+  for (const semi of result.slots.filter((s) => s.stage === 'SEMIFINAL')) expect(semi.scheduledAt!.getTime() + 40 * 60_000).toBeLessThanOrEqual(final.scheduledAt!.getTime());
+  expect(result.slots.every((s) => s.scheduledAt && s.courtId)).toBe(true);
+  expect(result.capacityWarnings.length).toBeGreaterThan(0);
+  // An impossible fixed final must remain invalid, never leapfrog an unscheduled semi.
+  config.overrides[0].scheduledAt = '2026-11-20T13:00:00Z';
+  const invalid = simulateProgram(slots, zones, courts, config);
+  expect(invalid.slots.find((s) => s.stage === 'FINAL')!.scheduledAt).toBeNull();
+  expect(invalid.warnings.find((w) => w.sequence === 103)?.message).toContain('P101');
+});
+
+it('keeps generating overnight when the planned turns run out, without overlapping games', () => {
+  const { slots, zones, courts, config } = fixture();
+  courts.forEach((court) => { court.venue = { ...court.venue, startsAt: '23:20', matchesPerDay: 1 }; });
+  const result = simulateProgram(slots, zones, courts, config);
+  expect(result.warnings).toEqual([]);
+  expect(result.capacityWarnings).toHaveLength(5);
+  const times = result.slots.map((s) => s.scheduledAt!.getTime()).sort((a, b) => a - b);
+  for (let i = 1; i < times.length; i++) expect(times[i] - times[i - 1]).toBe(40 * 60_000);
+  expect(new Date(times[5]).toISOString()).toBe('2026-11-21T05:40:00.000Z');
 });
 
 it('allows different venues and days for individual quarterfinals in the same category', () => {

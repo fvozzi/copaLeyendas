@@ -288,7 +288,7 @@ export class TournamentsService {
         await manager.getRepository(Tournament).update(tournamentId, { playingDays: [...new Set([...this.programDays(tournament), config.mainDay, config.finalsDay, ...assignedDays])].sort() });
         await runner.commitTransaction();
       } else await runner.rollbackTransaction();
-      return { baseVersion, slots: programView(result.slots), warnings: result.warnings };
+      return { baseVersion, slots: programView(result.slots), warnings: result.warnings, capacityWarnings: result.capacityWarnings };
     } catch (error) { if (runner.isTransactionActive) await runner.rollbackTransaction(); throw error; }
     finally { await runner.release(); }
   }
