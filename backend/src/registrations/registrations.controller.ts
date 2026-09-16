@@ -81,6 +81,18 @@ export class RegistrationsController {
     return this.registrationsService.remove(id);
   }
 
+  @Get(':id/payment-proofs/:paymentId')
+  async getAdditionalPaymentProof(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('paymentId', ParseIntPipe) paymentId: number,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const file = await this.registrationsService.getPaymentProof(id, paymentId);
+    response.setHeader('Content-Type', file.contentType);
+    response.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file.filename)}"`);
+    return file.stream;
+  }
+
   @Get(':id/payment-proof')
   async getPaymentProof(
     @Param('id', ParseIntPipe) id: number,

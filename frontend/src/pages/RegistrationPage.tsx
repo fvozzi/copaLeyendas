@@ -63,6 +63,10 @@ export function RegistrationPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const feePerPlayer = access?.registration?.feePerPlayer ?? 15000;
+  const money = (amount: number) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(amount);
+  const previousRosterSize = access?.registration?.coveredRosterSize ?? (access?.registration?.fields.playerThreeName?.trim() ? 3 : 2);
+  const additionalPlayers = access?.registration && !access.feeWaived ? Math.max(0, (form.playerThreeName?.trim() ? 3 : 2) - previousRosterSize) : 0;
 
   const updateField = <K extends keyof PublicRegistrationPayload>(
     field: K,
@@ -154,7 +158,8 @@ export function RegistrationPage() {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
-    const errors = validateRegistration(form, paymentProof, Boolean(access?.feeWaived || access?.paymentDeferredUntilConfirmed || access?.registration?.paymentProofName));
+    const errors = validateRegistration(form, paymentProof, !additionalPlayers && Boolean(access?.feeWaived || access?.paymentDeferredUntilConfirmed || access?.registration?.paymentProofName));
+    if (additionalPlayers && !paymentProof) errors.paymentProof = 'Adjuntá un nuevo comprobante por la suplente agregada.';
     if (Object.keys(errors).length) {
       setFieldErrors(errors);
       setError('Revisa los campos marcados para continuar.');
@@ -250,7 +255,7 @@ export function RegistrationPage() {
           </section>
 
           <form className="registration-form registration-form-wide" onSubmit={handleSubmit} noValidate>
-            {access.registration ? <div className="form-section span-2" role="status"><h3>Rectificar inscripción</h3><p>Dirección habilitó este enlace para corregir los datos o agregar una suplente. Las fotos y el comprobante ya cargados se conservan si no los reemplazás. Al guardar, el token vuelve a quedar usado.</p></div> : null}
+            {access.registration ? <div className="form-section span-2" role="status"><h3>Rectificar inscripción</h3><p>Dirección habilitó este enlace para corregir los datos o agregar una suplente. Conservamos los comprobantes anteriores y las fotos que no reemplaces. Si agregás una suplente en una inscripción no bonificada, debés adjuntar su comprobante de pago. Al guardar, el token vuelve a quedar usado.</p></div> : null}
             <div className="form-section span-2">
               <h3>Confirmaciones</h3>
               <label>
@@ -388,13 +393,14 @@ export function RegistrationPage() {
 
             <div className="form-section span-2">
               <h3>Inscripcion y comprobante</h3>
-              <p>$15.000 por cada jugadora. 2 jugadoras: $30.000. 3 jugadoras: $45.000.</p>
+              <p>{money(feePerPlayer)} por cada jugadora. 2 jugadoras: {money(2 * feePerPlayer)}. 3 jugadoras: {money(3 * feePerPlayer)}.</p>
+              {additionalPlayers > 0 && <p role="status"><strong>Pago adicional por la suplente: {money(additionalPlayers * feePerPlayer)}.</strong> Adjuntá un nuevo comprobante. El comprobante anterior se conserva.</p>}
               {access.feeWaived ? (
                 <div className="inline-state inline-state-success">
                   Esta inscripcion fue bonificada por la organizacion. No hace falta adjuntar
                   comprobante.
                 </div>
-              ) : access.paymentDeferredUntilConfirmed ? (
+              ) : access.paymentDeferredUntilConfirmed && !additionalPlayers ? (
                 <div className="inline-state inline-state-success">
                   Esta inscripcion ingresa a lista de espera. El pago se solicitara al confirmarla.
                 </div>
@@ -404,11 +410,11 @@ export function RegistrationPage() {
                     Transferir al alias `copaleyendas`, titular Renato Jose Meritano, Uala Bank.
                   </p>
                   <label className="span-2">
-                    {access.registration?.paymentProofName ? `Comprobante cargado: ${access.registration.paymentProofName}. Reemplazar (opcional)` : 'Subir captura del comprobante de pago'}
+                    {additionalPlayers ? 'Nuevo comprobante de la suplente (obligatorio)' : access.registration?.paymentProofName ? `Comprobante cargado: ${access.registration.paymentProofName}. Adjuntar otro (opcional)` : 'Subir captura del comprobante de pago'}
                     <input
                       type="file"
                       accept="image/*,.pdf"
-                      onChange={(event) => setPaymentProof(event.target.files?.[0] ?? null)}
+                      onChange={(event) => { setPaymentProof(event.target.files?.[0] ?? null); setFieldErrors((current) => ({ ...current, paymentProof: undefined })); }}
                     />
                     <FieldError message={fieldErrors.paymentProof} />
                   </label>

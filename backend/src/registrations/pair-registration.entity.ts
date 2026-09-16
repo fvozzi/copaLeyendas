@@ -4,11 +4,13 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { RegistrationAccessGrant } from './registration-access-grant.entity';
 import { Category } from '../categories/category.entity';
+import { RegistrationPayment } from './registration-payment.entity';
 import {
   HeardAboutSource,
   RegistrationStatus,
@@ -17,6 +19,9 @@ import {
 
 @Entity('pair_registrations')
 export class PairRegistration {
+  @OneToMany(() => RegistrationPayment, (payment) => payment.registration)
+  payments: RegistrationPayment[];
+
   @PrimaryGeneratedColumn()
   id: number;
 

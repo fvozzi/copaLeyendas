@@ -38,8 +38,8 @@ async function renderPage(path = '/inscripcion?token=COPA-TEST') {
 }
 
 describe('registration form', () => {
-  it('loads a correction, adds a substitute and submits without uploading the saved files again', async () => {
-    vi.mocked(getPublicRegistrationAccess).mockResolvedValue({ ...grant, feeWaived: false, registration: {
+  it.each([false, true])('requires a new proof for a substitute unless fee waived (%s), keeping previous files', async (feeWaived) => {
+    vi.mocked(getPublicRegistrationAccess).mockResolvedValue({ ...grant, feeWaived, registration: {
       fields: { representingText: 'Junín', heardAboutSource: 'CLUB', contactEmail: 'team@example.com',
         playerOneName: 'Jugadora Uno', playerOneDni: '11111111', playerOneBirthDate: '1980-01-01', playerOnePhone: '1111111111', playerOneShirtSize: 'L', playerOneHasCommercialAgreement: true, playerOneCommercialAgreementDetails: 'Dabber',
         playerTwoName: 'Jugadora Dos', playerTwoDni: '22222222', playerTwoBirthDate: '1981-01-01', playerTwoPhone: '2222222222',
@@ -49,7 +49,7 @@ describe('registration form', () => {
     await renderPage();
     expect(container.textContent).toContain('Rectificar inscripción');
     expect(container.textContent).toContain('Foto cargada: uno.jpg');
-    expect(container.textContent).toContain('Comprobante cargado: pago.pdf');
+    if (!feeWaived) expect(container.textContent).toContain('Comprobante cargado: pago.pdf');
     const sections = container.querySelectorAll('.player-card');
     const playerSections = sections.length ? sections : Array.from(container.querySelectorAll('.form-section')).filter((section) => section.querySelector('.player-photo-field'));
     const firstInputs = playerSections[0].querySelectorAll('input');
@@ -64,7 +64,17 @@ describe('registration form', () => {
       });
     }
     await act(async () => container.querySelector('.registration-form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
-    expect(createPublicRegistration).toHaveBeenCalledWith(expect.objectContaining({ accessToken: 'COPA-TEST', playerOneName: 'Jugadora Uno', playerOneShirtSize: 'L', playerThreeName: 'Suplente Nueva', playerThreeDni: '33333333', paymentProof: undefined, playerOnePhoto: undefined }));
+    let proof: File | undefined;
+    if (!feeWaived) {
+      expect(createPublicRegistration).not.toHaveBeenCalled();
+      expect(container.textContent).toContain('Adjuntá un nuevo comprobante por la suplente agregada');
+      expect(container.textContent).toContain('Pago adicional por la suplente');
+      proof = new File(['payment'], 'suplente.pdf', { type: 'application/pdf' });
+      const input = container.querySelector<HTMLInputElement>('input[accept="image/*,.pdf"]')!;
+      await act(async () => { Object.defineProperty(input, 'files', { value: [proof] }); input.dispatchEvent(new Event('change', { bubbles: true })); });
+      await act(async () => container.querySelector('.registration-form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+    }
+    expect(createPublicRegistration).toHaveBeenCalledWith(expect.objectContaining({ accessToken: 'COPA-TEST', playerOneName: 'Jugadora Uno', playerOneShirtSize: 'L', playerThreeName: 'Suplente Nueva', playerThreeDni: '33333333', paymentProof: proof, playerOnePhoto: undefined }));
     expect(container.textContent).toContain('Inscripción actualizada con éxito.');
   });
 

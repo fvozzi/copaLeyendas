@@ -125,10 +125,13 @@ export interface PublicAccessGrant {
     fields: Partial<PublicRegistrationPayload>;
     photos: Record<'playerOne' | 'playerTwo' | 'playerThree', string | null>;
     paymentProofName: string | null;
+    feePerPlayer?: number;
+    coveredRosterSize?: number;
   } | null;
 }
 
 export interface PairRegistration {
+  payments?: { id: number; kind: 'INITIAL' | 'ADDITIONAL' | 'REPLACEMENT'; players: number; amount: number; originalName: string; createdAt: string }[];
   id: number;
   accessGrantId: number;
   categoryId: number;
@@ -339,6 +342,8 @@ export interface PlayerPayload {
 
 export interface CashIncome {
   id: number;
+  registrationId: number;
+  concept: string;
   team: string;
   players: number;
   amount: number;

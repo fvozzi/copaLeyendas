@@ -456,9 +456,9 @@ export function getPaymentProofUrl(id: number) {
   return `${API_URL}/registrations/${id}/payment-proof`;
 }
 
-export async function openRegistrationPaymentProof(id: number) {
+export async function openRegistrationPaymentProof(id: number, paymentId?: number) {
   const token = getToken();
-  const response = await fetch(getPaymentProofUrl(id), {
+  const response = await fetch(paymentId === undefined ? getPaymentProofUrl(id) : `${API_URL}/registrations/${id}/payment-proofs/${paymentId}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
 

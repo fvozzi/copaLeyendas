@@ -3,10 +3,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CreatePublicRegistrationDto } from './dto/create-public-registration.dto';
 import { RegistrationAccessGrant } from './registration-access-grant.entity';
 import { PairRegistration } from './pair-registration.entity';
+import { RegistrationPayment } from './registration-payment.entity';
 import { RegistrationAccessGrantStatus, RegistrationStatus } from './registration.enums';
 import { RegistrationsService } from './registrations.service';
 
 vi.mock('./pair-registration.entity', () => ({ PairRegistration: class PairRegistration {} }));
+vi.mock('./registration-payment.entity', () => ({ RegistrationPayment: class RegistrationPayment {} }));
 vi.mock('./registration-access-grant.entity', () => ({ RegistrationAccessGrant: class RegistrationAccessGrant {} }));
 vi.mock('../localities/locality.entity', () => ({ Locality: class Locality {} }));
 vi.mock('../tournaments/tournament.entity', () => ({ Tournament: class Tournament {} }));
@@ -24,6 +26,8 @@ function setup() {
   };
   const grants = { findOne: vi.fn().mockResolvedValue(grant), update: vi.fn().mockResolvedValue({ affected: 1 }) };
   const manager = {
+    find: vi.fn().mockResolvedValue([]),
+    create: vi.fn((_entity, value) => value),
     findOne: vi.fn(async (entity) => entity === RegistrationAccessGrant ? grant : null),
     update: vi.fn().mockResolvedValue({ affected: 1 }),
     save: vi.fn(async (_entity, registration) => ({ ...registration, id: 10 })),
@@ -128,10 +132,13 @@ describe('registration tracking', () => {
     const previous = { ...registrationDto, id: 42, status: RegistrationStatus.CONFIRMED, adminNotes: 'Reviewed', feePerPlayer: 12000, paymentProofStoredName: 'pago.pdf', playerOnePhotoStoredName: 'drive:old' };
     manager.findOne.mockImplementation(async (entity) => (entity === RegistrationAccessGrant ? grant : previous) as never);
     const dto = { ...registrationDto, playerOneName: 'Nombre corregido', playerThreeName: 'Suplente', playerThreeDni: '33333333' };
-    const result = await service.createPublic(dto);
+    await expect(service.createPublic(dto)).rejects.toThrow('nuevo comprobante');
+    expect(manager.save).not.toHaveBeenCalled();
+    const result = await service.createPublic(dto, { paymentProof: { filename: 'extra.pdf', originalname: 'suplente.pdf', mimetype: 'application/pdf', size: 100 } as Express.Multer.File });
     expect(result.message).toContain('actualizada');
     expect(manager.save).toHaveBeenCalledWith(PairRegistration, expect.objectContaining({ id: 42, status: 'CONFIRMED', adminNotes: 'Reviewed', feePerPlayer: 12000, paymentProofStoredName: 'pago.pdf', playerOnePhotoStoredName: 'drive:old', playerOneName: 'Nombre corregido', playerThreeName: 'Suplente' }));
     expect(players.syncRegistrationPlayers).toHaveBeenCalledWith(expect.anything(), { manager, previous });
+    expect(manager.save).toHaveBeenCalledWith(RegistrationPayment, expect.objectContaining({ kind: 'ADDITIONAL', players: 1, rosterSize: 3, amount: 12000, storedName: 'extra.pdf' }));
   });
 
   it('aborts a correction if synchronizing the players fails', async () => {
@@ -139,6 +146,24 @@ describe('registration tracking', () => {
     manager.findOne.mockImplementation(async (entity) => (entity === RegistrationAccessGrant ? grant : { ...registrationDto, id: 42 }) as never);
     players.syncRegistrationPlayers.mockRejectedValue(new Error('Sync failed'));
     await expect(service.createPublic(registrationDto)).rejects.toThrow('Sync failed');
+  });
+
+  it('requires the added-player proof even for a deferred non-waived registration', async () => {
+    const { service, grant, manager } = setup();
+    const previous = { ...registrationDto, id: 42, feeWaived: false, paymentDeferredUntilConfirmed: true };
+    manager.findOne.mockImplementation(async (entity) => (entity === RegistrationAccessGrant ? grant : previous) as never);
+    await expect(service.createPublic({ ...registrationDto, playerThreeName: 'Suplente', playerThreeDni: '33333333' })).rejects.toThrow('nuevo comprobante');
+    expect(manager.save).not.toHaveBeenCalled();
+  });
+
+  it('does not charge again for a substitute whose payment was already recorded', async () => {
+    const { service, grant, manager } = setup();
+    const previous = { ...registrationDto, id: 42, feeWaived: false, paymentProofStoredName: 'initial.pdf' };
+    manager.findOne.mockImplementation(async (entity) => (entity === RegistrationAccessGrant ? grant : previous) as never);
+    manager.find.mockResolvedValue([{ rosterSize: 3, amount: 15000 }]);
+    await service.createPublic({ ...registrationDto, playerThreeName: 'Suplente', playerThreeDni: '33333333' });
+    expect(manager.save).toHaveBeenCalledOnce();
+    expect(manager.save.mock.calls[0][0]).toBe(PairRegistration);
   });
 
   it('rejects duplicate players before consuming the token', async () => {

@@ -24,6 +24,7 @@ import {
   RegistrationAccessGrantStatus,
 } from './registration.enums';
 import { PairRegistration } from './pair-registration.entity';
+import { RegistrationPayment } from './registration-payment.entity';
 import { RegistrationAccessGrant } from './registration-access-grant.entity';
 import { Locality } from '../localities/locality.entity';
 import { PlayersService } from '../players/players.service';
@@ -209,7 +210,7 @@ export class RegistrationsService {
     const grant = await this.findAccessGrantByToken(token);
     // Only an explicitly reopened token may expose the previously submitted form.
     const registration = grant.status === RegistrationAccessGrantStatus.ACTIVE
-      ? await this.registrationsRepository.findOne({ where: { accessGrantId: grant.id } })
+      ? await this.registrationsRepository.findOne({ where: { accessGrantId: grant.id }, relations: { payments: true } })
       : null;
 
     return {
@@ -223,8 +224,8 @@ export class RegistrationsService {
       contactName: grant.contactName,
       contactEmail: grant.contactEmail,
       contactPhone: grant.contactPhone,
-      feeWaived: grant.feeWaived,
-      paymentDeferredUntilConfirmed: grant.paymentDeferredUntilConfirmed,
+      feeWaived: registration?.feeWaived ?? grant.feeWaived,
+      paymentDeferredUntilConfirmed: registration?.paymentDeferredUntilConfirmed ?? grant.paymentDeferredUntilConfirmed,
       status: grant.status,
       enabled: grant.status === RegistrationAccessGrantStatus.ACTIVE,
       registration: registration ? publicRegistrationDraft(registration) : null,
@@ -251,6 +252,14 @@ export class RegistrationsService {
           where: { accessGrantId: grant.id }, lock: { mode: 'pessimistic_write' },
         });
         correcting = Boolean(existing);
+        const payments = existing ? await manager.find(RegistrationPayment, { where: { registrationId: existing.id } }) : [];
+        const rosterSize = dto.playerThreeName?.trim() ? 3 : 2;
+        const previousSize = existing?.playerThreeName?.trim() ? 3 : 2;
+        const coveredRoster = Math.max(previousSize, ...payments.filter((payment) => payment.amount > 0).map((payment) => payment.rosterSize));
+        const feeWaived = existing?.feeWaived ?? grant.feeWaived;
+        const deferred = existing?.paymentDeferredUntilConfirmed ?? grant.paymentDeferredUntilConfirmed;
+        const additionalPlayers = existing && !feeWaived ? Math.max(0, rosterSize - coveredRoster) : 0;
+        if (additionalPlayers && !paymentProof) throw new BadRequestException('Debe adjuntar un nuevo comprobante por la jugadora suplente agregada');
         if (!dto.tournamentAvailabilityConfirmed) {
           throw new BadRequestException('Debe confirmar disponibilidad para las fechas del torneo');
         }
@@ -259,7 +268,7 @@ export class RegistrationsService {
           throw new BadRequestException('Debe indicar como se entero del evento');
         }
 
-        if (!grant.feeWaived && !grant.paymentDeferredUntilConfirmed && !paymentProof && !existing?.paymentProofStoredName) {
+        if (!feeWaived && !deferred && !paymentProof && !existing?.paymentProofStoredName) {
           throw new BadRequestException('Debe adjuntar el comprobante de pago');
         }
 
@@ -319,10 +328,10 @@ export class RegistrationsService {
           playerThreePhotoOriginalName: playerThreePhoto?.originalname ?? existing?.playerThreePhotoOriginalName ?? null,
           playerThreePhotoMimeType: playerThreePhoto?.mimetype ?? existing?.playerThreePhotoMimeType ?? null,
           playerThreePhotoSizeBytes: playerThreePhoto?.size ?? existing?.playerThreePhotoSizeBytes ?? null,
-          paymentProofStoredName: paymentProof?.filename ?? existing?.paymentProofStoredName ?? null,
-          paymentProofOriginalName: paymentProof?.originalname ?? existing?.paymentProofOriginalName ?? null,
-          paymentProofMimeType: paymentProof?.mimetype ?? existing?.paymentProofMimeType ?? null,
-          paymentProofSizeBytes: paymentProof?.size ?? existing?.paymentProofSizeBytes ?? null,
+          paymentProofStoredName: existing?.paymentProofStoredName ?? paymentProof?.filename ?? null,
+          paymentProofOriginalName: existing?.paymentProofOriginalName ?? paymentProof?.originalname ?? null,
+          paymentProofMimeType: existing?.paymentProofMimeType ?? paymentProof?.mimetype ?? null,
+          paymentProofSizeBytes: existing?.paymentProofSizeBytes ?? paymentProof?.size ?? null,
           status: existing?.status ?? (grant.paymentDeferredUntilConfirmed ? RegistrationStatus.WAITLIST : RegistrationStatus.RECEIVED),
           adminNotes: existing?.adminNotes ?? null,
         });
@@ -345,6 +354,15 @@ export class RegistrationsService {
         await manager.update(RegistrationAccessGrant, { id: grant.id },
           { status: RegistrationAccessGrantStatus.USED, consumedAt: new Date() });
         const result = await manager.save(PairRegistration, registration);
+        if (paymentProof) {
+          const players = feeWaived ? 0 : additionalPlayers || (!existing?.paymentProofStoredName ? rosterSize : 0);
+          await manager.save(RegistrationPayment, manager.create(RegistrationPayment, {
+            registrationId: result.id, kind: additionalPlayers ? 'ADDITIONAL' : existing?.paymentProofStoredName ? 'REPLACEMENT' : 'INITIAL',
+            players, rosterSize, amount: players * result.feePerPlayer,
+            storedName: paymentProof.filename, originalName: paymentProof.originalname,
+            mimeType: paymentProof.mimetype, sizeBytes: paymentProof.size,
+          }));
+        }
         if (existing) await this.playersService.syncRegistrationPlayers(result, { manager, previous: existing });
         return result;
       });
@@ -369,7 +387,7 @@ export class RegistrationsService {
   }
 
   async list(query: QueryRegistrationsDto) {
-    const qb = this.registrationsRepository.createQueryBuilder('registration').leftJoinAndSelect('registration.category', 'category');
+    const qb = this.registrationsRepository.createQueryBuilder('registration').leftJoinAndSelect('registration.category', 'category').leftJoinAndSelect('registration.payments', 'payments');
 
     if (query.categoryId) {
       qb.andWhere('registration.categoryId = :categoryId', { categoryId: query.categoryId });
@@ -404,6 +422,7 @@ export class RegistrationsService {
       relations: {
         accessGrant: true,
         category: true,
+        payments: true,
       },
     });
 
@@ -446,15 +465,22 @@ export class RegistrationsService {
       throw error;
     }
 
-    [registration.paymentProofStoredName, registration.playerOnePhotoStoredName, registration.playerTwoPhotoStoredName, registration.playerThreePhotoStoredName].forEach((storedName) => {
+    new Set([registration.paymentProofStoredName, ...(registration.payments ?? []).map((payment) => payment.storedName), registration.playerOnePhotoStoredName, registration.playerTwoPhotoStoredName, registration.playerThreePhotoStoredName]).forEach((storedName) => {
       if (storedName) this.cleanupStoredPaymentProof(storedName);
     });
 
     return { success: true };
   }
 
-  async getPaymentProof(id: number) {
+  async getPaymentProof(id: number, paymentId?: number) {
     const registration = await this.getById(id);
+    if (paymentId !== undefined) {
+      const payment = registration.payments.find((item) => item.id === paymentId);
+      if (!payment) throw new NotFoundException('Comprobante no encontrado en esta inscripción');
+      const path = join(ensurePaymentProofDir(), payment.storedName);
+      if (!existsSync(path)) throw new NotFoundException('Archivo de comprobante no encontrado');
+      return { stream: new StreamableFile(createReadStream(path)), filename: payment.originalName, contentType: payment.mimeType };
+    }
     if (
       !registration.paymentProofStoredName ||
       !registration.paymentProofOriginalName ||
@@ -557,7 +583,9 @@ function publicRegistrationDraft(registration: PairRegistration) {
     }
     photos[prefix] = registration[`${prefix}PhotoStoredName`] ? registration[`${prefix}PhotoOriginalName`] || 'Foto cargada' : null;
   }
-  return { fields, photos, paymentProofName: registration.paymentProofStoredName ? registration.paymentProofOriginalName || 'Comprobante cargado' : null };
+  return { fields, photos, feePerPlayer: registration.feePerPlayer,
+    coveredRosterSize: Math.max(registration.playerThreeName?.trim() ? 3 : 2, ...(registration.payments ?? []).filter((payment) => payment.amount > 0).map((payment) => payment.rosterSize)),
+    paymentProofName: registration.paymentProofStoredName ? registration.paymentProofOriginalName || 'Comprobante cargado' : null };
 }
 
 function normalizeOptional(value?: string | null) {
