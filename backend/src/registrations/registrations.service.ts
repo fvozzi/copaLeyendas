@@ -33,6 +33,7 @@ import { Tournament } from '../tournaments/tournament.entity';
 import { TournamentStatus } from '../tournaments/tournament.enums';
 import { Category } from '../categories/category.entity';
 import { WhatsAppService } from '../whatsapp/whatsapp.service';
+import { WhatsAppDelivery } from '../whatsapp/whatsapp-delivery.entity';
 
 interface RegistrationFiles {
   paymentProof?: Express.Multer.File;
@@ -98,7 +99,10 @@ export class RegistrationsService {
   }
 
   async listAccessGrants(query: QueryAccessGrantsDto) {
-    const qb = this.accessGrantsRepository.createQueryBuilder('grant').leftJoinAndSelect('grant.category', 'category');
+    const qb = this.accessGrantsRepository.createQueryBuilder('grant').leftJoinAndSelect('grant.category', 'category')
+      .leftJoin('grant.registrations', 'registration')
+      .addSelect(['registration.id', 'registration.status', 'registration.feeWaived', 'registration.paymentDeferredUntilConfirmed', 'registration.paymentProofStoredName'])
+      .leftJoinAndMapOne('grant.whatsappDelivery', WhatsAppDelivery, 'delivery', 'delivery.messageId = grant.whatsappMessageId');
 
     if (query.categoryId) {
       qb.andWhere('grant.categoryId = :categoryId', { categoryId: query.categoryId });
@@ -176,7 +180,7 @@ export class RegistrationsService {
     if (!messageId) throw new BadGatewayException('WhatsApp no confirmo la aceptacion del mensaje');
     const whatsappSentAt = new Date();
     // Update only the send timestamp: the token may have been consumed during the request to Meta.
-    await this.accessGrantsRepository.update(id, { whatsappSentAt });
+    await this.accessGrantsRepository.update(id, { whatsappSentAt, whatsappMessageId: messageId });
 
     return {
       success: true,
@@ -434,11 +438,28 @@ export class RegistrationsService {
   }
 
   async updateStatus(id: number, dto: UpdateRegistrationStatusDto) {
-    const registration = await this.getById(id);
-    registration.status = dto.status;
-    registration.adminNotes =
-      dto.adminNotes === undefined ? registration.adminNotes : dto.adminNotes.trim() || null;
-    return this.registrationsRepository.save(registration);
+    const current = await this.getById(id);
+    await this.registrationsRepository.manager.transaction(async (manager) => {
+      // Same lock order as public corrections: grant, then registration.
+      const grant = await manager.findOne(RegistrationAccessGrant, {
+        where: { id: current.accessGrantId }, lock: { mode: 'pessimistic_write' },
+      });
+      const registration = await manager.findOne(PairRegistration, {
+        where: { id }, lock: { mode: 'pessimistic_write' },
+      });
+      if (!grant || !registration) throw new NotFoundException('Registration not found');
+      await manager.update(PairRegistration, { id }, {
+        status: dto.status,
+        adminNotes: dto.adminNotes === undefined ? registration.adminNotes : dto.adminNotes.trim() || null,
+      });
+      if (dto.status === RegistrationStatus.CONFIRMED) {
+        await manager.update(RegistrationAccessGrant, { id: grant.id }, {
+          status: RegistrationAccessGrantStatus.USED,
+          consumedAt: grant.consumedAt ?? registration.createdAt,
+        });
+      }
+    });
+    return this.getById(id);
   }
 
   async remove(id: number) {

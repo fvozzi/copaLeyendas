@@ -127,6 +127,22 @@ async function main() {
   assert.equal(await repo(Player).count(), 3);
   assert.equal((await cash.summary()).totalIncome, 45000);
   assert.equal(await repo(Payment).count(), 2);
+  // Director confirmation also closes a reopened correction, preserving the actual use time.
+  const consumedAt = (await repo(Grant).findOneByOrFail({ id: grant.id })).consumedAt;
+  await service.updateAccessGrantStatus(grant.id, { status: 'ACTIVE' });
+  await service.updateStatus(initial.id, { status: 'UNDER_REVIEW', adminNotes: 'Review correction' });
+  assert.equal((await repo(Grant).findOneByOrFail({ id: grant.id })).status, 'ACTIVE');
+  await service.updateStatus(initial.id, { status: 'CONFIRMED' });
+  const closed = await repo(Grant).findOneByOrFail({ id: grant.id });
+  assert.equal(closed.status, 'USED');
+  assert.equal(closed.consumedAt.toISOString(), consumedAt.toISOString());
+  assert.equal((await service.getById(initial.id)).adminNotes, 'Review correction');
+  const listed = (await service.listAccessGrants({ search: 'Junin' }))[0];
+  assert.equal(listed.registrations[0].status, 'CONFIRMED');
+  assert.equal(listed.registrations[0].paymentProofStoredName, originalProof.filename);
+  assert.equal(listed.status, 'USED');
+  await service.updateAccessGrantStatus(grant.id, { status: 'ACTIVE' });
+  assert.equal((await service.getPublicAccessGrant(grant.token)).enabled, true);
   console.log('PASS: payments migration, additional proof required, both proofs readable, Caja 30000 + 15000, no duplicate payment,  reopen, private draft, correction, substitute, existing files/approval/fee, DNI identity, concurrent submissions and transaction rollback');
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; }).finally(async () => {

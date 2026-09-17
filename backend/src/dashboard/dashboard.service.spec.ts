@@ -19,6 +19,19 @@ describe('shirt summary', () => {
 });
 
 describe('category capacity summary', () => {
+  it('counts reopened tokens as used without double counting active or revoked tokens', async () => {
+    const grants = [
+      { status: 'ACTIVE', consumedAt: null },
+      { status: 'ACTIVE', consumedAt: new Date() },
+      { status: 'USED', consumedAt: new Date() },
+      { status: 'REVOKED', consumedAt: new Date() },
+    ];
+    const empty = { find: vi.fn(async () => []) };
+    const service = new DashboardService(empty as never, empty as never,
+      { find: vi.fn(async () => grants) } as never, { findOne: vi.fn(async () => null) } as never,
+      empty as never, empty as never);
+    expect((await service.getSummary()).accessGrants.byStatus).toEqual({ ACTIVE: 1, USED: 2, REVOKED: 1 });
+  });
   it('counts all generated grants separately from director-confirmed registrations and includes empty categories', async () => {
     const a = { id: 1, name: 'Damas A' };
     const b = { id: 2, name: 'Damas B' };

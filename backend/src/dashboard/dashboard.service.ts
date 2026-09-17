@@ -54,7 +54,9 @@ export class DashboardService {
       accessGrants: {
         total: accessGrants.length,
         byCategory: countByCategory(accessGrants, categories),
-        byStatus: countBy(accessGrants, 'status'),
+        byStatus: countBy(accessGrants.map((grant) => ({
+          status: grant.status === 'ACTIVE' && grant.consumedAt ? 'USED' : grant.status,
+        })), 'status'),
       },
       matchesByVenue: summarizeMatchesByVenue(tournament?.name ?? null, zones),
     };

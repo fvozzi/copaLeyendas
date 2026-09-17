@@ -1,6 +1,10 @@
 # Rectificar una inscripción
 
-En **Inscripciones → Equipos habilitados**, Dirección puede seleccionar **Rehabilitar para rectificar** para un token usado. Se conserva el mismo token y enlace; su estado visible pasa a **Para rectificar**. Dirección puede copiarlo o volver a enviarlo por WhatsApp y también revocar el acceso mientras está habilitado.
+En **Inscripciones → Equipos habilitados**, Dirección puede seleccionar **Rehabilitar para rectificar** para un token usado. Se conserva el mismo token y enlace; se muestra **Usado**, con la aclaración **Habilitado para rectificar**. Sigue sumando en Usados del tablero, sin contarlo también como activo. Los revocados se cuentan en Revocados. Dirección puede copiarlo o volver a enviarlo por WhatsApp y también revocar el acceso mientras está habilitado.
+
+Al guardar el seguimiento como **Confirmada**, se cierra la habilitación para rectificar en la misma transacción y se conserva la fecha del último uso. Dirección puede volver a habilitarlo después. Rehabilitar una inscripción ya confirmada no cierra automáticamente el acceso: permanece disponible hasta que se envíe la rectificación o Dirección vuelva a confirmar.
+
+Ambas tablas consultan el pago de la inscripción vinculada: **Pagado** si está confirmada y tiene comprobante, **Comprobante recibido** si aún no está confirmada, **Bonificada** si corresponde, y **Pendiente** si falta comprobante. Confirmar sin comprobante no acredita un pago. Para habilitaciones aún sin inscripción se conserva la modalidad inicial.
 
 El enlace carga los datos existentes, incluidas las marcas y talles. Permite corregirlos y agregar la tercera jugadora / suplente. Las fotos se conservan si no se adjunta un reemplazo. Los comprobantes anteriores se conservan siempre.
 

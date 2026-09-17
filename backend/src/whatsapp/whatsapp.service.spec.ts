@@ -13,11 +13,37 @@ const configuration = {
 };
 
 function createService(values: Record<string, string> = configuration) {
-  return new WhatsAppService(new ConfigService(values));
+  return new WhatsAppService(new ConfigService(values), { record: vi.fn().mockResolvedValue(undefined) } as never);
 }
 
 describe('WhatsAppService', () => {
   afterEach(() => vi.restoreAllMocks());
+
+  it('persists delivery timestamps and failures returned by Meta, and waits for storage', async () => {
+    vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    const record = vi.fn().mockResolvedValue(undefined);
+    const service = new WhatsAppService(new ConfigService(configuration), { record } as never);
+    const payload = { entry: [{ changes: [{ field: 'messages', value: { statuses: [
+      { id: 'wamid.one', status: 'delivered', timestamp: '1789588233' },
+      { id: 'wamid.two', status: 'failed', timestamp: '1789588234', errors: [{ code: 131049, error_data: { details: 'Delivery rejected by Meta' } }] },
+      { id: 'wamid.bad', status: 'delivered', timestamp: 'invalid' },
+    ] } }] }] };
+    await service.processWebhook(payload);
+    expect(record).toHaveBeenCalledTimes(2);
+    expect(record).toHaveBeenCalledWith('wamid.one', 'delivered', new Date(1789588233000), null, null);
+    expect(record).toHaveBeenCalledWith('wamid.two', 'failed', new Date(1789588234000), 131049, 'Delivery rejected by Meta');
+    record.mockRejectedValueOnce(new Error('Database unavailable'));
+    await expect(service.processWebhook(payload)).rejects.toThrow('Database unavailable');
+  });
+
+  it('records acceptance by message ID without treating it as delivery', async () => {
+    const record = vi.fn().mockResolvedValue(undefined);
+    const service = new WhatsAppService(new ConfigService(configuration), { record } as never);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ messages: [{ id: 'wamid.accepted' }] })));
+    await service.sendText('+5491112345678', 'Test');
+    expect(record).toHaveBeenCalledWith('wamid.accepted', 'accepted', expect.any(Date));
+  });
 
   it('reports missing settings without exposing secrets', () => {
     const status = createService({ WHATSAPP_PHONE_NUMBER_ID: '123' }).configurationStatus();
@@ -41,9 +67,9 @@ describe('WhatsAppService', () => {
     expect(() => service.verifyWebhookSignature(body, 'sha256=incorrect')).toThrow(ForbiddenException);
   });
 
-  it('logs asynchronous delivery failures with the reason returned by Meta', () => {
+  it('logs asynchronous delivery failures with the reason returned by Meta', async () => {
     const errorLog = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
-    createService().processWebhook({
+    await createService().processWebhook({
       entry: [{ changes: [{ field: 'messages', value: { statuses: [{
         id: 'wamid.failed',
         status: 'failed',

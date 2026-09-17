@@ -86,6 +86,7 @@ export interface DashboardSummary {
 }
 
 export interface RegistrationAccessGrant {
+  registrations?: Pick<PairRegistration, 'id' | 'status' | 'feeWaived' | 'paymentDeferredUntilConfirmed' | 'paymentProofStoredName'>[];
   id: number;
   token: string;
   categoryId: number;
@@ -102,6 +103,8 @@ export interface RegistrationAccessGrant {
   status: AccessGrantStatus;
   consumedAt: string | null;
   whatsappSentAt: string | null;
+  whatsappMessageId?: string | null;
+  whatsappDelivery?: { messageId: string; status: 'accepted' | 'sent' | 'delivered' | 'read' | 'failed'; statusAt: string; errorCode: number | null; errorMessage: string | null } | null;
   createdAt: string;
   updatedAt: string;
 }

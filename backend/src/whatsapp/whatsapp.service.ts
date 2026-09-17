@@ -1,6 +1,8 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { BadGatewayException, ForbiddenException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { WhatsAppDeliveryService } from './whatsapp-delivery.service';
+import type { DeliveryStatus } from './whatsapp-delivery.entity';
 
 type MetaMessageResponse = {
   messaging_product?: string;
@@ -13,7 +15,7 @@ type MetaMessageResponse = {
 export class WhatsAppService {
   private readonly logger = new Logger(WhatsAppService.name);
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(private readonly configService: ConfigService, private readonly deliveries: WhatsAppDeliveryService) {}
 
   configurationStatus() {
     const required = {
@@ -99,7 +101,7 @@ export class WhatsAppService {
     }
   }
 
-  processWebhook(payload: unknown) {
+  async processWebhook(payload: unknown) {
     if (!isRecord(payload) || !Array.isArray(payload.entry)) return;
     for (const entry of payload.entry) {
       if (!isRecord(entry) || !Array.isArray(entry.changes)) continue;
@@ -124,6 +126,14 @@ export class WhatsAppService {
           } else {
             this.logger.log(summary);
           }
+          if (typeof status.id !== 'string' || !['sent', 'delivered', 'read', 'failed'].includes(String(status.status))) continue;
+          const timestamp = typeof status.timestamp === 'string' || typeof status.timestamp === 'number' ? Number(status.timestamp) * 1000 : NaN;
+          if (!Number.isFinite(timestamp) || !Number.isFinite(new Date(timestamp).getTime())) continue;
+          const error = Array.isArray(status.errors) ? status.errors.find(isRecord) : undefined;
+          const details = error && isRecord(error.error_data) ? error.error_data.details : undefined;
+          await this.deliveries.record(status.id, status.status as DeliveryStatus, new Date(timestamp),
+            typeof error?.code === 'number' && Number.isInteger(error.code) ? error.code : null,
+            typeof details === 'string' ? details : typeof error?.message === 'string' ? error.message : typeof error?.title === 'string' ? error.title : null);
         }
       }
     }
@@ -151,6 +161,7 @@ export class WhatsAppService {
         subcode: result.error?.error_subcode ?? null,
       });
     }
+    for (const message of result.messages ?? []) if (message.id) await this.deliveries.record(message.id, 'accepted', new Date());
     return result;
   }
 

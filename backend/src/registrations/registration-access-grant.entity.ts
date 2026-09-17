@@ -11,9 +11,11 @@ import {
 import { PairRegistration } from './pair-registration.entity';
 import { RegistrationAccessGrantStatus } from './registration.enums';
 import { Category } from '../categories/category.entity';
+import type { WhatsAppDelivery } from '../whatsapp/whatsapp-delivery.entity';
 
 @Entity('registration_access_grants')
 export class RegistrationAccessGrant {
+  whatsappDelivery?: WhatsAppDelivery | null;
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -67,6 +69,9 @@ export class RegistrationAccessGrant {
 
   @Column({ type: 'timestamp with time zone', nullable: true })
   whatsappSentAt: Date | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  whatsappMessageId: string | null;
 
   @OneToMany(() => PairRegistration, (registration) => registration.accessGrant)
   registrations: PairRegistration[];

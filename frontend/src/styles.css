@@ -716,6 +716,9 @@ img {
 .scenario-capacity-notice { background: #fff8dc; color: #624800; padding: 0.8rem; border-radius: 8px; }
 .scenario-capacity-message { color: #624800; font-size: 0.8rem; padding-top: 0.5rem; }
 .program-capacity-warning { display: block; color: #624800; font-size: 0.8rem; }
+.whatsapp-delivery { max-width: 22rem; }
+.whatsapp-delivery-failed { color: #a32916; }
+.whatsapp-delivery-failed .status-chip { background: #fbe7e2; color: #a32916; }
 .program-page tr:has(.program-capacity-warning) { background: #fff8dc; }
 .scenario-match-row .scenario-preview-game { grid-template-columns: 4rem 1.2fr 1fr auto; border: 0; }
 .scenario-match-row button { font-size: 0.8rem; padding: 0.5rem 0.65rem; }

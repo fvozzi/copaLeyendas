@@ -41,13 +41,13 @@ export class WhatsAppController {
 
   @Post('webhook')
   @HttpCode(200)
-  receiveWebhook(
+  async receiveWebhook(
     @Req() request: RawBodyRequest<Request>,
     @Headers('x-hub-signature-256') signature: string | undefined,
     @Body() payload: unknown,
   ) {
     this.whatsAppService.verifyWebhookSignature(request.rawBody, signature);
-    this.whatsAppService.processWebhook(payload);
+    await this.whatsAppService.processWebhook(payload);
     return { received: true };
   }
 }

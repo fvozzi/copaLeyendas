@@ -66,7 +66,7 @@ describe('registration tracking', () => {
     });
     const result = await service.sendAccessGrantTokenByWhatsApp(7, 'https://copa.example.com');
     expect(result.whatsappSentAt.toISOString()).toBe('2026-09-09T23:05:00.000Z');
-    expect(grants.update).toHaveBeenCalledWith(7, { whatsappSentAt: result.whatsappSentAt });
+    expect(grants.update).toHaveBeenCalledWith(7, { whatsappSentAt: result.whatsappSentAt, whatsappMessageId: 'wamid.test' });
     expect(grant.status).toBe(RegistrationAccessGrantStatus.USED);
   });
 
