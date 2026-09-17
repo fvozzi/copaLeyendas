@@ -224,6 +224,19 @@ async function main() {
   const afterPlayed = await service.scheduleGrid(smallTournament.id);
   assert.equal(afterPlayed.find((slot) => slot.id === moved[0].id).courtId, destinationCourt.id);
   assert(afterPlayed.filter((slot) => moved.slice(1).some((item) => item.id === slot.id)).every((slot) => slot.court.venueId === venue.id));
+  // Public map reads the same real games and latest results without modifying the programme.
+  const publicMap = await publicService.currentPublicMap();
+  const privateMap = await service.scheduleGrid(publicMap.detail.id);
+  assert.equal(publicMap.detail.id, tournament.id);
+  assert.equal(publicMap.detail.zones.length, zones.length);
+  assert.deepEqual(publicMap.slots.map(slot => [slot.matchId, slot.courtId, slot.scheduledAt?.toISOString(), slot.match?.homeScore, slot.match?.awayScore]),
+    privateMap.map(slot => [slot.matchId, slot.courtId, slot.scheduledAt?.toISOString(), slot.match?.homeScore, slot.match?.awayScore]));
+  assert(publicMap.slots.some(slot => slot.stage === 'FINAL'));
+  assert(publicMap.slots.some(slot => slot.match?.homeRegistration));
+  const publicJson = JSON.stringify(publicMap);
+  for (const field of ['playerOneDni', 'contactEmail', 'adminNotes', 'paymentProofStoredName', 'accessToken', 'driveFolderId', 'assistants']) assert(!publicJson.includes(`"${field}"`), field);
+  await ds.getRepository(Tournament).update({ status: 'ACTIVE' }, { status: 'COMPLETED' });
+  assert.deepEqual(await publicService.currentPublicMap(), { detail: null, slots: [] });
   console.log('PASS: migration up/down, legacy schedules, shared IDs, zone rename, both scheduling directions, pair assignment, quarterfinals, semifinals and final.');
 }
 main().catch((error) => { console.error(error.stack); process.exitCode = 1; }).finally(async () => {

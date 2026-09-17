@@ -4,11 +4,19 @@ import { categoryGraph, mapParticipant, mapZonePairs, roundNames, venueColor, ty
 import type { TournamentDetail, TournamentScheduleSlot, TournamentZone, Venue } from '../types';
 import { ProgramZoneEditor } from './ProgramZoneEditor';
 
-type Props = { tournamentId: number; slots: TournamentScheduleSlot[]; venues: Venue[]; busy: boolean; onChanged: () => Promise<void>; onMatch: (slot: TournamentScheduleSlot, kind: 'schedule' | 'result') => void };
+type Props = { slots: TournamentScheduleSlot[]; venues: Venue[] } & (
+  { readOnly: true; detail: TournamentDetail } |
+  { readOnly?: false; tournamentId: number; busy: boolean; onChanged: () => Promise<void>; onMatch: (slot: TournamentScheduleSlot, kind: 'schedule' | 'result') => void }
+);
 const colorStyle = (venueId?: number | null) => ({ '--venue-color': venueColor(venueId) }) as CSSProperties;
 
-export function ProgramMap({ tournamentId, slots, venues, busy, onChanged, onMatch }: Props) {
-  const [detail, setDetail] = useState<TournamentDetail | null>(null);
+export function ProgramMap(props: Props) {
+  const { slots, venues, readOnly = false } = props;
+  const tournamentId = props.readOnly ? props.detail.id : props.tournamentId;
+  const busy = props.readOnly ? false : props.busy;
+  const onMatch = (slot: TournamentScheduleSlot, kind: 'schedule' | 'result') => { if (!props.readOnly) props.onMatch(slot, kind); };
+  const [loadedDetail, setDetail] = useState<TournamentDetail | null>(null);
+  const detail = props.readOnly ? props.detail : loadedDetail;
   const [error, setError] = useState<string | null>(null);
   const [categoryId, setCategoryId] = useState(0);
   const [venueId, setVenueId] = useState(0);
@@ -16,11 +24,13 @@ export function ProgramMap({ tournamentId, slots, venues, busy, onChanged, onMat
   const [editingZone, setEditingZone] = useState<TournamentZone | null>(null);
   useEffect(() => {
     let current = true;
+    if (readOnly) return;
     if (tournamentId) getTournament(tournamentId).then((item) => { if (current) setDetail(item); }).catch((reason: Error) => { if (current) setError(reason.message); });
     return () => { current = false; };
-  }, [tournamentId]);
+  }, [tournamentId, readOnly]);
   const refresh = async () => {
-    const [, item] = await Promise.all([onChanged(), getTournament(tournamentId)]);
+    if (props.readOnly) return;
+    const [, item] = await Promise.all([props.onChanged(), getTournament(tournamentId)]);
     setDetail(item);
     if (editingZone) setEditingZone(item.zones.find((zone) => zone.id === editingZone.id) ?? null);
   };
@@ -46,15 +56,16 @@ export function ProgramMap({ tournamentId, slots, venues, busy, onChanged, onMat
     {!boards.length && <div className="inline-state">No hay zonas ni partidos para estos filtros.<button className="inline-link" onClick={() => { setCategoryId(0); setVenueId(0); }}>Ver todo el torneo</button></div>}
     {boards.map((board) => <section className="map-category" key={board.category.id} aria-label={`Mapa de ${board.category.category.name}`}>
       <div className="map-category-title"><h2>{board.category.category.name}</h2><span>{board.graph.nodes.filter((node) => node.zone).length} zonas · {board.games.length} partidos</span></div>
-      <MapBoard {...board} zoom={zoom} busy={busy} onZone={setEditingZone} onMatch={(slot) => onMatch(slot, slot.match?.status === 'PLAYED' ? 'result' : 'schedule')} />
+      <MapBoard {...board} zoom={zoom} busy={busy} readOnly={readOnly} onZone={setEditingZone} onMatch={(slot) => onMatch(slot, slot.match?.status === 'PLAYED' ? 'result' : 'schedule')} />
     </section>)}
-    {editingZone && <ProgramZoneEditor key={editingZone.id} zone={editingZone} venues={allVenues} slots={slots.filter((slot) => slot.match?.zoneId === editingZone.id)} onClose={() => setEditingZone(null)} onChanged={refresh} onMatch={(slot, kind) => { setEditingZone(null); onMatch(slot, kind); }} />}
+    {!readOnly && editingZone && <ProgramZoneEditor key={editingZone.id} zone={editingZone} venues={allVenues} slots={slots.filter((slot) => slot.match?.zoneId === editingZone.id)} onClose={() => setEditingZone(null)} onChanged={refresh} onMatch={(slot, kind) => { setEditingZone(null); onMatch(slot, kind); }} />}
   </div>;
 }
 
-function MapBoard({ graph, full, zones, games, zoom, busy, onZone, onMatch }: {
+function MapBoard({ graph, full, zones, games, zoom, busy, readOnly, onZone, onMatch }: {
   graph: ReturnType<typeof categoryGraph>; full: ReturnType<typeof categoryGraph>; zones: TournamentZone[]; games: TournamentScheduleSlot[]; zoom: number; busy: boolean;
   onZone: (zone: TournamentZone) => void; onMatch: (slot: TournamentScheduleSlot) => void;
+  readOnly: boolean;
 }) {
   const viewport = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
@@ -85,24 +96,25 @@ function MapBoard({ graph, full, zones, games, zoom, busy, onZone, onMatch }: {
     const pairs = zone ? mapZonePairs(zone, zoneGames) : [];
     const position = positions.get(node.id)!;
     const venueId = zone?.venueId ?? slot?.court?.venueId;
-    return <button type="button" key={node.id} className={`map-node ${zone ? 'map-zone-node' : 'map-match-node'}`} data-map-node={node.id} aria-label={zone ? `Editar zona ${zone.name} de ${zone.tournamentCategory.category.name}` : `${slot?.match?.status === 'PLAYED' ? 'Ver resultado' : 'Editar partido'} P${slot?.sequence}`} disabled={busy}
-      style={{ ...colorStyle(venueId), ...(positioned ? { left: position.x, top: position.y, width: 224, height: nodeHeight(node) } : {}) }} onClick={() => zone ? onZone(zone) : slot && onMatch(slot)}>
+    const Node = readOnly ? 'div' : 'button';
+    return <Node type={readOnly ? undefined : 'button'} key={node.id} className={`map-node ${zone ? 'map-zone-node' : 'map-match-node'}`} data-map-node={node.id} aria-label={readOnly ? (zone ? `Zona ${zone.name} de ${zone.tournamentCategory.category.name}` : `Partido P${slot?.sequence}`) : zone ? `Editar zona ${zone.name} de ${zone.tournamentCategory.category.name}` : `${slot?.match?.status === 'PLAYED' ? 'Ver resultado' : 'Editar partido'} P${slot?.sequence}`} disabled={readOnly ? undefined : busy}
+      style={{ ...colorStyle(venueId), ...(positioned ? { left: position.x, top: position.y, width: 224, height: nodeHeight(node) } : {}) }} onClick={readOnly ? undefined : () => zone ? onZone(zone) : slot && onMatch(slot)}>
       {zone ? <><span className="map-zone-heading"><span className="map-node-kicker">Zona</span><strong className="map-node-title">{zone.name.replace(/^zona\s+/i, '')}</strong></span><span className="map-node-venue" title={zone.venue.name}>{zone.venue.name}</span><span className="map-node-meta">{pairs.filter((pair) => pair.registration).length}/{zone.capacity} parejas · {zoneGames.length} partidos</span>
         <span className="map-zone-pairs">{pairs.map(({ seed, registration }) => {
           const label = registration ? `${registration.playerOneName} / ${registration.playerTwoName}` : `Pareja ${seed}`;
           return <span className="map-zone-pair" key={seed} title={label}><span className="map-pair-seed">{seed}</span><span className="map-pair-name">{label}</span></span>;
-        })}</span><span className="map-node-action">Editar zona y parejas ↗</span></> : slot && <>
+        })}</span>{!readOnly && <span className="map-node-action">Editar zona y parejas ↗</span>}</> : slot && <>
         <span className="map-match-heading"><strong>P{slot.sequence}</strong><span>{slot.match?.status === 'PLAYED' ? `${slot.match.homeScore}–${slot.match.awayScore}` : slot.match?.status === 'READY' ? 'Listo' : 'A definir'}</span></span>
         <span className="map-participant" title={mapParticipant(slot, 'home', zones, games)}>{mapParticipant(slot, 'home', zones, games)}</span>
         <span className="map-participant" title={mapParticipant(slot, 'away', zones, games)}>{mapParticipant(slot, 'away', zones, games)}</span>
         <span className="map-node-venue" title={`${slot.court?.venue?.name ?? 'Sede a definir'} · ${slot.court?.name ?? 'Sin cancha'}`}>{slot.court ? `${slot.court.venue?.name ?? ''} · ${slot.court.name}` : 'Cancha a definir'}</span>
         <span className="map-node-meta">{slot.scheduledAt ? new Date(slot.scheduledAt).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : 'Horario a definir'}</span>
       </>}
-    </button>;
+    </Node>;
   };
   if (columnCount === 1) return <div className="map-zones-only">{graph.nodes.map((node) => renderNode(node, false))}<p className="field-hint">Los cruces se mostrarán cuando estén definidos en el programa.</p></div>;
   return <>
-    <p className="map-pan-hint">Deslizá el mapa para recorrer el cuadro. Tocá una zona o un partido para editar.</p>
+    <p className="map-pan-hint">Deslizá el mapa para recorrer el cuadro. {!readOnly && 'Tocá una zona o un partido para editar.'}</p>
     <div className="map-viewport" ref={viewport} tabIndex={0} role="region" aria-label="Cuadro de zonas y eliminatorias"
       onPointerDown={(event) => { if (event.pointerType !== 'mouse' || event.button !== 0 || (event.target as Element).closest('button')) return; drag.current = { x: event.clientX, y: event.clientY, left: event.currentTarget.scrollLeft, top: event.currentTarget.scrollTop }; event.currentTarget.setPointerCapture(event.pointerId); }}
       onPointerMove={(event) => { if (drag.current) { event.currentTarget.scrollLeft = drag.current.left + drag.current.x - event.clientX; event.currentTarget.scrollTop = drag.current.top + drag.current.y - event.clientY; } }}

@@ -11,6 +11,7 @@ import type {
   PublicRegistrationPayload,
   PublicRegistrationResponse,
   PublicCurrentTournament,
+  PublicProgramMapData,
   RegistrationAccessGrant,
   RegistrationStatusPayload,
   ContentPost,
@@ -160,6 +161,10 @@ export function getPublicRegistrationAccess(token: string) {
 
 export function getPublicCurrentTournament() {
   return request<PublicCurrentTournament>('/public/tournaments/current');
+}
+
+export function getPublicProgramMap() {
+  return request<PublicProgramMapData>('/public/tournaments/current/map');
 }
 
 export function createPublicRegistration(payload: PublicRegistrationPayload) {

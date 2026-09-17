@@ -9,4 +9,9 @@ export class PublicTournamentsController {
   current() {
     return this.tournaments.currentPublic();
   }
+
+  @Get('current/map')
+  map() {
+    return this.tournaments.currentPublicMap();
+  }
 }

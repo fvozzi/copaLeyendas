@@ -10,7 +10,9 @@ import { RegistrationStatus } from '../registrations/registration.enums';
 import { TournamentMatch } from './tournament-match.entity';
 import { TournamentStatus } from './tournament.enums';
 import { Court } from '../courts/court.entity';
-import { matchView } from './program-view';
+import { matchView, programRelations } from './program-view';
+import { TournamentScheduleSlot } from './tournament-schedule-slot.entity';
+import { publicProgramView } from './public-program-view';
 import { standings } from './zone-standings';
 
 @Injectable()
@@ -45,5 +47,16 @@ export class TournamentQueryService {
       },
       courts,
     };
+  }
+  async currentPublicMap() {
+    const tournament = await this.tournaments.findOne({ where: { status: TournamentStatus.ACTIVE }, order: { startsAt: 'ASC', id: 'ASC' } });
+    if (!tournament) return { detail: null, slots: [] };
+    const [detail, slots] = await Promise.all([
+      this.detail(tournament.id),
+      this.matches.manager.getRepository(TournamentScheduleSlot).find({
+        where: { tournamentId: tournament.id }, relations: programRelations, order: { sequence: 'ASC' },
+      }),
+    ]);
+    return publicProgramView(detail, slots);
   }
 }

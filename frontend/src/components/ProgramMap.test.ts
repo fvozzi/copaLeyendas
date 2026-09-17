@@ -37,6 +37,25 @@ it('opens a real match from the graph', async () => {
   expect(onMatch).toHaveBeenCalledWith(slot, 'schedule');
 });
 
+it('renders the same graph publicly without admin requests or editing controls, including score updates', async () => {
+  vi.mocked(getTournament).mockClear();
+  await act(async () => root.render(createElement(ProgramMap, { readOnly: true, detail: fixture.tournament, slots: fixture.slots, venues: fixture.venues })));
+  expect(getTournament).not.toHaveBeenCalled();
+  expect(container.querySelectorAll('[data-map-edge]')).toHaveLength(28);
+  expect(container.querySelectorAll('button.map-node')).toHaveLength(0);
+  expect(container.querySelectorAll('.map-node-action')).toHaveLength(0);
+  expect(container.textContent).not.toContain('para editar');
+  await act(async () => (container.querySelector('[data-map-node="zone-1"]') as HTMLElement).click());
+  expect(getZone).not.toHaveBeenCalled();
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  const slot = fixture.slots.find(item => item.stage === 'QUARTERFINAL')!;
+  slot.match = { ...slot.match!, status: 'PLAYED', homeScore: 21, awayScore: 18 };
+  await act(async () => root.render(createElement(ProgramMap, { readOnly: true, detail: fixture.tournament, slots: [...fixture.slots], venues: fixture.venues })));
+  expect(container.querySelector(`[data-map-node="match-${slot.matchId}"]`)?.textContent).toContain('21–18');
+  await change('Filtrar mapa por categoría', '2');
+  expect(container.querySelectorAll('[data-map-node^="zone-"]')).toHaveLength(4);
+});
+
 it('lists placeholders and replaces only the assigned pair with player names', async () => {
   const zoneCard = container.querySelector('[data-map-node="zone-1"]')!;
   expect([...zoneCard.querySelectorAll('.map-pair-name')].map((item) => item.textContent)).toEqual(['Pareja 1', 'Pareja 2', 'Pareja 3', 'Pareja 4']);

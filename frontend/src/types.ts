@@ -304,6 +304,7 @@ export interface PublicStanding { registration: PairRegistration; played: number
 export interface PublicTournamentZone { id: number; name: string; category: string; venue: Venue; court?: Court; standings: PublicStanding[]; matches: TournamentMatch[]; }
 export interface PublicTournament extends Tournament { zones: PublicTournamentZone[]; }
 export interface PublicCurrentTournament { tournament: PublicTournament | null; courts: Court[]; }
+export interface PublicProgramMapData { detail: TournamentDetail | null; slots: TournamentScheduleSlot[]; }
 export interface TournamentScheduleSlot { capacityWarning?: string | null; id: number; matchId?: number | null; match?: TournamentMatch | null; tournamentId: number; tournamentCategoryId: number; zoneName: string; matchOrder: number; stage: 'ZONE' | 'QUARTERFINAL' | 'SEMIFINAL' | 'FINAL'; sequence: number; courtId: number | null; court: Court | null; scheduledAt: string | null; tournamentCategory: TournamentCategory; }
 
 export interface Player {
