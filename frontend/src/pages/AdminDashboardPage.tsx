@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminDataGrid } from '../components/AdminDataGrid';
+import { ShirtDistribution } from '../components/ShirtDistribution';
 import { getDashboardSummary } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import {
@@ -90,6 +91,7 @@ export function AdminDashboardPage() {
           <p className="field-hint">TOT: todas las habilitaciones emitidas, incluidas las revocadas. CONF: aprobadas por Dirección.</p>
           <Link to="/app/inscripciones" className="inline-link">Ver inscripciones</Link>
         </section>
+        <ShirtDistribution distribution={summary.registrations.shirtDistribution} />
         <section className="data-card">
           <h2>Estado de seguimiento</h2>
           <ul className="data-list">
@@ -108,17 +110,6 @@ export function AdminDashboardPage() {
               <li key={key}>
                 <span>{value}</span>
                 <strong>{summary.accessGrants.byStatus[key] ?? 0}</strong>
-              </li>
-            ))}
-          </ul>
-        </section>
-        <section className="data-card">
-          <h2>Camisetas por talle</h2>
-          <ul className="data-list">
-            {['S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'XXXXL', 'XXXXXL'].map((size) => (
-              <li key={size}>
-                <span>{size}</span>
-                <strong>{summary.registrations.shirtSizes[size] ?? 0}</strong>
               </li>
             ))}
           </ul>

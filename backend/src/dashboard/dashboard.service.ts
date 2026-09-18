@@ -9,6 +9,7 @@ import { Tournament } from '../tournaments/tournament.entity';
 import { Zone } from '../tournaments/zone.entity';
 import { Category } from '../categories/category.entity';
 import { RegistrationStatus } from '../registrations/registration.enums';
+import { distributeShirts } from './shirt-distribution';
 
 @Injectable()
 export class DashboardService {
@@ -36,6 +37,7 @@ export class DashboardService {
       this.categoriesRepository.find({ order: { sortOrder: 'ASC', name: 'ASC' } }),
     ]);
     const zones = tournament ? await this.zonesRepository.find({ where: { tournamentCategory: { tournamentId: tournament.id } }, relations: { venue: true, tournamentCategory: { category: true } } }) : [];
+    const shirtDistribution = distributeShirts(registrations);
 
     return {
       posts: {
@@ -49,7 +51,8 @@ export class DashboardService {
         byCategory: countByCategory(registrations, categories),
         confirmedByCategory: countByCategory(registrations.filter((registration) => registration.status === RegistrationStatus.CONFIRMED), categories),
         byStatus: countBy(registrations, 'status'),
-        shirtSizes: countShirtSizes(registrations),
+        shirtSizes: shirtDistribution.totals,
+        shirtDistribution,
       },
       accessGrants: {
         total: accessGrants.length,
@@ -73,17 +76,6 @@ function summarizeMatchesByVenue(tournamentName: string | null, zones: Zone[]) {
   }
   const rows = [...venues.values()].sort((left, right) => left.venue.localeCompare(right.venue)).map((item) => ({ venue: item.venue, categories: [...item.categories].sort(), matches: item.matches }));
   return { tournamentName, venues: rows, totalMatches: rows.reduce((total, item) => total + item.matches, 0) };
-}
-
-function countShirtSizes(registrations: PairRegistration[]) {
-  return registrations.reduce<Record<string, number>>((accumulator, registration) => {
-    [registration.playerOneName?.trim() ? registration.playerOneShirtSize : null,
-      registration.playerTwoName?.trim() ? registration.playerTwoShirtSize : null,
-      registration.playerThreeName?.trim() ? registration.playerThreeShirtSize : null]
-      .filter((size): size is NonNullable<typeof size> => Boolean(size))
-      .forEach((size) => { accumulator[size] = (accumulator[size] ?? 0) + 1; });
-    return accumulator;
-  }, {});
 }
 
 function countBy<T>(items: T[], key: keyof T & string) {
