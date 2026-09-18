@@ -72,7 +72,7 @@ export interface DashboardSummary {
     confirmedByCategory: Record<string, number>;
     byStatus: Record<string, number>;
     shirtSizes: Record<string, number>;
-    shirtDistribution?: { sizes: string[]; totals: Record<string, number>; models: { name: string; sizes: Record<string, number>; total: number }[]; total: number };
+    shirtDistribution?: { sizes: string[]; totals: Record<string, number>; models: { name: string; sizes: Record<string, number>; total: number; players?: { registrationId: number; position: string; name: string; size: string; team: string; category: string; brand: string | null }[] }[]; total: number };
   };
   accessGrants: {
     total: number;

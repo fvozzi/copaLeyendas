@@ -1221,6 +1221,16 @@ textarea {
 }
 
 .shirt-distribution { grid-column: 1 / -1; min-width: 0; }
+.shirt-detail-button { text-align: left; font-weight: 700; padding: 0; }
+.shirt-distribution-table tbody tr, .shirt-distribution-table tfoot tr { cursor: pointer; }
+.shirt-distribution-table tbody tr:hover { background: #173f3908; }
+.shirt-players-table { width: 100%; border-collapse: collapse; }
+.shirt-players-table th, .shirt-players-table td { text-align: left; padding: 0.65rem; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .shirt-players-table thead { display: none; }
+  .shirt-players-table tr { display: grid; grid-template-columns: 1fr; margin-bottom: 1rem; border: 1px solid var(--line); }
+  .shirt-players-table td::before { content: attr(data-label); display: block; font-size: 0.75rem; color: var(--ink-soft); }
+}
 .shirt-distribution-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .shirt-distribution-table th, .shirt-distribution-table td { padding: 0.8rem 0.4rem; text-align: center; border-bottom: 1px solid var(--line); }
 .shirt-distribution-table th:first-child { text-align: left; }

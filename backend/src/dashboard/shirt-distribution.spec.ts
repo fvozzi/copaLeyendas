@@ -7,6 +7,26 @@ const request = (size: ShirtSize, brand = '') => ({ playerOneName: 'Jugadora', p
 const copies = (quantity: number, size: ShirtSize, brand = '') => Array.from({ length: quantity }, () => request(size, brand));
 
 describe('shirt distribution', () => {
+  it('keeps the exact players behind each count, respecting brand and stable identities', () => {
+    const registrations = Array.from({ length: 12 }, (_, index) => ({
+      ...request(index % 2 ? ShirtSize.S : ShirtSize.M, index < 4 ? 'Guastavino' : index < 7 ? 'Dabber' : ''),
+      id: index + 1, playerOneName: `Jugadora ${index + 1}`, localityName: 'Equipo', category: { name: 'Damas A' },
+    })) as PairRegistration[];
+    const result = distributeShirts(registrations);
+    expect(result).toEqual(distributeShirts([...registrations].reverse()));
+    const players = result.models.flatMap(model => model.players);
+    expect(players).toHaveLength(12);
+    expect(new Set(players.map(player => `${player.registrationId}-${player.position}`)).size).toBe(12);
+    for (const model of result.models) {
+      expect(model.players).toHaveLength(model.total);
+      for (const size of result.sizes) expect(model.players.filter(player => player.size === size)).toHaveLength(model.sizes[size]);
+      for (const player of model.players) {
+        if (player.brand) expect(model.name.startsWith(player.brand)).toBe(true);
+        expect(player.team).toBe('Equipo');
+        expect(player.category).toBe('Damas A');
+      }
+    }
+  });
   it('balances each size among four models and spreads rounding remainders across totals', () => {
     const result = distributeShirts([...copies(5, ShirtSize.S), ...copies(14, ShirtSize.M), ...copies(5, ShirtSize.L), ...copies(3, ShirtSize.XL), ...copies(2, ShirtSize.XXL), ...copies(3, ShirtSize.XXXL), request(ShirtSize.XXXXL)]);
     expect(result.total).toBe(33);
