@@ -44,7 +44,8 @@ it('shows effective totals, projected chart and separate income and expense tabs
   await render();
   expect(container.querySelectorAll('.cash-stats strong')[0].textContent).toContain('30.000');
   expect(container.querySelector('.cash-chart[role="img"]')).toBeTruthy();
-  expect(container.querySelector('.cash-chart desc')?.textContent).toContain('80.000');
+  expect(container.querySelector('.cash-chart desc')?.textContent).toContain('60.000');
+  expect(container.querySelectorAll('.cash-chart path')).toHaveLength(2);
   expect(container.querySelector('#cash-panel-incomes')?.textContent).toContain('Auspicio');
   expect(container.querySelector('#cash-panel-expenses')).toBeNull();
   await act(async () => (container.querySelector('#cash-tab-expenses') as HTMLButtonElement).click());

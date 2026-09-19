@@ -86,6 +86,8 @@ Al agregar o editar una categoría del torneo, el Director puede fijar la cantid
 
 El Director crea una zona para una categoria, asigna cancha y define cupo. El sistema impide exceder el cupo al asignar parejas.
 
+Desde la lista de zonas, el Director puede eliminar una zona sobrante tras confirmar la acción. Se borran sus partidos pendientes y los cruces eliminatorios pendientes de la categoría; al abrir Programa se generan los cruces correspondientes a las zonas restantes. No se permite eliminar una zona con parejas o resultados cargados, ni alterar cruces eliminatorios que ya tienen participantes o resultados.
+
 ### CU-07 Asignar parejas a zona
 
 El Director asigna parejas confirmadas a una zona. Una pareja no puede pertenecer a dos zonas de la misma categoria del torneo.

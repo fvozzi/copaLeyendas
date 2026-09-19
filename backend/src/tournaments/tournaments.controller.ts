@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Param, ParseIntPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, ForbiddenException, Get, Param, ParseIntPipe, Patch, Post, UseGuards } from '@nestjs/common';
 import { IsDateString, IsInt, Min } from 'class-validator';
 import { CurrentUser, type AuthenticatedUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -31,6 +31,7 @@ export class TournamentsController {
   @Patch('categories/:id') updateCategory(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: { pointsPerSet?: number; setsToWin?: number; zoneSize?: number; zoneCount?: number | null; registrationsOpen?: boolean }) { this.assertDirector(user); return this.s.updateCategory(id, dto); }
   @Post('zones') createZone(@CurrentUser() user: AuthenticatedUser, @Body() dto: { tournamentCategoryId: number; venueId: number; name: string; capacity: number }) { this.assertDirector(user); return this.s.createZone(dto); }
   @Patch('zones/:id') updateZone(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: { name?: string; venueId?: number; capacity?: number }) { this.assertDirector(user); return this.s.updateZone(id, dto); }
+  @Delete('zones/:id') removeZone(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { this.assertDirector(user); return this.s.removeZone(id); }
   @Post('categories/:id/divide-zones') divideZones(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { this.assertDirector(user); return this.s.divideZones(id); }
   @Patch('schedule-slots/:id') scheduleSlot(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: { scheduledAt?: string | null; courtId?: number | null }) { this.assertDirector(user); return this.s.updateScheduleSlot(id, dto); }
   @Post('zones/:id/entries') entry(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: { registrationId: number }) { this.assertDirector(user); return this.s.addEntry(id, dto.registrationId); }

@@ -24,6 +24,53 @@ vi.mock('../courts/venue.entity', () => ({ Venue: class Venue {} }));
 vi.mock('../courts/court-assistant-assignment.entity', () => ({ CourtAssistantAssignment: class CourtAssistantAssignment {} }));
 vi.mock('../auth/user.entity', () => ({ UserRole: { DIRECTOR: 'DIRECTOR', ASSISTANT: 'ASSISTANT' } }));
 
+function removableZone() {
+  const zone = { id: 2, name: 'C', tournamentCategoryId: 8 };
+  const zoneMatch = { id: 10, zoneId: 2, status: MatchStatus.PENDING, homeRegistrationId: null, awayRegistrationId: null };
+  const knockoutMatch = { id: 20, zoneId: null, status: MatchStatus.PENDING, homeRegistrationId: null as number | null, awayRegistrationId: null, homeQualifierZoneId: 2 };
+  const zoneSlot = { id: 100, tournamentCategoryId: 8, stage: 'ZONE', zoneName: 'C', matchId: 10, match: zoneMatch };
+  const otherZoneSlot = { id: 101, tournamentCategoryId: 8, stage: 'ZONE', zoneName: 'A', matchId: 11, match: { zoneId: 1 } };
+  const knockoutSlot = { id: 200, tournamentCategoryId: 8, stage: 'QUARTERFINAL', matchId: 20, match: knockoutMatch };
+  const operations: string[] = [];
+  const zoneRepository = { findOne: vi.fn(async () => zone), remove: vi.fn(async () => { operations.push('zone'); }) };
+  const entryRepository = { countBy: vi.fn(async () => 0) };
+  const matchRepository = { find: vi.fn().mockResolvedValueOnce([zoneMatch]).mockResolvedValueOnce([knockoutMatch]), remove: vi.fn(async () => { operations.push('matches'); }) };
+  const slotRepository = { find: vi.fn(async () => [zoneSlot, otherZoneSlot, knockoutSlot]), remove: vi.fn(async () => { operations.push('slots'); }) };
+  const repositories = new Map<any, any>([
+    [Tournament, { findOne: vi.fn(async () => ({ id: 1 })) }],
+    [TournamentCategory, { findOneBy: vi.fn(async () => ({ id: 8, tournamentId: 1 })) }],
+    [Zone, zoneRepository], [ZoneEntry, entryRepository], [TournamentMatch, matchRepository], [TournamentScheduleSlot, slotRepository],
+  ]);
+  const manager = { getRepository: (entity: any) => repositories.get(entity) };
+  const transaction = vi.fn(async (work) => work(manager));
+  const service = new TournamentsService({} as never, {} as never, { ...zoneRepository, manager: { transaction } } as never,
+    {} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never);
+  return { service, zone, zoneMatch, knockoutMatch, zoneSlot, otherZoneSlot, knockoutSlot, zoneRepository, entryRepository, matchRepository, slotRepository, operations };
+}
+
+it('removes an empty zone and its pending games and knockout schedule without touching other zones', async () => {
+  const state = removableZone();
+  await expect(state.service.removeZone(2)).resolves.toEqual({ success: true });
+  expect(state.slotRepository.remove).toHaveBeenCalledWith([state.zoneSlot, state.knockoutSlot]);
+  expect(state.matchRepository.remove.mock.calls).toEqual([[[state.knockoutMatch]], [[state.zoneMatch]]]);
+  expect(state.zoneRepository.remove).toHaveBeenCalledWith(state.zone);
+  expect(state.operations).toEqual(['slots', 'matches', 'matches', 'zone']);
+});
+
+it('does not delete a zone with assigned pairs or progressed knockout matches', async () => {
+  const assigned = removableZone();
+  assigned.entryRepository.countBy.mockResolvedValue(1);
+  await expect(assigned.service.removeZone(2)).rejects.toThrow('parejas asignadas');
+  expect(assigned.slotRepository.remove).not.toHaveBeenCalled();
+  expect(assigned.zoneRepository.remove).not.toHaveBeenCalled();
+
+  const progressed = removableZone();
+  progressed.knockoutMatch.homeRegistrationId = 42;
+  await expect(progressed.service.removeZone(2)).rejects.toThrow('cruces de la categoría');
+  expect(progressed.slotRepository.remove).not.toHaveBeenCalled();
+  expect(progressed.zoneRepository.remove).not.toHaveBeenCalled();
+});
+
 it('creates the configured number of zones even before all pairs are confirmed', async () => {
   const zones: any[] = [];
   const zoneRepository = {

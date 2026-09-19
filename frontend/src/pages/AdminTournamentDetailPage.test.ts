@@ -3,13 +3,13 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, expect, it, vi } from 'vitest';
 import { AdminTournamentDetailPage } from './AdminTournamentDetailPage';
-import { getCategories, getTournament, getVenues, updateTournamentCategory, updateTournamentZone } from '../lib/api';
+import { deleteTournamentZone, getCategories, getTournament, getVenues, updateTournamentCategory, updateTournamentZone } from '../lib/api';
 
 vi.mock('../lib/auth', () => ({ useAuth: () => ({ user: { role: 'DIRECTOR' } }) }));
-vi.mock('../lib/api', () => ({ getCategories: vi.fn(), getTournament: vi.fn(), getVenues: vi.fn(), updateTournamentZone: vi.fn(), addTournamentCategory: vi.fn(), createTournamentZone: vi.fn(), divideTournamentZones: vi.fn(), updateTournamentCategory: vi.fn() }));
+vi.mock('../lib/api', () => ({ getCategories: vi.fn(), getTournament: vi.fn(), getVenues: vi.fn(), updateTournamentZone: vi.fn(), deleteTournamentZone: vi.fn(), addTournamentCategory: vi.fn(), createTournamentZone: vi.fn(), divideTournamentZones: vi.fn(), updateTournamentCategory: vi.fn() }));
 let container: HTMLDivElement;
 let root: Root;
-afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.resetAllMocks(); });
+afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.restoreAllMocks(); vi.resetAllMocks(); });
 
 it('shows when a venue has no active courts and allows correction without closing the zone form', async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -52,4 +52,39 @@ it('saves two zones of four pairs for Cimadamore and shows the total capacity', 
   expect(form.textContent).toContain('Cupo total: 8 parejas');
   await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
   expect(updateTournamentCategory).toHaveBeenCalledWith(8, expect.objectContaining({ zoneSize: 4, zoneCount: 2 }));
+});
+
+it('deletes an unused zone from the list after warning about its pending games', async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  const category = { id: 8, category: { name: 'Silvina Cimadamore' } };
+  const zone = { id: 12, name: 'C', tournamentCategoryId: 8, tournamentCategory: category, venue: { name: 'GEBA' }, capacity: 3 };
+  vi.mocked(getTournament).mockResolvedValueOnce({ id: 1, name: 'Copa', categories: [category], zones: [zone] } as never)
+    .mockResolvedValueOnce({ id: 1, name: 'Copa', categories: [category], zones: [] } as never);
+  vi.mocked(getCategories).mockResolvedValue([]);
+  vi.mocked(getVenues).mockResolvedValue([]);
+  vi.mocked(deleteTournamentZone).mockResolvedValue({ success: true });
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  container = document.createElement('div'); document.body.append(container); root = createRoot(container);
+  await act(async () => root.render(createElement(MemoryRouter, { initialEntries: ['/app/torneos/1'], future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(Routes, null, createElement(Route, { path: '/app/torneos/:id', element: createElement(AdminTournamentDetailPage) })))));
+  const remove = [...container.querySelectorAll<HTMLButtonElement>('tbody button')].find(button => button.textContent === 'Eliminar')!;
+  await act(async () => remove.click());
+  expect(confirm).toHaveBeenCalledWith(expect.stringContaining('zona C de Silvina Cimadamore'));
+  expect(deleteTournamentZone).toHaveBeenCalledWith(12);
+  expect(container.textContent).toContain('Usa Dividir zonas');
+});
+
+it('shows the server reason and keeps the zone when it has assigned pairs', async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  const category = { id: 8, category: { name: 'Silvina Cimadamore' } };
+  const zone = { id: 12, name: 'C', tournamentCategoryId: 8, tournamentCategory: category, venue: { name: 'GEBA' }, capacity: 3 };
+  vi.mocked(getTournament).mockResolvedValue({ id: 1, name: 'Copa', categories: [category], zones: [zone] } as never);
+  vi.mocked(getCategories).mockResolvedValue([]);
+  vi.mocked(getVenues).mockResolvedValue([]);
+  vi.mocked(deleteTournamentZone).mockRejectedValue(new Error('No se puede eliminar la zona porque tiene parejas asignadas.'));
+  vi.spyOn(window, 'confirm').mockReturnValue(true);
+  container = document.createElement('div'); document.body.append(container); root = createRoot(container);
+  await act(async () => root.render(createElement(MemoryRouter, { initialEntries: ['/app/torneos/1'], future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(Routes, null, createElement(Route, { path: '/app/torneos/:id', element: createElement(AdminTournamentDetailPage) })))));
+  await act(async () => [...container.querySelectorAll<HTMLButtonElement>('tbody button')].find(button => button.textContent === 'Eliminar')!.click());
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain('parejas asignadas');
+  expect(container.querySelectorAll('tbody tr')).toHaveLength(2);
 });

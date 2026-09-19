@@ -101,6 +101,39 @@ export class TournamentsService {
       return manager.getRepository(Zone).save(zone);
     });
   }
+  async removeZone(id: number) {
+    return this.withLockedZone(id, async (manager, zone) => {
+      const hasProgress = (match: TournamentMatch) => ![MatchStatus.DRAFT, MatchStatus.PENDING].includes(match.status) || !!(match.homeRegistrationId || match.awayRegistrationId || match.winnerRegistrationId) || match.homeScore != null || match.awayScore != null;
+      const entries = await manager.getRepository(ZoneEntry).countBy({ zoneId: id });
+      if (entries) throw new BadRequestException('No se puede eliminar la zona porque tiene parejas asignadas.');
+
+      const matchesRepository = manager.getRepository(TournamentMatch);
+      const zoneMatches = await matchesRepository.find({ where: { zoneId: id } });
+      if (zoneMatches.some(hasProgress)) {
+        throw new BadRequestException('No se puede eliminar la zona porque sus partidos tienen parejas o resultados cargados.');
+      }
+
+      const slotsRepository = manager.getRepository(TournamentScheduleSlot);
+      const slots = await slotsRepository.find({ where: { tournamentCategoryId: zone.tournamentCategoryId }, relations: { match: true } });
+      const knockoutSlots = slots.filter((slot) => slot.stage !== 'ZONE');
+      if (knockoutSlots.some((slot) => slot.match && hasProgress(slot.match))) {
+        throw new BadRequestException('No se puede eliminar la zona porque los cruces de la categoría ya tienen parejas o resultados cargados.');
+      }
+      const knockoutMatchIds = new Set(knockoutSlots.map((slot) => slot.matchId).filter((matchId): matchId is number => matchId !== null));
+      const qualifiers = await matchesRepository.find({ where: [{ homeQualifierZoneId: id }, { awayQualifierZoneId: id }] });
+      if (qualifiers.some((match) => !knockoutMatchIds.has(match.id))) throw new BadRequestException('No se puede eliminar la zona porque tiene cruces sin un programa asociado.');
+
+      const zoneMatchIds = new Set(zoneMatches.map((match) => match.id));
+      const zoneSlots = slots.filter((slot) => slot.stage === 'ZONE' && (slot.match?.zoneId === id || (slot.matchId !== null && zoneMatchIds.has(slot.matchId)) || (slot.matchId === null && slot.zoneName === zone.name)));
+      const affectedSlots = [...zoneSlots, ...knockoutSlots];
+      const knockoutMatches = knockoutSlots.flatMap((slot) => slot.match ? [slot.match] : []);
+      if (affectedSlots.length) await slotsRepository.remove(affectedSlots);
+      if (knockoutMatches.length) await matchesRepository.remove(knockoutMatches);
+      if (zoneMatches.length) await matchesRepository.remove(zoneMatches);
+      await manager.getRepository(Zone).remove(zone);
+      return { success: true };
+    });
+  }
   addEntry(zoneId: number, registrationId: number) { return this.assignPlace(zoneId, registrationId); }
 
   async assignPlace(zoneId: number, registrationId: number, requestedSeed?: number) {

@@ -1158,16 +1158,27 @@ textarea {
 .cash-projection-card .panel-header { margin-bottom: 0.75rem; }
 .cash-chart-legend { display: flex; flex-wrap: wrap; gap: 0.55rem 1.5rem; color: var(--ink-soft); font-size: 0.9rem; }
 .cash-chart-legend span { display: inline-flex; align-items: center; gap: 0.45rem; }
-.cash-chart-legend i { width: 0.85rem; height: 0.85rem; border-radius: 2px; }
+.cash-chart-legend i { width: 1.15rem; height: 0.2rem; border-radius: 2px; }
 .cash-legend-current { background: var(--forest); }
 .cash-legend-forecast { background: var(--coral); }
+.cash-chart-legend .cash-legend-deficit { width: 0.7rem; height: 0.7rem; border-radius: 50%; background: #b33e2e; }
 .cash-chart-scroll { overflow-x: auto; }
-.cash-chart { display: block; width: 100%; max-width: 900px; min-width: 570px; height: auto; margin: 0.5rem auto 0; }
-.cash-chart-zero { stroke: var(--line); stroke-width: 2; }
-.cash-chart-current { fill: var(--forest); }
-.cash-chart-forecast { fill: var(--coral); }
-.cash-chart-value { fill: var(--ink); font-size: 14px; font-weight: 700; }
-.cash-chart-category { fill: var(--ink-soft); font-size: 16px; font-weight: 700; }
+.cash-chart { display: block; width: 100%; height: auto; margin: 0.5rem auto 0; }
+.cash-chart-grid { stroke: var(--line); stroke-width: 1; }
+.cash-chart-zero { stroke: #9faeb0; stroke-width: 1.5; stroke-dasharray: 5 5; }
+.cash-chart-current-line, .cash-chart-forecast-line { fill: none; stroke-linecap: round; stroke-linejoin: round; stroke-width: 3; }
+.cash-chart-current-line { stroke: var(--forest); }
+.cash-chart-forecast-line { stroke: var(--coral); stroke-dasharray: 8 5; }
+.cash-chart-current-point { fill: var(--forest); stroke: white; stroke-width: 1.5; }
+.cash-chart-forecast-point { fill: var(--coral); stroke: white; stroke-width: 1.5; }
+.cash-chart-deficit-point { fill: #b33e2e; stroke: white; stroke-width: 2; }
+.cash-chart-tick, .cash-chart-date { fill: var(--ink-soft); font-size: 12px; }
+.cash-chart-today { fill: var(--ink); font-size: 12px; font-weight: 700; }
+.cash-gap-summary { margin-top: 0.75rem; padding: 0.8rem 1rem; border-left: 3px solid #b33e2e; background: #b33e2e0d; }
+.cash-gap-summary ul { margin: 0.35rem 0 0; padding-left: 1.2rem; }
+.cash-gap-summary li + li { margin-top: 0.25rem; }
+.cash-gap-none, .cash-undated { margin: 0.65rem 0 0; color: var(--ink-soft); }
+.cash-undated strong { color: var(--ink); }
 .cash-projection-totals { margin: 0.5rem 0 0; color: var(--ink-soft); }
 .cash-projection-totals strong { color: var(--ink); }
 .cash-tabs { margin: 0; }
