@@ -28,7 +28,7 @@ La vista previa muestra los partidos pendientes primero, con su sede/cancha prev
 
 La acción alternativa **Completar sin cambiar horarios** genera partidos faltantes de categorías y zonas nuevas y asigna horarios vacíos aprovechando turnos disponibles, conservando los horarios existentes. Para cuatro zonas de tres parejas se generan 12 partidos de zona y 7 eliminatorias. Si faltan turnos, se indica cuántos partidos siguen sin horario.
 
-Al guardar una zona con una sede seleccionada, sus partidos pendientes se distribuyen automáticamente en esa sede. Se conservan los IDs, horarios, parejas y resultados; los partidos ya jugados conservan su cancha anterior. Se tienen en cuenta los partidos que ya ocupan las canchas de destino. Si no existe una cancha activa libre en un horario, el cambio se rechaza completo y el formulario muestra el conflicto, sin dejar la zona y los partidos con asignaciones diferentes.
+Al guardar una zona con una sede seleccionada, sus partidos pendientes se distribuyen automáticamente en esa sede. Se conservan los IDs, parejas y resultados; los partidos ya jugados conservan su cancha y horario. Los partidos pendientes mantienen el horario cuando hay una cancha libre. Si se superponen, pasan al primer horario posterior disponible, respetando los cruces previos e incluso fuera de los turnos previstos. La falta de una cancha activa en la sede sí impide esta redistribución.
 
 Desplegar backend y frontend. En producción, el inicio del backend aplica la migración cuando `DB_SYNCHRONIZE=false`. La reversión se bloquea si ya existen partidos de eliminatorias, para evitar perderlos.
 

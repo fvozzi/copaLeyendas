@@ -86,8 +86,8 @@ export class TournamentsService {
         // Stable match IDs also cover renamed zones and stale court assignments.
         for (const slot of pending) slot.zoneName = zone.name;
         const movingIds = new Set(pending.map((slot) => slot.id));
-        redistributeExistingCourts(pending, [zone], courts, slots.filter((slot) => !movingIds.has(slot.id)));
-        for (const slot of pending) await repository.update(slot.id, { courtId: slot.courtId });
+        redistributeExistingCourts(pending, [zone], courts, slots.filter((slot) => !movingIds.has(slot.id)), true);
+        for (const slot of pending) await repository.update(slot.id, { courtId: slot.courtId, scheduledAt: slot.scheduledAt });
       }
       if (dto.name !== undefined) for (const slot of zoneSlots) await repository.update(slot.id, { zoneName: zone.name });
       return manager.getRepository(Zone).save(zone);

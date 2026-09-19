@@ -47,6 +47,21 @@ describe('existing program redistribution', () => {
     const slots = [1, 2, 3].map((sequence) => ({ ...games()[0], sequence, courtId: 1, scheduledAt: new Date(start) }));
     expect(() => redistributeExistingCourts(slots, zones, courts)).toThrow('No hay una cancha activa disponible');
   });
+  it('moves a zone to one active court, keeping played reservations and extending past planned turns', () => {
+    const destination = { ...venue, matchesPerDay: 2 } as Venue;
+    const oneCourt = [{ id: 1, venueId: 1, active: true, venue: destination }] as Court[];
+    const fixed = [{ ...games()[0], id: 90, sequence: 1, courtId: 1, scheduledAt: new Date(start), match: { zoneId: 2 } } as TournamentScheduleSlot];
+    const slots = [1, 2, 3, 4].map((matchOrder) => ({ ...games()[0], id: matchOrder, sequence: matchOrder + 1,
+      matchOrder, courtId: 4, scheduledAt: new Date(start + (matchOrder > 2 ? 40 * 60_000 : 0)), match: { zoneId: 1 } } as TournamentScheduleSlot));
+    redistributeExistingCourts(slots, [{ ...zones[0], venue: destination }], oneCourt, fixed, true);
+    expect(slots.map((slot) => slot.courtId)).toEqual([1, 1, 1, 1]);
+    expect(slots.map((slot) => slot.scheduledAt?.getTime())).toEqual([1, 2, 3, 4].map(index => start + index * 40 * 60_000));
+    expect(fixed[0].scheduledAt?.getTime()).toBe(start);
+  });
+  it('still blocks a venue without active courts when moving a zone', () => {
+    const slot = { ...games()[0], sequence: 8, scheduledAt: new Date(start) };
+    expect(() => redistributeExistingCourts([slot], zones, [], [], true)).toThrow('No hay canchas activas');
+  });
 });
 
 describe('program court allocation', () => {

@@ -7,6 +7,7 @@ import { RegistrationAccessGrant } from '../registrations/registration-access-gr
 import { TournamentStatus } from '../tournaments/tournament.enums';
 import { Tournament } from '../tournaments/tournament.entity';
 import { Zone } from '../tournaments/zone.entity';
+import { ZoneEntry } from '../tournaments/zone-entry.entity';
 import { Category } from '../categories/category.entity';
 import { RegistrationStatus } from '../registrations/registration.enums';
 import { distributeShirts } from './shirt-distribution';
@@ -24,6 +25,8 @@ export class DashboardService {
     private readonly tournamentsRepository: Repository<Tournament>,
     @InjectRepository(Zone)
     private readonly zonesRepository: Repository<Zone>,
+    @InjectRepository(ZoneEntry)
+    private readonly zoneEntriesRepository: Repository<ZoneEntry>,
     @InjectRepository(Category)
     private readonly categoriesRepository: Repository<Category>,
   ) {}
@@ -37,7 +40,12 @@ export class DashboardService {
       this.categoriesRepository.find({ order: { sortOrder: 'ASC', name: 'ASC' } }),
     ]);
     const zones = tournament ? await this.zonesRepository.find({ where: { tournamentCategory: { tournamentId: tournament.id } }, relations: { venue: true, tournamentCategory: { category: true } } }) : [];
-    const shirtDistribution = distributeShirts(registrations);
+    const zoneEntries = zones.length ? await this.zoneEntriesRepository.find({ where: zones.map(zone => ({ zoneId: zone.id })) }) : [];
+    const zonesById = new Map(zones.map(zone => [zone.id, zone]));
+    const shirtDistribution = distributeShirts(registrations, zoneEntries.flatMap(entry => {
+      const zone = zonesById.get(entry.zoneId);
+      return zone ? [{ registrationId: entry.registrationId, zoneId: zone.id, zoneName: zone.name, categoryId: zone.tournamentCategory.categoryId, seed: entry.seed }] : [];
+    }));
 
     return {
       posts: {

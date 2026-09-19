@@ -10,6 +10,7 @@ import { PairRegistration } from '../registrations/pair-registration.entity';
 import { RegistrationStatus } from '../registrations/registration.enums';
 import { Tournament } from './tournament.entity';
 import { Court } from '../courts/court.entity';
+import { Venue } from '../courts/venue.entity';
 
 vi.mock('./tournament.entity', () => ({ Tournament: class Tournament {} }));
 vi.mock('./tournament-category.entity', () => ({ TournamentCategory: class TournamentCategory {} }));
@@ -76,6 +77,41 @@ it('redistributes existing slots atomically, updating only courts, and rejects t
   slots.push({ ...slots[0], id: 3 }, { ...slots[0], id: 4 });
   await expect(service.redistributeCourts(1)).rejects.toThrow('No hay una cancha activa disponible');
   expect(repository.update).not.toHaveBeenCalled();
+});
+
+it('saves a zone moved to a single-court venue by moving only pending games that collide', async () => {
+  const oldVenue = { id: 1, name: 'Anterior', active: true, matchDurationMinutes: 40, matchesPerDay: 16 };
+  const destination = { id: 2, name: 'Gure Echea', active: true, matchDurationMinutes: 40, matchesPerDay: 16 };
+  const zone = { id: 1, name: 'C', capacity: 4, venueId: 1, venue: oldVenue, tournamentCategoryId: 8 };
+  const start = Date.parse('2026-11-20T13:00:00Z');
+  const pending = [1, 2].map((matchOrder) => ({ id: matchOrder, sequence: matchOrder + 6, stage: 'ZONE', matchOrder,
+    tournamentCategoryId: 8, zoneName: 'C', courtId: 1, scheduledAt: new Date(start), match: { zoneId: 1, status: MatchStatus.PENDING } }));
+  const played = { id: 3, sequence: 1, stage: 'ZONE', matchOrder: 1, tournamentCategoryId: 9, zoneName: 'A',
+    courtId: 2, scheduledAt: new Date(start), match: { zoneId: 2, status: MatchStatus.PLAYED } };
+  const slots = [...pending, played];
+  const slotRepository = {
+    createQueryBuilder: vi.fn(() => ({ where: vi.fn().mockReturnThis(), setLock: vi.fn().mockReturnThis(), getMany: vi.fn(async () => slots) })),
+    find: vi.fn(async () => slots), update: vi.fn(async () => undefined),
+  };
+  const zoneRepository = { findOne: vi.fn(async () => zone), save: vi.fn(async (value) => value) };
+  const repositories = new Map<any, any>([
+    [Tournament, { findOne: vi.fn(async () => ({ id: 1 })) }],
+    [TournamentCategory, { findOneBy: vi.fn(async () => ({ id: 8, tournamentId: 1 })) }],
+    [Zone, zoneRepository], [TournamentMatch, { countBy: vi.fn(async () => 0) }],
+    [TournamentScheduleSlot, slotRepository], [Venue, { findOneBy: vi.fn(async () => destination) }],
+    [Court, { find: vi.fn(async () => [{ id: 1, venueId: 1, active: true, venue: oldVenue }, { id: 2, venueId: 2, active: true, venue: destination }]) }],
+  ]);
+  const manager = { getRepository: (entity: any) => repositories.get(entity) };
+  const transaction = vi.fn(async (work) => work(manager));
+  const service = new TournamentsService({} as never, {} as never, { manager: { transaction } } as never,
+    {} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never);
+  await service.updateZone(1, { venueId: 2 });
+  expect(zoneRepository.save).toHaveBeenCalledWith(expect.objectContaining({ venueId: 2 }));
+  expect(slotRepository.update.mock.calls).toEqual([
+    [1, { courtId: 2, scheduledAt: new Date(start + 40 * 60_000) }],
+    [2, { courtId: 2, scheduledAt: new Date(start + 80 * 60_000) }],
+  ]);
+  expect(played).toMatchObject({ courtId: 2, scheduledAt: new Date(start) });
 });
 
 function setup(capacity = 4) {

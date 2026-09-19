@@ -9,7 +9,7 @@ export function ShirtDistribution({ distribution }: { distribution: DashboardSum
     .sort((a, b) => (distribution?.sizes.indexOf(a.size) ?? 0) - (distribution?.sizes.indexOf(b.size) ?? 0) || a.name.localeCompare(b.name, 'es'));
   return <section className="data-card shirt-distribution">
     <h2>Camisetas por modelo y talle</h2>
-    <p className="field-hint">Distribución proporcional por talle. Las jugadoras con acuerdo Guastavino o Dabber reciben esa marca; el resto se reparte entre los cuatro modelos.</p>
+    <p className="field-hint">Las integrantes de una pareja reciben el mismo color, salvo que tengan acuerdos con marcas distintas. En cada zona se priorizan colores diferentes para posibles rivales y la misma marca en los partidos iniciales. Los acuerdos de marca siempre se respetan; “Otra” no restringe el reparto.</p>
     {distribution ? <table className="shirt-distribution-table" aria-label="Camisetas por modelo y talle">
       <thead><tr><th scope="col">Modelo</th>{distribution.sizes.map(size => <th scope="col" key={size}>{size}</th>)}<th scope="col">Total</th></tr></thead>
       <tbody>{distribution.models.map(model => <tr key={model.name} onDoubleClick={() => setSelected(model.name)} title="Doble clic para ver las jugadoras">
@@ -24,10 +24,10 @@ export function ShirtDistribution({ distribution }: { distribution: DashboardSum
     {selected !== null && <AdminDialog title={selected === '__all__' ? 'Todas las camisetas' : selected} onClose={() => setSelected(null)} className="shirt-players-dialog">
       <p>{players.length} jugadoras en este reparto.</p>
       {selectedModels.some(model => !model.players) ? <p>Actualizá el resumen para cargar el detalle de las jugadoras.</p> : players.length ? <table className="shirt-players-table" aria-label="Jugadoras del reparto">
-        <thead><tr><th>Jugadora</th><th>Talle</th><th>Equipo / categoría</th><th>Marca declarada</th></tr></thead>
+        <thead><tr><th>Jugadora</th><th>Talle</th><th>Equipo / categoría</th><th>Zona</th><th>Marca declarada</th></tr></thead>
         <tbody>{players.map(player => <tr key={`${player.registrationId}-${player.position}`}>
           <th scope="row">{player.name}{player.position === 'playerThree' && <small className="admin-grid-detail">Suplente</small>}{selected === '__all__' && <small className="admin-grid-detail">{player.model}</small>}</th>
-          <td data-label="Talle">{player.size}</td><td data-label="Equipo / categoría">{player.team}<small className="admin-grid-detail">{player.category}</small></td><td data-label="Marca declarada">{player.brand || 'Sin acuerdo'}</td>
+          <td data-label="Talle">{player.size}</td><td data-label="Equipo / categoría">{player.team}<small className="admin-grid-detail">{player.category}</small></td><td data-label="Zona">{player.zone || 'Sin asignar'}</td><td data-label="Marca declarada">{player.brand || 'Sin acuerdo'}</td>
         </tr>)}</tbody>
       </table> : <p>No hay jugadoras asignadas a este modelo.</p>}
     </AdminDialog>}

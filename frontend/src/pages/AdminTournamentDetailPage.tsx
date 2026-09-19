@@ -38,7 +38,7 @@ function ZoneForm({ categories, venues, editing, onSave }: { categories: Tournam
     {error && <div className="inline-state span-2" role="alert">{error}</div>}
     <label>Nombre<input value={value.name} onChange={(event) => setValue({ ...value, name: event.target.value })} required /></label>
     <label>Sede<select value={value.venueId} onChange={(event) => setValue({ ...value, venueId: Number(event.target.value) })} required><option value="0">Seleccionar</option>{venues.filter((venue) => venue.active).map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}</select></label>
-    {editing && <p className="field-hint span-2">Al cambiar la sede, los partidos pendientes pasan a sus canchas conservando los horarios. Los partidos jugados mantienen su cancha.</p>}
+    {editing && <p className="field-hint span-2">Al cambiar la sede, los partidos pendientes pasan a sus canchas. Si hay superposiciones, se mueven al siguiente horario libre, incluso fuera de los turnos previstos. Los partidos jugados mantienen su cancha y horario.</p>}
     <label>Categoria<select value={value.tournamentCategoryId} disabled={!!editing} onChange={(event) => setValue({ ...value, tournamentCategoryId: Number(event.target.value) })} required><option value="0">Seleccionar</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.category.name}</option>)}</select></label>
     <label>Cupo<input type="number" value={value.capacity} onChange={(event) => setValue({ ...value, capacity: Number(event.target.value) })} /></label>
     <div className="span-2 form-actions"><button className="primary-button" disabled={saving || !value.venueId || !value.tournamentCategoryId}>{saving ? 'Guardando...' : 'Guardar zona'}</button></div>
