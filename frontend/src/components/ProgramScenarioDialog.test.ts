@@ -36,6 +36,20 @@ it('loads every zone and knockout stage and applies only after preview', async (
   expect(onApplied).toHaveBeenCalledWith(fixture.slots);
 });
 
+it('places semifinals and finals on the selected finals day even when old slots were on the main day', async () => {
+  const finalsDay = container.querySelectorAll<HTMLInputElement>('.scenario-days input')[1];
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(finalsDay, '2026-11-22');
+    finalsDay.dispatchEvent(new Event('input', { bubbles: true }));
+    finalsDay.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await click('Calcular vista previa');
+  const config = vi.mocked(previewProgramScenario).mock.calls[0][1];
+  expect(config.finalsDay).toBe('2026-11-22');
+  expect(config.rules.filter((rule) => rule.stage === 'SEMIFINAL' || rule.stage === 'FINAL').every((rule) => rule.day === 'FINALS')).toBe(true);
+  expect(config.rules.filter((rule) => rule.stage === 'QUARTERFINAL').every((rule) => rule.day === 'MAIN')).toBe(true);
+});
+
 it('allows explicitly fixing a court without locking the other zones and knockout games', async () => {
   const court = container.querySelector<HTMLSelectElement>('[aria-label="Cancha: Damas A · Zona A"]')!;
   expect(court.value).toBe('0');

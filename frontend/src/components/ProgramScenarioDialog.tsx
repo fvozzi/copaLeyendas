@@ -41,7 +41,8 @@ export function ProgramScenarioDialog({ tournamentId, courts, venues, onClose, o
             const matchOrder = game.matchOrder;
             const venueId = game?.court?.venueId ?? zones[0]?.venueId ?? venues.find((venue) => venue.active)?.id ?? 0;
             const recordedDay = dayOf(game?.scheduledAt);
-            rules.push({ categoryId: category.id, stage, matchOrder, venueId, courtId: null, day: recordedDay ? finalsDay !== mainDay && recordedDay === finalsDay ? 'FINALS' : 'MAIN' : stage === 'QUARTERFINAL' ? 'MAIN' : 'FINALS' });
+            const day = stage === 'QUARTERFINAL' && recordedDay !== finalsDay ? 'MAIN' : 'FINALS';
+            rules.push({ categoryId: category.id, stage, matchOrder, venueId, courtId: null, day });
           }
         }
       }

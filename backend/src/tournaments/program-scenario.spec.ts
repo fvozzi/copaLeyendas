@@ -54,6 +54,28 @@ it('respects finals day, venue, court and real source matches; reports impossibl
   const impossible = { ...config, rules: config.rules.map((r) => ({ ...r, day: r.stage === 'ZONE' ? 'FINALS' as const : 'MAIN' as const })) };
   expect(simulateProgram(slots, zones, courts, impossible).warnings).toHaveLength(1);
 });
+
+it('schedules semifinals and the final on the finals date after the zone games', () => {
+  const { slots, zones, courts, config } = fixture();
+  zones[1].tournamentCategoryId = 1;
+  for (const slot of slots) slot.tournamentCategoryId = 1;
+  for (const rule of config.rules) rule.categoryId = 1;
+  config.mainDay = '2026-11-21';
+  config.finalsDay = '2026-11-22';
+  for (const order of [1, 2]) {
+    slots.push({ ...slots[0], id: 100 + order, matchId: 100 + order, sequence: 100 + order, stage: 'SEMIFINAL', matchOrder: order,
+      match: { ...slots[0].match!, zoneId: null, homeQualifierZoneId: order, awayQualifierZoneId: order === 1 ? 2 : 1 } });
+    config.rules.push({ categoryId: 1, stage: 'SEMIFINAL', matchOrder: order, venueId: 1, courtId: null, day: 'FINALS' });
+  }
+  slots.push({ ...slots[0], id: 103, matchId: 103, sequence: 103, stage: 'FINAL', matchOrder: 1,
+    match: { ...slots[0].match!, zoneId: null, homeSourceMatchId: 101, awaySourceMatchId: 102 } });
+  config.rules.push({ categoryId: 1, stage: 'FINAL', matchOrder: 1, venueId: 1, courtId: null, day: 'FINALS' });
+  const result = simulateProgram(slots, zones, courts, config);
+  expect(result.warnings).toEqual([]);
+  const localDay = (slot: TournamentScheduleSlot) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' }).format(slot.scheduledAt!);
+  expect(result.slots.filter((slot) => slot.stage === 'ZONE').every((slot) => localDay(slot) === '2026-11-21')).toBe(true);
+  expect(result.slots.filter((slot) => slot.stage !== 'ZONE').map(localDay)).toEqual(['2026-11-22', '2026-11-22', '2026-11-22']);
+});
 it('extends beyond planned capacity and rejects mismatched courts and missing rules', () => {
   const { slots, zones, courts, config } = fixture();
   courts.forEach((court) => { court.venue = { ...court.venue, matchesPerDay: 1 }; });
