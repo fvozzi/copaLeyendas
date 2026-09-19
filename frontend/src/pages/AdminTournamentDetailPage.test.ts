@@ -3,7 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, expect, it, vi } from 'vitest';
 import { AdminTournamentDetailPage } from './AdminTournamentDetailPage';
-import { getCategories, getTournament, getVenues, updateTournamentZone } from '../lib/api';
+import { getCategories, getTournament, getVenues, updateTournamentCategory, updateTournamentZone } from '../lib/api';
 
 vi.mock('../lib/auth', () => ({ useAuth: () => ({ user: { role: 'DIRECTOR' } }) }));
 vi.mock('../lib/api', () => ({ getCategories: vi.fn(), getTournament: vi.fn(), getVenues: vi.fn(), updateTournamentZone: vi.fn(), addTournamentCategory: vi.fn(), createTournamentZone: vi.fn(), divideTournamentZones: vi.fn(), updateTournamentCategory: vi.fn() }));
@@ -30,4 +30,26 @@ it('shows when a venue has no active courts and allows correction without closin
   expect(form.querySelector('[role="alert"]')?.textContent).toContain('No hay canchas activas');
   expect(venue.value).toBe('2');
   expect(form.querySelector('button')?.disabled).toBe(false);
+});
+
+it('saves two zones of four pairs for Cimadamore and shows the total capacity', async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  const category = { id: 8, categoryId: 3, category: { id: 3, name: 'Silvina Cimadamore' }, pointsPerSet: 25, setsToWin: 1, zoneSize: 4, zoneCount: null };
+  vi.mocked(getTournament).mockResolvedValue({ id: 1, name: 'Copa', categories: [category], zones: [] } as never);
+  vi.mocked(getCategories).mockResolvedValue([{ id: 3, name: 'Silvina Cimadamore' }] as never);
+  vi.mocked(getVenues).mockResolvedValue([]);
+  vi.mocked(updateTournamentCategory).mockResolvedValue({ ...category, zoneCount: 2 } as never);
+  container = document.createElement('div'); document.body.append(container); root = createRoot(container);
+  await act(async () => root.render(createElement(MemoryRouter, { initialEntries: ['/app/torneos/1'], future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(Routes, null, createElement(Route, { path: '/app/torneos/:id', element: createElement(AdminTournamentDetailPage) })))));
+  expect(container.textContent).toContain('Según confirmadas');
+  await act(async () => (container.querySelector('tbody button') as HTMLButtonElement).click());
+  const form = document.querySelector('form')!;
+  const zoneCount = form.querySelector('input[placeholder="Automático"]') as HTMLInputElement;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(zoneCount, '2');
+    zoneCount.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(form.textContent).toContain('Cupo total: 8 parejas');
+  await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+  expect(updateTournamentCategory).toHaveBeenCalledWith(8, expect.objectContaining({ zoneSize: 4, zoneCount: 2 }));
 });

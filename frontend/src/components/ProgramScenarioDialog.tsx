@@ -37,10 +37,8 @@ export function ProgramScenarioDialog({ tournamentId, courts, venues, onClose, o
         }
         for (const stage of ['QUARTERFINAL', 'SEMIFINAL', 'FINAL'] as const) {
           const games = slots.filter((slot) => slot.tournamentCategoryId === category.id && slot.stage === stage);
-          if (!games.length && zones.length < 4) continue;
-          const count = stage === 'QUARTERFINAL' ? 4 : stage === 'SEMIFINAL' ? 2 : 1;
-          for (let matchOrder = 1; matchOrder <= count; matchOrder++) {
-            const game = games.find((slot) => slot.matchOrder === matchOrder);
+          for (const game of games) {
+            const matchOrder = game.matchOrder;
             const venueId = game?.court?.venueId ?? zones[0]?.venueId ?? venues.find((venue) => venue.active)?.id ?? 0;
             const recordedDay = dayOf(game?.scheduledAt);
             rules.push({ categoryId: category.id, stage, matchOrder, venueId, courtId: null, day: recordedDay ? finalsDay !== mainDay && recordedDay === finalsDay ? 'FINALS' : 'MAIN' : stage === 'QUARTERFINAL' ? 'MAIN' : 'FINALS' });

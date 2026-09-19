@@ -96,6 +96,20 @@ describe('program court allocation', () => {
     distributeProgramCourts(slots, [{ ...zones[0], capacity: 3 }], courts, dateAt);
     expect(slots.map((slot) => slot.scheduledAt?.getTime())).toEqual([0, 1, 2, 3, 4, 5, 6].map((index) => start + index * 2_400_000));
   });
+  it('schedules two-zone semifinals after both zones and their final afterward', () => {
+    const otherZone = { ...zones[0], id: 2, name: 'B' };
+    const slots = [
+      ...games(),
+      ...games().map((game) => ({ ...game, zoneName: 'B' })),
+      ...[1, 2].map((matchOrder) => ({ stage: 'SEMIFINAL', tournamentCategoryId: 1, matchOrder } as TournamentScheduleSlot)),
+      { stage: 'FINAL', tournamentCategoryId: 1, matchOrder: 1 } as TournamentScheduleSlot,
+    ];
+    distributeProgramCourts(slots, [zones[0], otherZone], courts.map((court) => ({ ...court, venue })), dateAt);
+    const latestZone = Math.max(...slots.filter((slot) => slot.stage === 'ZONE').map((slot) => slot.scheduledAt!.getTime()));
+    const semifinals = slots.filter((slot) => slot.stage === 'SEMIFINAL');
+    expect(semifinals.every((slot) => slot.scheduledAt!.getTime() > latestZone)).toBe(true);
+    expect(slots.at(-1)!.scheduledAt!.getTime()).toBeGreaterThan(Math.max(...semifinals.map((slot) => slot.scheduledAt!.getTime())));
+  });
   it('does not schedule games in a venue without an active court', () => {
     const slots = games();
     distributeProgramCourts(slots, zones, [], dateAt);

@@ -20,7 +20,7 @@ import type {
   Player,
   PlayerPayload,
   Category, CategoryPayload, Court, CourtPayload, Venue, VenuePayload,
-  Tournament, TournamentPayload, TournamentDetail, TournamentMatch, ZoneDetail, AdminUser, AdminUserPayload, CashExpense, CashSummary, TournamentScheduleSlot,
+  Tournament, TournamentPayload, TournamentDetail, TournamentMatch, ZoneDetail, AdminUser, AdminUserPayload, CashExpense, CashExpensePayload, CashIncomePayload, CashSummary, TournamentScheduleSlot,
 } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
@@ -240,7 +240,11 @@ export function getDashboardSummary() {
 
 export function getCash() { return request<CashSummary>('/cash', {}, true); }
 export function updateCashFee(feePerPlayer: number) { return request<{ id: number; feePerPlayer: number }>('/cash/fee', { method: 'PATCH', body: JSON.stringify({ feePerPlayer }) }, true); }
-export function createCashExpense(payload: { reason: string; quantity: number; unitPrice: number }) { return request<CashExpense>('/cash/expenses', { method: 'POST', body: JSON.stringify(payload) }, true); }
+export function createCashIncome(payload: CashIncomePayload) { return request<{ id: number }>('/cash/incomes', { method: 'POST', body: JSON.stringify(payload) }, true); }
+export function updateCashIncome(id: number, payload: Partial<CashIncomePayload>) { return request<{ id: number }>(`/cash/incomes/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true); }
+export function deleteCashIncome(id: number) { return request<{ success: boolean }>(`/cash/incomes/${id}`, { method: 'DELETE' }, true); }
+export function createCashExpense(payload: CashExpensePayload) { return request<CashExpense>('/cash/expenses', { method: 'POST', body: JSON.stringify(payload) }, true); }
+export function updateCashExpense(id: number, payload: Partial<CashExpensePayload>) { return request<CashExpense>(`/cash/expenses/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true); }
 export function deleteCashExpense(id: number) { return request<{ success: boolean }>(`/cash/expenses/${id}`, { method: 'DELETE' }, true); }
 
 export function getAdminPosts(params?: {
@@ -310,8 +314,8 @@ export function getTournaments() { return request<Tournament[]>('/tournaments', 
 export function createTournament(payload: TournamentPayload) { return request<Tournament>('/tournaments', { method: 'POST', body: JSON.stringify(payload) }, true); }
 export function updateTournament(id: number, payload: TournamentPayload) { return request<Tournament>(`/tournaments/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true); }
 export function getTournament(id: number) { return request<TournamentDetail>(`/tournaments/${id}`, {}, true); }
-export function addTournamentCategory(id: number, payload: { categoryId: number; pointsPerSet: number; setsToWin: number; zoneSize: number }) { return request(`/tournaments/${id}/categories`, { method: 'POST', body: JSON.stringify(payload) }, true); }
-export function updateTournamentCategory(id: number, payload: { pointsPerSet: number; setsToWin: number; zoneSize: number }) { return request(`/tournaments/categories/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true); }
+export function addTournamentCategory(id: number, payload: { categoryId: number; pointsPerSet: number; setsToWin: number; zoneSize: number; zoneCount: number | null }) { return request(`/tournaments/${id}/categories`, { method: 'POST', body: JSON.stringify(payload) }, true); }
+export function updateTournamentCategory(id: number, payload: { pointsPerSet: number; setsToWin: number; zoneSize: number; zoneCount: number | null }) { return request(`/tournaments/categories/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true); }
 export function createTournamentZone(payload: { tournamentCategoryId: number; venueId: number; name: string; capacity: number }) { return request('/tournaments/zones', { method: 'POST', body: JSON.stringify(payload) }, true); }
 export function updateTournamentZone(id: number, payload: { name: string; venueId: number; capacity: number }) { return request(`/tournaments/zones/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true); }
 export function divideTournamentZones(id: number) { return request(`/tournaments/categories/${id}/divide-zones`, { method: 'POST' }, true); }

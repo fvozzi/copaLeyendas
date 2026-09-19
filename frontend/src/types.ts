@@ -290,7 +290,7 @@ export interface CourtPayload { name: string; venueId: number; active?: boolean;
 
 export interface Tournament { id: number; name: string; feePerPlayer: number; startsAt: string | null; endsAt: string | null; playingDays: string[]; city: string | null; status: 'DRAFT' | 'ACTIVE' | 'COMPLETED'; }
 export interface TournamentPayload { name: string; feePerPlayer?: number; startsAt?: string; endsAt?: string; playingDays?: string[]; city?: string; status?: 'DRAFT' | 'ACTIVE' | 'COMPLETED'; }
-export interface TournamentCategory { id: number; categoryId: number; pointsPerSet: number; setsToWin: number; zoneSize: number; category: Category; }
+export interface TournamentCategory { id: number; categoryId: number; pointsPerSet: number; setsToWin: number; zoneSize: number; zoneCount: number | null; category: Category; }
 export interface TournamentZone { id: number; name: string; capacity: number; tournamentCategoryId: number; venueId: number; venue: Venue; tournamentCategory: TournamentCategory; }
 export interface TournamentDetail extends Tournament { categories: TournamentCategory[]; zones: TournamentZone[]; }
 export interface TournamentMatch { id: number; zoneId?: number | null; sequence?: number | null; homeQualifierZoneId?: number | null; awayQualifierZoneId?: number | null; homeQualifierRank?: number | null; awayQualifierRank?: number | null; matchOrder: number; status: string; court?: Court | null; homeRegistration: PairRegistration | null; awayRegistration: PairRegistration | null; homeSource?: 'DIRECT' | 'WINNER' | 'LOSER'; awaySource?: 'DIRECT' | 'WINNER' | 'LOSER'; homeSourceMatchId?: number | null; awaySourceMatchId?: number | null; homeScore: number | null; awayScore: number | null; scheduledAt: string | null; }
@@ -347,12 +347,17 @@ export interface PlayerPayload {
 
 export interface CashIncome {
   id: number;
-  registrationId: number;
+  source: 'REGISTRATION' | 'MANUAL';
+  manualIncomeId: number | null;
+  registrationId: number | null;
   concept: string;
-  team: string;
-  players: number;
+  team: string | null;
+  players: number | null;
   amount: number;
-  paidAt: string;
+  status: 'PROJECTED' | 'REALIZED';
+  expectedAt: string | null;
+  paidAt: string | null;
+  createdAt: string;
 }
 
 export interface CashExpense {
@@ -361,14 +366,26 @@ export interface CashExpense {
   quantity: number;
   unitPrice: number;
   amount: number;
+  status: 'PROJECTED' | 'REALIZED';
+  expectedAt: string | null;
+  occurredAt: string | null;
   createdAt: string;
 }
+
+export type CashStatus = 'PROJECTED' | 'REALIZED';
+export interface CashIncomePayload { concept: string; payer: string; amount: number; status: CashStatus; expectedAt: string | null; occurredAt: string | null }
+export interface CashExpensePayload { reason: string; quantity: number; unitPrice: number; status: CashStatus; expectedAt: string | null; occurredAt: string | null }
 
 export interface CashSummary {
   feePerPlayer: number;
   incomes: CashIncome[];
   expenses: CashExpense[];
   totalIncome: number;
+  projectedIncome: number;
+  forecastIncome: number;
   totalExpense: number;
+  projectedExpense: number;
+  forecastExpense: number;
   balance: number;
+  forecastBalance: number;
 }

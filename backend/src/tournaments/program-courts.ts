@@ -90,7 +90,7 @@ export function distributeProgramCourts(
     const venue = (slot.stage !== 'ZONE' ? courts.find((court) => court.id === slot.courtId)?.venue : null) ?? zone?.venue;
     const available = courts.filter((court) => court.active && court.venueId === venue?.id && venue?.active);
     const categoryGames = previous.filter((item) => item.tournamentCategoryId === slot.tournamentCategoryId);
-    const priorStage = slot.stage === 'QUARTERFINAL' ? 'ZONE' : slot.stage === 'SEMIFINAL' ? 'QUARTERFINAL' : 'SEMIFINAL';
+    const priorStage = slot.stage === 'QUARTERFINAL' || (slot.stage === 'SEMIFINAL' && !categoryGames.some((item) => item.stage === 'QUARTERFINAL')) ? 'ZONE' : slot.stage === 'SEMIFINAL' ? 'QUARTERFINAL' : 'SEMIFINAL';
     const dependencies = slot.stage === 'ZONE'
       ? categoryGames.filter((item) => item.stage === 'ZONE' && item.zoneName === slot.zoneName && item.matchOrder < slot.matchOrder && (zone?.capacity === 3 || (slot.matchOrder > 2 && item.matchOrder <= 2)))
       : categoryGames.filter((item) => item.stage === priorStage);

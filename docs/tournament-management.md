@@ -80,6 +80,8 @@ El Director registra una localidad/equipo y le asigna categoria. Al emitir un to
 
 Una vez validado el pago o bonificacion, el Director marca la inscripcion como confirmada. Solo esas parejas se consideran para el conteo de la categoria y para armar zonas.
 
+Al agregar o editar una categoría del torneo, el Director puede fijar la cantidad de zonas además de las parejas por zona. Por ejemplo, 2 zonas de 4 reservan 8 lugares aunque todavía no estén confirmadas todas las parejas. Si deja la cantidad vacía, se calcula al dividir según las parejas confirmadas. El sistema no divide si las parejas confirmadas superan el cupo configurado. Con 2 zonas se programan dos semifinales (1.ª A contra 2.ª B y 1.ª B contra 2.ª A) y la final, sin cuartos.
+
 ### CU-06 Crear zona
 
 El Director crea una zona para una categoria, asigna cancha y define cupo. El sistema impide exceder el cupo al asignar parejas.

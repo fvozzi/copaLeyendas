@@ -1153,6 +1153,26 @@ textarea {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.cash-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.cash-projection-card { min-width: 0; }
+.cash-projection-card .panel-header { margin-bottom: 0.75rem; }
+.cash-chart-legend { display: flex; flex-wrap: wrap; gap: 0.55rem 1.5rem; color: var(--ink-soft); font-size: 0.9rem; }
+.cash-chart-legend span { display: inline-flex; align-items: center; gap: 0.45rem; }
+.cash-chart-legend i { width: 0.85rem; height: 0.85rem; border-radius: 2px; }
+.cash-legend-current { background: var(--forest); }
+.cash-legend-forecast { background: var(--coral); }
+.cash-chart-scroll { overflow-x: auto; }
+.cash-chart { display: block; width: 100%; max-width: 900px; min-width: 570px; height: auto; margin: 0.5rem auto 0; }
+.cash-chart-zero { stroke: var(--line); stroke-width: 2; }
+.cash-chart-current { fill: var(--forest); }
+.cash-chart-forecast { fill: var(--coral); }
+.cash-chart-value { fill: var(--ink); font-size: 14px; font-weight: 700; }
+.cash-chart-category { fill: var(--ink-soft); font-size: 16px; font-weight: 700; }
+.cash-projection-totals { margin: 0.5rem 0 0; color: var(--ink-soft); }
+.cash-projection-totals strong { color: var(--ink); }
+.cash-tabs { margin: 0; }
+.cash-page .admin-data-grid-actions { min-width: 12rem; }
+
 .inline-form {
   display: flex;
   align-items: end;

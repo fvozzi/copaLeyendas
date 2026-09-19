@@ -18,7 +18,7 @@ const publicCourt = (court: Court | null) => court ? ({
 }) : null;
 const publicCategory = (category: TournamentCategory) => ({
   id: category.id, categoryId: category.categoryId, pointsPerSet: category.pointsPerSet, setsToWin: category.setsToWin,
-  zoneSize: category.zoneSize, category: { id: category.category.id, name: category.category.name, active: category.category.active, sortOrder: category.category.sortOrder },
+  zoneSize: category.zoneSize, zoneCount: category.zoneCount, category: { id: category.category.id, name: category.category.name, active: category.category.active, sortOrder: category.category.sortOrder },
 });
 
 // Explicit public projection: never serialize registration entities or staff assignments.

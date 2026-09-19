@@ -24,6 +24,63 @@ vi.mock('../courts/venue.entity', () => ({ Venue: class Venue {} }));
 vi.mock('../courts/court-assistant-assignment.entity', () => ({ CourtAssistantAssignment: class CourtAssistantAssignment {} }));
 vi.mock('../auth/user.entity', () => ({ UserRole: { DIRECTOR: 'DIRECTOR', ASSISTANT: 'ASSISTANT' } }));
 
+it('creates the configured number of zones even before all pairs are confirmed', async () => {
+  const zones: any[] = [];
+  const zoneRepository = {
+    find: vi.fn(async () => zones),
+    create: vi.fn((value) => value),
+    save: vi.fn(async (values: any[]) => {
+      const saved = values.map((value, index) => ({ ...value, id: index + 1 }));
+      zones.push(...saved);
+      return saved;
+    }),
+  };
+  const entries = { create: vi.fn((value) => value), save: vi.fn(async (value) => value) };
+  const registrations = { find: vi.fn(async () => [1, 2, 3, 4, 5, 6].map((id) => ({ id, localityName: `Localidad ${id}` }))) };
+  const service = new TournamentsService({} as never,
+    { findOne: vi.fn(async () => ({ id: 8, categoryId: 3, zoneSize: 4, zoneCount: 2 })) } as never,
+    zoneRepository as never, entries as never, {} as never, {} as never, {} as never,
+    { find: vi.fn(async () => [{ id: 7, active: true }]) } as never, {} as never, registrations as never);
+  expect(await service.divideZones(8)).toMatchObject([{ name: 'Zona A', capacity: 4 }, { name: 'Zona B', capacity: 4 }]);
+  expect(entries.save).toHaveBeenCalledTimes(6);
+  expect(entries.create.mock.calls.map(([entry]) => entry.zoneId)).toEqual([1, 2, 1, 2, 1, 2]);
+});
+
+it('keeps existing zones if confirmed pairs exceed the configured capacity', async () => {
+  const existing = [{ id: 10, tournamentCategoryId: 8 }];
+  const zoneRepository = { find: vi.fn(async () => existing), remove: vi.fn(), save: vi.fn() };
+  const registrations = { find: vi.fn(async () => Array.from({ length: 9 }, (_, index) => ({ id: index + 1 }))) };
+  const service = new TournamentsService({} as never,
+    { findOne: vi.fn(async () => ({ id: 8, categoryId: 3, zoneSize: 4, zoneCount: 2 })) } as never,
+    zoneRepository as never, { count: vi.fn(async () => 0) } as never,
+    { count: vi.fn(async () => 0) } as never, {} as never, {} as never, {} as never, {} as never, registrations as never);
+  await expect(service.divideZones(8)).rejects.toThrow('solo 8 lugares');
+  expect(zoneRepository.remove).not.toHaveBeenCalled();
+  expect(zoneRepository.save).not.toHaveBeenCalled();
+});
+
+it('adds two semifinals and a final for a category with two zones', async () => {
+  const { service, planned, matches, repositories, venue } = setup();
+  const zoneRepository = repositories.get(Zone);
+  const zones = [
+    { id: 1, capacity: 4, tournamentCategoryId: 8, name: 'A', venueId: 1, venue },
+    { id: 2, capacity: 4, tournamentCategoryId: 8, name: 'B', venueId: 1, venue },
+  ];
+  zoneRepository.find.mockResolvedValue(zones);
+  zoneRepository.findOne.mockImplementation(async ({ where }: any) => zones.find((zone) => zone.id === where.id));
+  vi.spyOn(service as any, 'fixtureInManager').mockResolvedValue([]);
+  await service.scheduleGrid(1);
+  expect(planned.filter((slot) => slot.stage === 'QUARTERFINAL')).toHaveLength(0);
+  expect(planned.filter((slot) => slot.stage === 'SEMIFINAL')).toHaveLength(2);
+  expect(planned.filter((slot) => slot.stage === 'FINAL')).toHaveLength(1);
+  const semifinals = matches.filter((match) => match.homeQualifierZoneId);
+  expect(semifinals).toMatchObject([
+    { homeQualifierZoneId: 1, homeQualifierRank: 1, awayQualifierZoneId: 2, awayQualifierRank: 2 },
+    { homeQualifierZoneId: 2, homeQualifierRank: 1, awayQualifierZoneId: 1, awayQualifierRank: 2 },
+  ]);
+  expect(matches.at(-1)).toMatchObject({ homeSourceMatchId: semifinals[0].id, awaySourceMatchId: semifinals[1].id });
+});
+
 it('uses the same real games in Program and Zone, preserves scheduling, and reflects assigned pairs and results', async () => {
   const { service, planned, matches, slotRepository, venue } = setup();
   planned.length = 0;
@@ -171,7 +228,7 @@ function setup(capacity = 4) {
   const manager = { getRepository: (entity: any) => repositories.get(entity) };
   const zoneRepository = { manager: { transaction: vi.fn(async (fn) => fn(manager)) } };
   const service = new TournamentsService(tournamentRepository as never, {} as never, zoneRepository as never, {} as never, matchRepository as never, { ...slotRepository, manager: zoneRepository.manager } as never, repositories.get(Court) as never, {} as never, {} as never, {} as never);
-  return { service, entries, matches, matchRepository, registration, schedule, entryRepository, planned, slotRepository, venue };
+  return { service, entries, matches, matchRepository, registration, schedule, entryRepository, planned, slotRepository, venue, repositories };
 }
 
 describe('fixtures with unassigned places', () => {
