@@ -24,7 +24,9 @@ export class PlayersService {
 
   async list(query: QueryPlayersDto) {
     const registrations = await this.importRegisteredPlayers();
-    const qb = this.playersRepository.createQueryBuilder('player').leftJoinAndSelect('player.locality', 'locality');
+    const qb = this.playersRepository.createQueryBuilder('player')
+      .leftJoinAndSelect('player.locality', 'locality')
+      .leftJoinAndSelect('locality.category', 'category');
     if (query.search?.trim()) {
       const term = `%${query.search.trim().toLowerCase()}%`;
       qb.andWhere(new Brackets((inner) => {
@@ -35,9 +37,11 @@ export class PlayersService {
     }
     const photos = registeredPhotos(registrations);
     const agreements = registeredAgreements(registrations);
+    const categories = registeredCategories(registrations);
     const players = await qb.orderBy('player.fullName', 'ASC').getMany();
     return players.map((player) => ({
       ...player, hasPhoto: photos.has(player.dni.trim()),
+      categoryName: categories.get(player.dni.trim()) ?? player.locality?.category?.name ?? null,
       ...(agreements.get(player.dni.trim()) ?? { hasCommercialAgreement: null, commercialAgreementDetails: null }),
     }));
   }
@@ -118,6 +122,7 @@ export class PlayersService {
 
   private async importRegisteredPlayers() {
     const registrations = await this.registrationsRepository.find({
+      relations: { category: true },
       order: { updatedAt: 'ASC', id: 'ASC' },
     });
 
@@ -221,6 +226,18 @@ export class PlayersService {
 function normalizeOptional(value?: string | null) {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
+}
+
+function registeredCategories(registrations: PairRegistration[]) {
+  const categories = new Map<string, string>();
+  for (const registration of registrations) {
+    if (!registration.category?.name) continue;
+    for (const prefix of ['playerOne', 'playerTwo', 'playerThree'] as const) {
+      const dni = registration[`${prefix}Dni`]?.trim();
+      if (dni && registration[`${prefix}Name`]?.trim()) categories.set(dni, registration.category.name);
+    }
+  }
+  return categories;
 }
 
 function registeredAgreements(registrations: PairRegistration[]) {

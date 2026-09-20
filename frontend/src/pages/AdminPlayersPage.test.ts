@@ -50,3 +50,14 @@ it('shows the brand, birth date and Instagram, distinguishing no agreement from 
   expect(rows[1].querySelector('[data-label="Marca / acuerdo"]')?.textContent).toBe('Sin acuerdo');
   expect(rows[2].querySelector('[data-label="Marca / acuerdo"]')?.textContent).toBe('Sin datos');
 });
+
+it('shows the category of each player and a clear value when it is unknown', async () => {
+  vi.mocked(getPlayers).mockResolvedValue([
+    { id: 1, fullName: 'Player One', categoryName: 'Silvina Cimadamore' },
+    { id: 2, fullName: 'Player Two', categoryName: null },
+  ] as never);
+  await act(async () => root.render(createElement(AdminPlayersPage)));
+  const rows = container.querySelectorAll('tbody tr');
+  expect(rows[0].querySelector('[data-label="Categoria"]')?.textContent).toBe('Silvina Cimadamore');
+  expect(rows[1].querySelector('[data-label="Categoria"]')?.textContent).toBe('Sin asignar');
+});

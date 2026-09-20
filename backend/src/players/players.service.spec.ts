@@ -23,6 +23,23 @@ function setup(storedName = 'drive:photo-id') {
 afterEach(() => vi.restoreAllMocks());
 
 describe('registered player agreements', () => {
+  it('uses the latest registration category and falls back to the locality category for manual players', async () => {
+    const { service, registrations, query, player } = setup();
+    vi.spyOn(service, 'syncRegistrationPlayers').mockResolvedValue();
+    query.getMany.mockResolvedValue([
+      player,
+      { id: 5, dni: '222', fullName: 'Manual', locality: { category: { name: 'Damas B' } } },
+      { id: 6, dni: '333', fullName: 'Sin equipo', locality: null },
+    ] as never);
+    registrations.find.mockResolvedValue([
+      { playerOneDni: player.dni, playerOneName: player.fullName, category: { name: 'Damas A' } },
+      { playerTwoDni: player.dni, playerTwoName: player.fullName, category: { name: 'Silvina Cimadamore' } },
+    ] as never);
+    const result = await service.list({});
+    expect(result.map((item) => item.categoryName)).toEqual(['Silvina Cimadamore', 'Damas B', null]);
+    expect(registrations.find).toHaveBeenCalledWith(expect.objectContaining({ relations: { category: true } }));
+  });
+
   it('matches each player by DNI, including the third player, and uses the latest declaration', async () => {
     const { service, registrations, query, player } = setup();
     vi.spyOn(service, 'syncRegistrationPlayers').mockResolvedValue();

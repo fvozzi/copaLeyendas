@@ -53,6 +53,7 @@ export function AdminPlayersPage() {
       { label: 'DNI', render: (item) => item.dni },
       { label: 'Nacimiento', sortValue: (item) => item.birthDate ?? '', render: (item) => item.birthDate ? item.birthDate.split('-').reverse().join('/') : '-' },
       { label: 'Localidad / equipo', render: (item) => item.locality ? `${item.locality.name}, ${item.locality.provinceName}` : 'Sin asignar' },
+      { label: 'Categoria', render: (item) => item.categoryName ?? 'Sin asignar' },
       { label: 'Celular', render: (item) => item.phone ?? '-' },
       { label: 'Instagram', render: (item) => item.instagram || '-' },
       { label: 'Marca / acuerdo', render: (item) => item.hasCommercialAgreement == null ? 'Sin datos' : item.hasCommercialAgreement ? item.commercialAgreementDetails || 'Marca no especificada' : 'Sin acuerdo' },
