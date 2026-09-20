@@ -76,3 +76,20 @@ describe('registered player photos', () => {
     await expect(service.getPhoto(4)).rejects.toThrow('no tiene foto');
   });
 });
+
+describe('registration player synchronization', () => {
+  it('does not recreate an old locality after its team was renamed when players already exist', async () => {
+    const players = { findOne: vi.fn().mockResolvedValue({ id: 1, dni: '123' }), save: vi.fn() };
+    const localities = { findOne: vi.fn(), save: vi.fn() };
+    const service = new PlayersService(players as never, localities as never, {} as never, {} as never);
+    await service.syncRegistrationPlayers({
+      localityName: 'Nombre anterior', provinceName: 'Buenos Aires',
+      playerOneName: 'Ana', playerOneDni: '123',
+      playerTwoName: 'Bea', playerTwoDni: '456',
+      playerThreeName: null, playerThreeDni: null,
+    } as never);
+    expect(players.findOne).toHaveBeenCalledTimes(2);
+    expect(localities.findOne).not.toHaveBeenCalled();
+    expect(localities.save).not.toHaveBeenCalled();
+  });
+});

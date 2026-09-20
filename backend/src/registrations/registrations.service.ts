@@ -79,6 +79,7 @@ export class RegistrationsService {
     const localityName = locality?.name ?? dto.localityName?.trim() ?? '';
     const grant = this.accessGrantsRepository.create({
       token,
+      localityId: locality?.id ?? null,
       categoryId: category.id,
       category,
       localityName,

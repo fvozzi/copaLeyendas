@@ -1,11 +1,13 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, IsNull, Repository } from 'typeorm';
+import { Brackets, In, IsNull, Repository } from 'typeorm';
 import { CreateLocalityDto } from './dto/create-locality.dto';
 import { QueryLocalitiesDto } from './dto/query-localities.dto';
 import { UpdateLocalityDto } from './dto/update-locality.dto';
 import { Locality } from './locality.entity';
 import { Category } from '../categories/category.entity';
+import { RegistrationAccessGrant } from '../registrations/registration-access-grant.entity';
+import { PairRegistration } from '../registrations/pair-registration.entity';
 
 @Injectable()
 export class LocalitiesService {
@@ -14,6 +16,8 @@ export class LocalitiesService {
     private readonly localitiesRepository: Repository<Locality>,
     @InjectRepository(Category)
     private readonly categoriesRepository: Repository<Category>,
+    @InjectRepository(RegistrationAccessGrant)
+    private readonly accessGrantsRepository: Repository<RegistrationAccessGrant>,
   ) {}
 
   async list(query: QueryLocalitiesDto) {
@@ -57,20 +61,50 @@ export class LocalitiesService {
   async update(id: number, dto: UpdateLocalityDto) {
     const locality = await this.getById(id);
     const previousIdentity = [normalizeName(locality.name), normalizeName(locality.provinceName), locality.categoryId];
-    if (dto.name !== undefined) locality.name = dto.name.trim();
-    if (dto.provinceName !== undefined) locality.provinceName = dto.provinceName.trim();
-    if (dto.active !== undefined) locality.active = dto.active;
-    if (dto.categoryId !== undefined) locality.categoryId = await this.resolveCategory(dto.categoryId);
-    const nextIdentity = [normalizeName(locality.name), normalizeName(locality.provinceName), locality.categoryId];
+    const name = dto.name !== undefined ? dto.name.trim() : locality.name;
+    const provinceName = dto.provinceName !== undefined ? dto.provinceName.trim() : locality.provinceName;
+    const categoryId = dto.categoryId !== undefined ? await this.resolveCategory(dto.categoryId) : locality.categoryId;
+    const nextIdentity = [normalizeName(name), normalizeName(provinceName), categoryId];
     if (JSON.stringify(previousIdentity) !== JSON.stringify(nextIdentity)) {
-      await this.ensureUnique(locality.name, locality.provinceName, locality.categoryId, id);
+      await this.ensureUnique(name, provinceName, categoryId, id);
     }
-    return this.localitiesRepository.save(locality);
+    await this.localitiesRepository.manager.transaction(async (manager) => {
+      // Older grants stored the team name but never saved the locality ID.
+      const sameIdentity = (await manager.find(Locality, { where: { categoryId: locality.categoryId ?? IsNull() } }))
+        .filter((item) => normalizeName(item.name) === normalizeName(locality.name)
+          && normalizeName(item.provinceName) === normalizeName(locality.provinceName));
+      if (sameIdentity.length === 1) {
+        await manager.update(RegistrationAccessGrant, {
+          localityId: IsNull(), categoryId: locality.categoryId ?? IsNull(),
+          localityName: locality.name, provinceName: locality.provinceName,
+        }, { localityId: id });
+      }
+      const grants = await manager.find(RegistrationAccessGrant, { where: { localityId: id }, select: { id: true } });
+      if (categoryId !== locality.categoryId && grants.length) {
+        throw new BadRequestException('Este equipo tiene habilitaciones o inscripciones. No se puede cambiar su categoria.');
+      }
+      await manager.update(Locality, id, { name, provinceName, categoryId, active: dto.active ?? locality.active });
+      if (name !== locality.name || provinceName !== locality.provinceName) {
+        await manager.update(RegistrationAccessGrant, { localityId: id }, { localityName: name, provinceName });
+        if (grants.length) {
+          await manager.update(PairRegistration, { accessGrantId: In(grants.map((grant) => grant.id)) }, { localityName: name, provinceName });
+        }
+      }
+    });
+    return this.getById(id);
   }
 
   async remove(id: number) {
     const locality = await this.getById(id);
-    await this.localitiesRepository.remove(locality);
+    const grants = await this.accessGrantsRepository.count({ where: [
+      { localityId: id },
+      { localityId: IsNull(), localityName: locality.name, provinceName: locality.provinceName, categoryId: locality.categoryId ?? IsNull() },
+    ] });
+    if (grants) {
+      throw new BadRequestException('Este equipo tiene habilitaciones o inscripciones. Eliminalas primero en Inscripciones, o desactiva el equipo.');
+    }
+    const result = await this.localitiesRepository.delete(id);
+    if (!result.affected) throw new NotFoundException('Localidad no encontrada');
     return { success: true };
   }
 

@@ -129,10 +129,7 @@ export class PlayersService {
 
   async syncRegistrationPlayers(registration: PairRegistration, correction?: { manager: EntityManager; previous: PairRegistration }) {
     if (correction) return this.correctRegistrationPlayers(registration, correction.previous, correction.manager);
-    const locality = await this.findOrCreateLocality(
-      registration.localityName,
-      registration.provinceName,
-    );
+    let locality: Locality | null = null;
     const candidates = [
       {
         fullName: registration.playerOneName,
@@ -167,6 +164,7 @@ export class PlayersService {
       const dni = candidate.dni.trim();
       const exists = await this.playersRepository.findOne({ where: { dni } });
       if (exists) continue;
+      locality ??= await this.findOrCreateLocality(registration.localityName, registration.provinceName);
 
       await this.playersRepository.save(
         this.playersRepository.create({

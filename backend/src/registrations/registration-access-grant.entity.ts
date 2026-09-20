@@ -25,6 +25,9 @@ export class RegistrationAccessGrant {
   @Column({ type: 'integer' })
   categoryId: number;
 
+  @Column({ type: 'integer', nullable: true })
+  localityId: number | null;
+
   @ManyToOne(() => Category, (category) => category.accessGrants, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'categoryId' })
   category: Category;
