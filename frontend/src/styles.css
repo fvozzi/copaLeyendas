@@ -1861,4 +1861,29 @@ textarea {
   .admin-data-grid-actions {
     justify-content: flex-start;
   }
+
+  .admin-data-grid-wrap.preserve-table-mobile {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .preserve-table-mobile .admin-data-grid {
+    display: table;
+    width: 100%;
+  }
+
+  .localities-data-card .preserve-table-mobile .admin-data-grid { min-width: 720px; }
+  .players-data-card .preserve-table-mobile .admin-data-grid { min-width: 1260px; }
+
+  .preserve-table-mobile .admin-data-grid thead { display: table-header-group; }
+  .preserve-table-mobile .admin-data-grid tbody { display: table-row-group; width: auto; }
+  .preserve-table-mobile .admin-data-grid tr { display: table-row; width: auto; padding: 0; border: 0; }
+  .preserve-table-mobile .admin-data-grid td {
+    display: table-cell;
+    width: auto;
+    padding: 0.9rem 0.75rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .preserve-table-mobile .admin-data-grid td::before { display: none; }
+  .preserve-table-mobile .admin-data-grid-actions { display: table-cell; }
 }

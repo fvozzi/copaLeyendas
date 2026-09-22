@@ -111,6 +111,15 @@ export function distributeShirts(registrations: PairRegistration[], zoneEntries:
     });
     assign(pair, players, target);
   };
+  const allocateConflictingPair = (pair: ShirtPair) => {
+    const flexible = pair.players.filter(player => !shirtBrand(player.brand));
+    pair.requiredBrands.forEach((brand, index) => {
+      const represented = pair.players.filter(player => shirtBrand(player.brand) === brand);
+      // Players without a competing agreement wear the exact same color as the
+      // first represented brand in their team.
+      allocate(pair, index === 0 ? [...represented, ...flexible] : represented, brand);
+    });
+  };
 
   const cimaGuastavino = pairs.filter(pair => categoryKey(pair.category).includes('cimadamore') && pair.requiredBrands.includes('guastavino')).length;
   const gomaDabberAgreements = pairs.filter(pair => categoryKey(pair.category).includes('gomaa') && pair.requiredBrands.includes('dabber')).length;
@@ -125,9 +134,7 @@ export function distributeShirts(registrations: PairRegistration[], zoneEntries:
     for (const pair of ordered.filter(pair => pair.requiredBrands.length > 1)) {
       assigned.add(pair);
       // A pair with conflicting agreements cannot share a model. Honor each player.
-      for (const brand of pair.requiredBrands) allocate(pair, pair.players.filter(player => shirtBrand(player.brand) === brand), brand);
-      const flexible = pair.players.filter(player => !shirtBrand(player.brand));
-      if (flexible.length) allocate(pair, flexible, pair.requiredBrands[0]);
+      allocateConflictingPair(pair);
     }
     const candidates = ordered.filter(pair => pair.requiredBrands.length <= 1);
     const choices = candidates.map(pair => {
@@ -177,9 +184,7 @@ export function distributeShirts(registrations: PairRegistration[], zoneEntries:
   for (const pair of pairs) {
     if (assigned.has(pair)) continue;
     if (pair.requiredBrands.length > 1) {
-      for (const brand of pair.requiredBrands) allocate(pair, pair.players.filter(player => shirtBrand(player.brand) === brand), brand);
-      const flexible = pair.players.filter(player => !shirtBrand(player.brand));
-      if (flexible.length) allocate(pair, flexible, pair.requiredBrands[0]);
+      allocateConflictingPair(pair);
       continue;
     }
     let brand = pair.requiredBrands[0] ?? (countBrand('guastavino') <= countBrand('dabber') ? 'guastavino' : 'dabber');

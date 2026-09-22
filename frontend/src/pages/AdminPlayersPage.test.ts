@@ -15,6 +15,11 @@ beforeEach(() => {
   vi.mocked(getPlayerPhoto).mockResolvedValue(new Blob(['photo'], { type: 'image/webp' }));
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
+it('keeps every sortable column header available on mobile layouts', async () => {
+  await act(async () => root.render(createElement(AdminPlayersPage)));
+  expect(container.querySelector('.players-data-card .preserve-table-mobile')).not.toBeNull();
+  expect(container.querySelectorAll('.players-data-card thead .admin-grid-sort')).toHaveLength(11);
+});
 it('opens a saved photo and offers a download only for players with a photo', async () => {
   await act(async () => root.render(createElement(AdminPlayersPage)));
   const view = Array.from(container.querySelectorAll('button')).filter((button) => button.textContent === 'Ver foto');
@@ -60,4 +65,15 @@ it('shows the category of each player and a clear value when it is unknown', asy
   const rows = container.querySelectorAll('tbody tr');
   expect(rows[0].querySelector('[data-label="Categoria"]')?.textContent).toBe('Silvina Cimadamore');
   expect(rows[1].querySelector('[data-label="Categoria"]')?.textContent).toBe('Sin asignar');
+});
+
+it('shows the assigned shirt brand and color', async () => {
+  vi.mocked(getPlayers).mockResolvedValue([
+    { id: 1, fullName: 'Player One', shirtModel: 'Guastavino Color 2' },
+    { id: 2, fullName: 'Player Two', shirtModel: null },
+  ] as never);
+  await act(async () => root.render(createElement(AdminPlayersPage)));
+  const rows = container.querySelectorAll('tbody tr');
+  expect(rows[0].querySelector('[data-label="Camiseta"]')?.textContent).toBe('Guastavino Color 2');
+  expect(rows[1].querySelector('[data-label="Camiseta"]')?.textContent).toBe('Sin asignar');
 });

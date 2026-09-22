@@ -11,6 +11,11 @@ import { CreatePlayerDto } from './dto/create-player.dto';
 import { QueryPlayersDto } from './dto/query-players.dto';
 import { UpdatePlayerDto } from './dto/update-player.dto';
 import { Player } from './player.entity';
+import { distributeShirts, type ShirtZoneEntry } from '../dashboard/shirt-distribution';
+import { Tournament } from '../tournaments/tournament.entity';
+import { TournamentStatus } from '../tournaments/tournament.enums';
+import { Zone } from '../tournaments/zone.entity';
+import { ZoneEntry } from '../tournaments/zone-entry.entity';
 
 @Injectable()
 export class PlayersService {
@@ -19,6 +24,9 @@ export class PlayersService {
     @InjectRepository(Locality) private readonly localitiesRepository: Repository<Locality>,
     @InjectRepository(PairRegistration)
     private readonly registrationsRepository: Repository<PairRegistration>,
+    @InjectRepository(Tournament) private readonly tournamentsRepository: Repository<Tournament>,
+    @InjectRepository(Zone) private readonly zonesRepository: Repository<Zone>,
+    @InjectRepository(ZoneEntry) private readonly zoneEntriesRepository: Repository<ZoneEntry>,
     private readonly drivePhotos: GoogleDrivePhotoStorageService,
   ) {}
 
@@ -38,10 +46,12 @@ export class PlayersService {
     const photos = registeredPhotos(registrations);
     const agreements = registeredAgreements(registrations);
     const categories = registeredCategories(registrations);
+    const shirtModels = registeredShirtModels(registrations, distributeShirts(registrations, await this.getShirtZoneEntries()));
     const players = await qb.orderBy('player.fullName', 'ASC').getMany();
     return players.map((player) => ({
       ...player, hasPhoto: photos.has(player.dni.trim()),
       categoryName: categories.get(player.dni.trim()) ?? player.locality?.category?.name ?? null,
+      shirtModel: shirtModels.get(player.dni.trim()) ?? null,
       ...(agreements.get(player.dni.trim()) ?? { hasCommercialAgreement: null, commercialAgreementDetails: null }),
     }));
   }
@@ -130,6 +140,27 @@ export class PlayersService {
       await this.syncRegistrationPlayers(registration);
     }
     return registrations;
+  }
+
+  private async getShirtZoneEntries(): Promise<ShirtZoneEntry[]> {
+    const tournament = await this.tournamentsRepository.findOne({
+      where: { status: TournamentStatus.ACTIVE }, order: { startsAt: 'ASC', id: 'ASC' },
+    });
+    if (!tournament) return [];
+    const zones = await this.zonesRepository.find({
+      where: { tournamentCategory: { tournamentId: tournament.id } },
+      relations: { tournamentCategory: true },
+    });
+    if (!zones.length) return [];
+    const entries = await this.zoneEntriesRepository.find({ where: zones.map((zone) => ({ zoneId: zone.id })) });
+    const zonesById = new Map(zones.map((zone) => [zone.id, zone]));
+    return entries.flatMap((entry) => {
+      const zone = zonesById.get(entry.zoneId);
+      return zone ? [{
+        registrationId: entry.registrationId, zoneId: zone.id, zoneName: zone.name,
+        categoryId: zone.tournamentCategory.categoryId, seed: entry.seed,
+      }] : [];
+    });
   }
 
   async syncRegistrationPlayers(registration: PairRegistration, correction?: { manager: EntityManager; previous: PairRegistration }) {
@@ -238,6 +269,23 @@ function registeredCategories(registrations: PairRegistration[]) {
     }
   }
   return categories;
+}
+
+function registeredShirtModels(registrations: PairRegistration[], distribution: ReturnType<typeof distributeShirts>) {
+  const byRegistrationPlayer = new Map<string, string>();
+  for (const model of distribution.models) {
+    for (const player of model.players) byRegistrationPlayer.set(`${player.registrationId}:${player.position}`, model.name);
+  }
+  const assignments = new Map<string, string>();
+  // Registrations arrive oldest first, so the most recent assignment wins for a repeated DNI.
+  for (const registration of registrations) {
+    for (const prefix of ['playerOne', 'playerTwo', 'playerThree'] as const) {
+      const dni = registration[`${prefix}Dni`]?.trim();
+      const model = byRegistrationPlayer.get(`${registration.id}:${prefix}`);
+      if (dni && model) assignments.set(dni, model);
+    }
+  }
+  return assignments;
 }
 
 function registeredAgreements(registrations: PairRegistration[]) {

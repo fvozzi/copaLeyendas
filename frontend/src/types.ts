@@ -311,6 +311,7 @@ export interface TournamentScheduleSlot { capacityWarning?: string | null; id: n
 export interface Player {
   hasPhoto?: boolean;
   categoryName?: string | null;
+  shirtModel?: string | null;
   hasCommercialAgreement?: boolean | null;
   commercialAgreementDetails?: string | null;
   id: number;

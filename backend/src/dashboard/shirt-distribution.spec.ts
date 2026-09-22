@@ -136,8 +136,18 @@ describe('shirt distribution', () => {
   it('keeps each agreement when the two players in a pair represent different sponsors', () => {
     const result = distributeShirts([pair(1, 'Goma A', 'Guastavino', 'Dabber', '')]);
     expect(result.total).toBe(3);
-    expect(result.models.find(model => model.players.some(player => player.position === 'playerOne'))?.name).toMatch(/^Guastavino/);
+    const playerOneModel = result.models.find(model => model.players.some(player => player.position === 'playerOne'));
+    expect(playerOneModel?.name).toMatch(/^Guastavino/);
     expect(result.models.find(model => model.players.some(player => player.position === 'playerTwo'))?.name).toMatch(/^Dabber/);
+    expect(result.models.find(model => model.players.some(player => player.position === 'playerThree'))?.name).toBe(playerOneModel?.name);
+    expect(assignedModels(result, 1)).toHaveLength(2);
+  });
+  it('keeps the flexible teammate on the represented partner color inside a zone', () => {
+    const registration = pair(1, 'Goma A', 'Guastavino', 'Dabber', 'Otra');
+    const result = distributeShirts([registration], [{ registrationId: 1, zoneId: 10, zoneName: 'Zona A', categoryId: 1, seed: 1 }]);
+    const playerOneModel = result.models.find(model => model.players.some(player => player.position === 'playerOne'));
+    expect(result.models.find(model => model.players.some(player => player.position === 'playerThree'))?.name).toBe(playerOneModel?.name);
+    expect(assignedModels(result, 1)).toHaveLength(2);
   });
   it('treats Otra as flexible so a pair can share the Guastavino color', () => {
     const result = distributeShirts([pair(1, 'Goma A', 'Guastavino', 'Otra')]);

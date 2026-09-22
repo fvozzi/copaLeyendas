@@ -48,7 +48,7 @@ export function AdminPlayersPage() {
     <div className="panel-header"><div><p className="eyebrow">ABM</p><h1>Jugadores y jugadoras</h1></div><div className="list-actions"><button type="button" className="secondary-button" onClick={() => exportPlayers('insurance')}>Excel para seguro</button><button type="button" className="secondary-button" onClick={() => exportPlayers('full')}>Excel completo</button><button type="button" className="primary-button" onClick={openCreate}>Agregar jugadora</button></div></div>
     <div className="toolbar"><input placeholder="Buscar por nombre, DNI o localidad" value={search} onChange={(event) => setSearch(event.target.value)} /><button type="button" className="secondary-button" onClick={load}>Buscar</button></div>
     {error ? <div className="inline-state">{error}</div> : null}
-    <section className="data-card"><AdminDataGrid columns={[
+    <section className="data-card players-data-card"><AdminDataGrid columns={[
       { label: 'Nombre y apellido', render: (item) => <strong>{item.fullName}</strong> },
       { label: 'DNI', render: (item) => item.dni },
       { label: 'Nacimiento', sortValue: (item) => item.birthDate ?? '', render: (item) => item.birthDate ? item.birthDate.split('-').reverse().join('/') : '-' },
@@ -57,9 +57,10 @@ export function AdminPlayersPage() {
       { label: 'Celular', render: (item) => item.phone ?? '-' },
       { label: 'Instagram', render: (item) => item.instagram || '-' },
       { label: 'Marca / acuerdo', render: (item) => item.hasCommercialAgreement == null ? 'Sin datos' : item.hasCommercialAgreement ? item.commercialAgreementDetails || 'Marca no especificada' : 'Sin acuerdo' },
+      { label: 'Camiseta', render: (item) => item.shirtModel ?? 'Sin asignar' },
       { label: 'Talle', render: (item) => item.shirtSize ?? '-' },
       { label: 'Foto', render: (item) => item.hasPhoto ? <div className="list-actions"><button className="inline-link" disabled={loadingPhoto !== null} onClick={() => void openPhoto(item)}>Ver foto</button><button className="inline-link" disabled={loadingPhoto !== null} onClick={() => void openPhoto(item, true)}>Descargar</button></div> : 'Sin foto' },
-    ]} rows={players} onEdit={openEdit} onDelete={remove} emptyMessage="No hay jugadoras cargadas." /></section>
+    ]} rows={players} onEdit={openEdit} onDelete={remove} emptyMessage="No hay jugadoras cargadas." preserveTableOnMobile /></section>
     {dialogOpen ? <AdminDialog title={editing ? 'Editar jugadora' : 'Nueva jugadora'} onClose={closeDialog}><form className="editor-form" onSubmit={save}>
       <label>Nombre y apellido<input value={form.fullName} onChange={(event) => setForm({ ...form, fullName: event.target.value })} required /></label>
       <label>DNI<input value={form.dni} onChange={(event) => setForm({ ...form, dni: event.target.value })} required /></label>

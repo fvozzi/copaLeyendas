@@ -23,6 +23,12 @@ afterEach(async () => { await act(async () => root.unmount()); container.remove(
 async function render() { await act(async () => root.render(createElement(AdminLocalitiesPage))); }
 function action(label: string) { return [...container.querySelectorAll('tbody button')].find((button) => button.textContent === label) as HTMLButtonElement; }
 
+it('keeps the sortable table header available on mobile layouts', async () => {
+  await render();
+  expect(container.querySelector('.localities-data-card .preserve-table-mobile')).not.toBeNull();
+  expect(container.querySelectorAll('.localities-data-card thead .admin-grid-sort')).toHaveLength(4);
+});
+
 it('renames the selected locality through PATCH without creating another row', async () => {
   vi.mocked(updateLocality).mockResolvedValue({ ...locality, name: 'Comodoro Rivadavia' } as never);
   vi.mocked(getLocalities).mockResolvedValueOnce([locality] as never).mockResolvedValueOnce([{ ...locality, name: 'Comodoro Rivadavia' }] as never);
