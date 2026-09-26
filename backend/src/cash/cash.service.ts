@@ -5,6 +5,8 @@ import { PairRegistration } from '../registrations/pair-registration.entity';
 import { CashExpense } from './cash-expense.entity';
 import { CashIncome } from './cash-income.entity';
 import { CashSettings } from './cash-settings.entity';
+import { Tournament } from '../tournaments/tournament.entity';
+import { TournamentStatus } from '../tournaments/tournament.enums';
 
 export type CashStatus = 'PROJECTED' | 'REALIZED';
 export interface IncomeInput { concept: string; payer?: string | null; amount: number; status?: CashStatus; expectedAt?: string | null; occurredAt?: string | null }
@@ -30,14 +32,16 @@ export class CashService {
     @InjectRepository(CashExpense) private expenses: Repository<CashExpense>,
     @InjectRepository(CashIncome) private manualIncomes: Repository<CashIncome>,
     @InjectRepository(PairRegistration) private registrations: Repository<PairRegistration>,
+    @InjectRepository(Tournament) private tournaments: Repository<Tournament>,
   ) {}
 
   async summary() {
-    const [settings, expenses, manualIncomes, registrations] = await Promise.all([
+    const [settings, expenses, manualIncomes, registrations, activeTournament] = await Promise.all([
       this.getSettings(),
       this.expenses.find({ order: { createdAt: 'DESC' } }),
       this.manualIncomes.find({ order: { createdAt: 'DESC' } }),
       this.registrations.find({ relations: { payments: true }, order: { createdAt: 'DESC' } }),
+      this.tournaments.findOne({ where: { status: TournamentStatus.ACTIVE }, order: { startsAt: 'ASC', id: 'ASC' } }),
     ]);
     const registrationIncomes = registrations.flatMap((item) => item.payments.filter((payment) => payment.amount > 0).map((payment) => ({
       id: payment.id, source: 'REGISTRATION' as const, manualIncomeId: null, registrationId: item.id,
@@ -57,12 +61,25 @@ export class CashService {
     const projectedIncome = incomes.filter(item => item.status === 'PROJECTED').reduce((sum, item) => sum + item.amount, 0);
     const totalExpense = expenses.filter(item => item.status !== 'PROJECTED').reduce((sum, item) => sum + item.amount, 0);
     const projectedExpense = expenses.filter(item => item.status === 'PROJECTED').reduce((sum, item) => sum + item.amount, 0);
+    const forecastIncome = totalIncome + projectedIncome;
+    const forecastExpense = totalExpense + projectedExpense;
+    const incomeToCover = Math.max(0, forecastExpense - forecastIncome);
+    const feePerPlayer = activeTournament?.feePerPlayer ?? settings.feePerPlayer;
+    const pairFee = feePerPlayer * 2;
+    const minimumPairsToCharge = pairFee > 0 ? Math.ceil(incomeToCover / pairFee) : null;
+    const calculatedIncome = minimumPairsToCharge === null ? incomeToCover : minimumPairsToCharge * pairFee;
+    const waivedPairCount = registrations.filter((item) => item.feeWaived).length;
+    const paidPairCount = registrations.filter((item) => !item.feeWaived
+      && item.payments.reduce((sum, payment) => sum + Math.max(0, payment.amount), 0) >= item.feePerPlayer * 2).length;
+    const chargeablePairCount = registrations.length - waivedPairCount - paidPairCount;
     return {
-      feePerPlayer: settings.feePerPlayer, incomes, expenses,
-      totalIncome, projectedIncome, forecastIncome: totalIncome + projectedIncome,
-      totalExpense, projectedExpense, forecastExpense: totalExpense + projectedExpense,
+      feePerPlayer, incomes, expenses,
+      totalIncome, projectedIncome, forecastIncome,
+      totalExpense, projectedExpense, forecastExpense,
       balance: totalIncome - totalExpense,
-      forecastBalance: totalIncome + projectedIncome - totalExpense - projectedExpense,
+      forecastBalance: forecastIncome - forecastExpense,
+      incomeToCover, calculatedIncome, pairFee, minimumPairsToCharge,
+      paidPairCount, chargeablePairCount, waivedPairCount,
     };
   }
 

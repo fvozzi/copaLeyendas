@@ -390,4 +390,11 @@ export interface CashSummary {
   forecastExpense: number;
   balance: number;
   forecastBalance: number;
+  incomeToCover: number;
+  calculatedIncome: number;
+  pairFee: number;
+  minimumPairsToCharge: number | null;
+  paidPairCount: number;
+  chargeablePairCount: number;
+  waivedPairCount: number;
 }

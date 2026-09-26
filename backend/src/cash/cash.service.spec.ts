@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { CashService } from './cash.service';
 vi.mock('../registrations/pair-registration.entity', () => ({ PairRegistration: class {} }));
+vi.mock('../tournaments/tournament.entity', () => ({ Tournament: class {} }));
 vi.mock('./cash-settings.entity', () => ({ CashSettings: class {} }));
 vi.mock('./cash-expense.entity', () => ({ CashExpense: class {} }));
 vi.mock('./cash-income.entity', () => ({ CashIncome: class {} }));
@@ -14,7 +15,8 @@ it('adds each payment once using its recorded amount, independently of the curre
   const service = new CashService({ findOneBy: vi.fn().mockResolvedValue({ feePerPlayer: 15000 }) } as never,
     { find: vi.fn().mockResolvedValue([{ amount: 5000 }]) } as never,
     { find: vi.fn().mockResolvedValue([]) } as never,
-    { find: vi.fn().mockResolvedValue([registration, { id: 9, payments: [] }]) } as never);
+    { find: vi.fn().mockResolvedValue([registration, { id: 9, payments: [] }]) } as never,
+    { findOne: vi.fn().mockResolvedValue(null) } as never);
   const summary = await service.summary();
   expect(summary).toMatchObject({ totalIncome: 45000, totalExpense: 5000, balance: 40000 });
   expect(summary.incomes).toHaveLength(2);
@@ -35,12 +37,34 @@ it('separates effective and projected amounts without counting registration paym
       { id: 2, concept: 'Donación', payer: null, amount: 50, status: 'REALIZED', expectedAt: null, occurredAt: '2026-09-02', createdAt: new Date('2026-09-01') },
     ]) } as never,
     { find: vi.fn().mockResolvedValue([{ id: 4, localityName: 'Junín', payments: [{ id: 3, amount: 30, players: 2, kind: 'INITIAL', createdAt: new Date('2026-09-03') }] }]) } as never,
+    { findOne: vi.fn().mockResolvedValue(null) } as never,
   );
   const summary = await service.summary();
   expect(summary).toMatchObject({ totalIncome: 80, projectedIncome: 100, forecastIncome: 180,
     totalExpense: 20, projectedExpense: 80, forecastExpense: 100, balance: 60, forecastBalance: 80 });
   expect(summary.incomes).toHaveLength(3);
   expect(summary.incomes.find(item => item.manualIncomeId === 1)).toMatchObject({ id: -1, team: 'Dabber', status: 'PROJECTED' });
+});
+
+it('calculates the minimum paid pairs needed to cover final projected expenses and excludes waived pairs', async () => {
+  const registrations = [
+    { id: 1, feeWaived: false, feePerPlayer: 15000, localityName: 'Paga', payments: [{ id: 1, amount: 30000, players: 2, kind: 'INITIAL', createdAt: new Date('2026-09-01') }] },
+    { id: 2, feeWaived: true, feePerPlayer: 15000, localityName: 'Bonificada', payments: [] },
+    { id: 3, feeWaived: false, feePerPlayer: 15000, localityName: 'Pendiente A', payments: [] },
+    { id: 4, feeWaived: false, feePerPlayer: 15000, localityName: 'Pendiente B', payments: [] },
+  ];
+  const service = new CashService(
+    { findOneBy: vi.fn().mockResolvedValue({ feePerPlayer: 15000 }) } as never,
+    { find: vi.fn().mockResolvedValue([{ amount: 100000, status: 'PROJECTED' }]) } as never,
+    { find: vi.fn().mockResolvedValue([{ id: 1, concept: 'Auspicio', amount: 20000, status: 'PROJECTED', expectedAt: null, createdAt: new Date('2026-09-01') }]) } as never,
+    { find: vi.fn().mockResolvedValue(registrations) } as never,
+    { findOne: vi.fn().mockResolvedValue({ feePerPlayer: 20000 }) } as never,
+  );
+  await expect(service.summary()).resolves.toMatchObject({
+    forecastIncome: 50000, forecastExpense: 100000, incomeToCover: 50000,
+    feePerPlayer: 20000, pairFee: 40000, minimumPairsToCharge: 2, calculatedIncome: 80000,
+    paidPairCount: 1, chargeablePairCount: 2, waivedPairCount: 1,
+  });
 });
 
 it('creates projections and realizes income and expenses on the supplied date', async () => {
@@ -54,7 +78,7 @@ it('creates projections and realizes income and expenses on the supplied date', 
     create: vi.fn((value) => value), save: vi.fn(async (value) => { const saved = { ...value, id: value.id ?? 1 }; expenses.set(saved.id, saved); return saved; }),
     findOneBy: vi.fn(async ({ id }) => expenses.get(id) ?? null),
   };
-  const service = new CashService({} as never, expenseRepository as never, incomeRepository as never, {} as never);
+  const service = new CashService({} as never, expenseRepository as never, incomeRepository as never, {} as never, {} as never);
   await service.createIncome({ concept: ' Auspicio ', payer: ' Guastavino ', amount: 1000, status: 'PROJECTED', expectedAt: '2026-10-01' });
   await service.createExpense({ reason: ' Pelotas ', quantity: 2, unitPrice: 200, status: 'PROJECTED', expectedAt: '2026-10-02' });
   expect(incomes.get(1)).toMatchObject({ concept: 'Auspicio', payer: 'Guastavino', status: 'PROJECTED', occurredAt: null });

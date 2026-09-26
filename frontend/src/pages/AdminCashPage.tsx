@@ -94,8 +94,22 @@ export function AdminCashPage() {
     <section className="stats-grid cash-stats">
       <article className="metric-card"><p>Ingresos</p><strong>{money.format(summary?.totalIncome ?? 0)}</strong><span>Cobrados, incluidas inscripciones</span></article>
       <article className="metric-card"><p>Egresos</p><strong>{money.format(summary?.totalExpense ?? 0)}</strong><span>Pagados</span></article>
-      <article className="metric-card"><p>Saldo</p><strong>{money.format(summary?.balance ?? 0)}</strong><span>Ingresos cobrados menos egresos pagados</span></article>
+      <article className="metric-card"><p>Egresos proyectados</p><strong>{money.format(summary?.projectedExpense ?? 0)}</strong><span>Total final: {money.format(summary?.forecastExpense ?? 0)}</span></article>
+      <article className="metric-card"><p>Ingresos calculados</p><strong>{money.format(summary?.calculatedIncome ?? 0)}</strong><span>{summary?.minimumPairsToCharge == null
+        ? 'No se puede calcular sin valor de inscripción'
+        : summary.minimumPairsToCharge === 0
+          ? 'Los ingresos actuales y proyectados ya cubren los gastos'
+          : `${summary.minimumPairsToCharge} ${summary.minimumPairsToCharge === 1 ? 'pareja' : 'parejas'} más a cobrar · ${money.format(summary.pairFee)} por pareja`}</span></article>
     </section>
+    {summary && <section className="data-card cash-coverage-summary" aria-labelledby="cash-coverage-title">
+      <div><h2 id="cash-coverage-title">Cobertura final</h2><p>El cálculo contempla los ingresos cobrados, los auspicios proyectados y todos los egresos pagados y proyectados.</p></div>
+      <div className="cash-coverage-values">
+        <span>Faltante exacto<strong>{money.format(summary.incomeToCover)}</strong></span>
+        <span>Parejas ya pagas<strong>{summary.paidPairCount}</strong></span>
+        <span>Parejas pendientes de cobro<strong>{summary.chargeablePairCount}</strong></span>
+        <span>Parejas bonificadas<strong>{summary.waivedPairCount}</strong></span>
+      </div>
+    </section>}
     <CashProjectionChart summary={summary} />
     <div className="program-tabs cash-tabs" role="tablist" aria-label="Movimientos de caja">
       <button type="button" role="tab" id="cash-tab-incomes" aria-controls="cash-panel-incomes" aria-selected={tab === 'incomes'} className={tab === 'incomes' ? 'is-selected' : ''} onClick={() => setTab('incomes')}>Ingresos</button>

@@ -1153,7 +1153,13 @@ textarea {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.cash-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.cash-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.cash-coverage-summary { display: grid; gap: 1rem; }
+.cash-coverage-summary h2, .cash-coverage-summary p { margin: 0; }
+.cash-coverage-summary p { margin-top: 0.35rem; color: var(--ink-soft); }
+.cash-coverage-values { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; }
+.cash-coverage-values span { display: grid; gap: 0.25rem; padding: 0.75rem; border-radius: 8px; background: #173f3908; color: var(--ink-soft); font-size: 0.82rem; }
+.cash-coverage-values strong { color: var(--ink); font-size: 1.15rem; }
 .cash-projection-card { min-width: 0; }
 .cash-projection-card .panel-header { margin-bottom: 0.75rem; }
 .cash-chart-legend { display: flex; flex-wrap: wrap; gap: 0.55rem 1.5rem; color: var(--ink-soft); font-size: 0.9rem; }
@@ -1538,6 +1544,8 @@ textarea {
     max-width: none;
     grid-column: span 2;
   }
+
+  .cash-coverage-values { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (min-width: 1101px) and (max-height: 820px) {
@@ -1861,6 +1869,8 @@ textarea {
   .admin-data-grid-actions {
     justify-content: flex-start;
   }
+
+  .cash-coverage-values { grid-template-columns: 1fr; }
 
   .admin-data-grid-wrap.preserve-table-mobile {
     overflow-x: auto;

@@ -20,11 +20,13 @@ const summary: CashSummary = {
     { id: -2, source: 'MANUAL', manualIncomeId: 2, registrationId: null, team: 'Guastavino', players: null,
       concept: 'Auspicio', amount: 50000, status: 'PROJECTED', expectedAt: '2026-10-01', paidAt: null, createdAt: '2026-09-19T12:00:00.000Z' },
   ],
-  expenses: [{ id: 4, reason: 'Pelotas', quantity: 2, unitPrice: 10000, amount: 20000,
+  expenses: [{ id: 4, reason: 'Pelotas', quantity: 12, unitPrice: 10000, amount: 120000,
     status: 'PROJECTED', expectedAt: '2026-10-02', occurredAt: null, createdAt: '2026-09-19T12:00:00.000Z' }],
   totalIncome: 30000, projectedIncome: 50000, forecastIncome: 80000,
-  totalExpense: 0, projectedExpense: 20000, forecastExpense: 20000,
-  balance: 30000, forecastBalance: 60000,
+  totalExpense: 0, projectedExpense: 120000, forecastExpense: 120000,
+  balance: 30000, forecastBalance: -40000,
+  incomeToCover: 40000, calculatedIncome: 60000, pairFee: 30000, minimumPairsToCharge: 2,
+  paidPairCount: 1, chargeablePairCount: 5, waivedPairCount: 2,
 };
 
 async function render() {
@@ -43,8 +45,13 @@ async function type(input: HTMLInputElement, value: string) {
 it('shows effective totals, projected chart and separate income and expense tabs', async () => {
   await render();
   expect(container.querySelectorAll('.cash-stats strong')[0].textContent).toContain('30.000');
+  expect(container.querySelectorAll('.cash-stats strong')[2].textContent).toContain('120.000');
+  expect(container.querySelectorAll('.cash-stats strong')[3].textContent).toContain('60.000');
+  expect(container.querySelector('.cash-stats')?.textContent).toContain('2 parejas más a cobrar');
+  expect(container.querySelector('.cash-coverage-summary')?.textContent).toContain('Parejas bonificadas2');
   expect(container.querySelector('.cash-chart[role="img"]')).toBeTruthy();
-  expect(container.querySelector('.cash-chart desc')?.textContent).toContain('60.000');
+  expect(container.querySelector('.cash-chart desc')?.textContent).toContain('40.000');
+  expect(container.querySelector('.cash-chart desc')?.textContent).toContain('saldo proyectado negativo');
   expect(container.querySelectorAll('.cash-chart path')).toHaveLength(2);
   expect(container.querySelector('#cash-panel-incomes')?.textContent).toContain('Auspicio');
   expect(container.querySelector('#cash-panel-expenses')).toBeNull();

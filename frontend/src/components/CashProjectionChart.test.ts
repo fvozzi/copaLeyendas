@@ -23,6 +23,8 @@ it('marks the dates and minimum balance of a forecast shortfall, leaving undated
     totalIncome: 100, projectedIncome: 150, forecastIncome: 250,
     totalExpense: 0, projectedExpense: 300, forecastExpense: 300,
     balance: 100, forecastBalance: -50,
+    incomeToCover: 50, calculatedIncome: 30000, pairFee: 30000, minimumPairsToCharge: 1,
+    paidPairCount: 0, chargeablePairCount: 0, waivedPairCount: 0,
   };
   const container = document.createElement('div');
   document.body.append(container);
