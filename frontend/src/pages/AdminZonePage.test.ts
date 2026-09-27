@@ -23,7 +23,7 @@ async function render() {
 it('lets the director assign a placeholder without generating the fixture again', async () => {
   await render();
   expect(container.querySelector('.panel-header a')?.textContent).toBe('Ver Programa');
-  expect(container.querySelectorAll('select')).toHaveLength(4);
+  expect(container.querySelectorAll('select[aria-label^="Asignar pareja"]')).toHaveLength(4);
   const select = container.querySelector('select[aria-label="Asignar pareja 3"]') as HTMLSelectElement;
   await act(async () => { select.value = '10'; select.dispatchEvent(new Event('change', { bubbles: true })); });
   await act(async () => (select.parentElement!.querySelector('button') as HTMLButtonElement).click());

@@ -28,7 +28,24 @@ export function AdminDataGrid<Row extends { id: number }>({ columns, rows, onEdi
   }) : rows;
   const toggleSort = (column: number) => setSort((current) => current?.column === column ? { column, direction: current.direction === 'asc' ? 'desc' : 'asc' } : { column, direction: 'asc' });
 
-  return <div className={`admin-data-grid-wrap${preserveTableOnMobile ? ' preserve-table-mobile' : ''}`}><table className="admin-data-grid"><thead><tr>{columns.map((column, index) => <th key={column.label} aria-sort={sort?.column === index ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button type="button" className="admin-grid-sort" onClick={() => toggleSort(index)}>{column.label}<span aria-hidden="true">{sort?.column === index ? (sort.direction === 'asc' ? ' ↑' : ' ↓') : ' ↕'}</span></button></th>)}{(renderActions || onEdit || onDelete) && <th aria-label="Acciones" />}</tr></thead><tbody>{sortedRows.map((row) => <tr key={row.id}>{columns.map((column) => <td key={column.label} data-label={column.label}>{column.render(row)}</td>)}{(renderActions || onEdit || onDelete) && <td className="admin-data-grid-actions" data-label="Acciones">{renderActions ? renderActions(row) : <>{onEdit && <button type="button" className="inline-link" onClick={() => onEdit(row)}>Editar</button>}{onDelete && <button type="button" className="danger-link" onClick={() => onDelete(row)}>Eliminar</button>}</>}</td>}</tr>)}</tbody></table></div>;
+  return <>
+    {!preserveTableOnMobile ? <div className="admin-grid-mobile-sort">
+      <label>Ordenar por<select value={sort?.column ?? ''} onChange={(event) => setSort(event.target.value === '' ? null : { column: Number(event.target.value), direction: 'asc' })}><option value="">Sin ordenar</option>{columns.map((column, index) => <option key={column.label} value={index}>{column.label}</option>)}</select></label>
+      <button type="button" className="secondary-button" disabled={!sort} onClick={() => setSort((current) => current ? { ...current, direction: current.direction === 'asc' ? 'desc' : 'asc' } : null)}>{sort?.direction === 'desc' ? 'Descendente' : 'Ascendente'}</button>
+    </div> : null}
+    <div
+      className={`admin-data-grid-wrap${preserveTableOnMobile ? ' preserve-table-mobile' : ''}`}
+      role={preserveTableOnMobile ? 'region' : undefined}
+      aria-label={preserveTableOnMobile ? 'Tabla desplazable' : undefined}
+      tabIndex={preserveTableOnMobile ? 0 : undefined}
+    >
+      {preserveTableOnMobile ? <p className="admin-grid-scroll-hint">Deslizá horizontalmente para ver todas las columnas. Tocá un encabezado para ordenar.</p> : null}
+      <table className="admin-data-grid">
+        <thead><tr>{columns.map((column, index) => <th key={column.label} aria-sort={sort?.column === index ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button type="button" className="admin-grid-sort" onClick={() => toggleSort(index)}>{column.label}<span aria-hidden="true">{sort?.column === index ? (sort.direction === 'asc' ? ' ↑' : ' ↓') : ' ↕'}</span></button></th>)}{(renderActions || onEdit || onDelete) && <th aria-label="Acciones" />}</tr></thead>
+        <tbody>{sortedRows.map((row) => <tr key={row.id}>{columns.map((column) => <td key={column.label} data-label={column.label}>{column.render(row)}</td>)}{(renderActions || onEdit || onDelete) && <td className="admin-data-grid-actions" data-label="Acciones">{renderActions ? renderActions(row) : <>{onEdit && <button type="button" className="inline-link" onClick={() => onEdit(row)}>Editar</button>}{onDelete && <button type="button" className="danger-link" onClick={() => onDelete(row)}>Eliminar</button>}</>}</td>}</tr>)}</tbody>
+      </table>
+    </div>
+  </>;
 }
 
 function cellText(value: ReactNode): string {

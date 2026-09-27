@@ -17,7 +17,9 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
 it('keeps every sortable column header available on mobile layouts', async () => {
   await act(async () => root.render(createElement(AdminPlayersPage)));
-  expect(container.querySelector('.players-data-card .preserve-table-mobile')).not.toBeNull();
+  const tableRegion = container.querySelector('.players-data-card .preserve-table-mobile');
+  expect(tableRegion?.getAttribute('role')).toBe('region');
+  expect(tableRegion?.querySelector('.admin-grid-scroll-hint')?.textContent).toContain('Tocá un encabezado para ordenar');
   expect(container.querySelectorAll('.players-data-card thead .admin-grid-sort')).toHaveLength(11);
 });
 it('opens a saved photo and offers a download only for players with a photo', async () => {

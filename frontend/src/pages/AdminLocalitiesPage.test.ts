@@ -25,7 +25,10 @@ function action(label: string) { return [...container.querySelectorAll('tbody bu
 
 it('keeps the sortable table header available on mobile layouts', async () => {
   await render();
-  expect(container.querySelector('.localities-data-card .preserve-table-mobile')).not.toBeNull();
+  const tableRegion = container.querySelector('.localities-data-card .preserve-table-mobile');
+  expect(tableRegion?.getAttribute('role')).toBe('region');
+  expect(tableRegion?.getAttribute('tabindex')).toBe('0');
+  expect(tableRegion?.querySelector('.admin-grid-scroll-hint')?.textContent).toContain('Deslizá horizontalmente');
   expect(container.querySelectorAll('.localities-data-card thead .admin-grid-sort')).toHaveLength(4);
 });
 
