@@ -14,7 +14,7 @@ beforeEach(async () => {
   fixture = programMapFixture();
   vi.mocked(getTournament).mockResolvedValue(fixture.tournament);
   vi.mocked(getZone).mockResolvedValue({ ...fixture.tournament.zones[0], entries: [] });
-  vi.mocked(getAvailableZoneRegistrations).mockResolvedValue([{ id: 900, playerOneName: 'Ana', playerTwoName: 'Bea', localityName: 'Junin' }] as never);
+  vi.mocked(getAvailableZoneRegistrations).mockResolvedValue([{ id: 900, playerOneName: 'Ana', playerTwoName: 'Bea', locality: { name: 'Junin' } }] as never);
   container = document.createElement('div'); document.body.append(container); root = createRoot(container);
   await act(async () => root.render(createElement(ProgramMap, { tournamentId: 1, slots: fixture.slots, venues: fixture.venues, busy: false, onChanged, onMatch })));
 });

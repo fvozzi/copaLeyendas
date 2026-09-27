@@ -199,7 +199,8 @@ export class TournamentsService {
     const existing = await this.z.find({ where: { tournamentCategoryId } });
     if (existing.length && await this.m.count({ where: existing.map((zone) => ({ zoneId: zone.id })) })) throw new BadRequestException('No se pueden redistribuir zonas que ya tienen fixture generado.');
     if (existing.length && await this.e.count({ where: existing.map((zone) => ({ zoneId: zone.id })) })) throw new BadRequestException('No se pueden redistribuir zonas que ya tienen parejas asignadas.');
-    const registrations = await this.r.find({ where: { categoryId: category.categoryId, status: RegistrationStatus.CONFIRMED }, order: { localityName: 'ASC', id: 'ASC' } });
+    const registrations = (await this.r.find({ where: { categoryId: category.categoryId, status: RegistrationStatus.CONFIRMED }, relations: { locality: true }, order: { id: 'ASC' } }))
+      .sort((left, right) => left.locality.name.localeCompare(right.locality.name, 'es') || left.id - right.id);
     const count = category.zoneCount ?? Math.max(1, Math.ceil(registrations.length / category.zoneSize));
     if (registrations.length > count * category.zoneSize) throw new BadRequestException(`Hay ${registrations.length} parejas confirmadas y solo ${count * category.zoneSize} lugares configurados. Aumentá la cantidad de zonas antes de dividir.`);
     const venues = await this.venues.find({ where: { active: true }, order: { name: 'ASC' } });
@@ -208,7 +209,7 @@ export class TournamentsService {
     const zones = await this.z.save(Array.from({ length: count }, (_, index) => this.z.create({ tournamentCategoryId, venueId: venues[index % venues.length].id, name: `Zona ${String.fromCharCode(65 + index)}`, capacity: category.zoneSize })));
     const assignments = zones.map((zone) => ({ zone, entries: [] as PairRegistration[] }));
     for (const registration of registrations) {
-      const eligible = assignments.filter((item) => item.entries.length < category.zoneSize && !item.entries.some((entry) => entry.localityName.trim().toLowerCase() === registration.localityName.trim().toLowerCase()));
+      const eligible = assignments.filter((item) => item.entries.length < category.zoneSize && !item.entries.some((entry) => entry.localityId === registration.localityId));
       const target = (eligible.length ? eligible : assignments.filter((item) => item.entries.length < category.zoneSize)).sort((a, b) => a.entries.length - b.entries.length)[0];
       target.entries.push(registration);
       await this.e.save(this.e.create({ zoneId: target.zone.id, registrationId: registration.id, seed: target.entries.length }));

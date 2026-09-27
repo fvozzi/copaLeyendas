@@ -11,6 +11,7 @@ import {
 import { RegistrationAccessGrant } from './registration-access-grant.entity';
 import { Category } from '../categories/category.entity';
 import { RegistrationPayment } from './registration-payment.entity';
+import { Locality } from '../localities/locality.entity';
 import {
   HeardAboutSource,
   RegistrationStatus,
@@ -41,14 +42,12 @@ export class PairRegistration {
   @JoinColumn({ name: 'categoryId' })
   category: Category;
 
-  @Column()
-  localityName: string;
+  @Column({ type: 'integer' })
+  localityId: number;
 
-  @Column()
-  provinceName: string;
-
-  @Column()
-  clubName: string;
+  @ManyToOne(() => Locality, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'localityId' })
+  locality: Locality;
 
   @Column({
     type: 'enum',

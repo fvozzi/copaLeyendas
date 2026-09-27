@@ -6,7 +6,8 @@ import type { PairRegistration } from '../registrations/pair-registration.entity
 import type { TournamentCategory } from './tournament-category.entity';
 
 const publicPair = (pair: PairRegistration | null) => pair ? ({
-  id: pair.id, playerOneName: pair.playerOneName, playerTwoName: pair.playerTwoName, localityName: pair.localityName,
+  id: pair.id, playerOneName: pair.playerOneName, playerTwoName: pair.playerTwoName,
+  locality: { id: pair.locality.id, name: pair.locality.name, provinceName: pair.locality.provinceName },
 }) : null;
 const publicVenue = (venue: Venue) => ({
   id: venue.id, name: venue.name, address: venue.address, city: venue.city, provinceName: venue.provinceName,

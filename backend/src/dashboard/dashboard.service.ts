@@ -34,8 +34,8 @@ export class DashboardService {
   async getSummary() {
     const [posts, registrations, accessGrants, tournament, categories] = await Promise.all([
       this.postsRepository.find(),
-      this.registrationsRepository.find({ relations: { category: true } }),
-      this.accessGrantsRepository.find({ relations: { category: true } }),
+      this.registrationsRepository.find({ relations: { category: true, locality: true } }),
+      this.accessGrantsRepository.find({ relations: { category: true, locality: true } }),
       this.tournamentsRepository.findOne({ where: { status: TournamentStatus.ACTIVE }, order: { startsAt: 'ASC', id: 'ASC' } }),
       this.categoriesRepository.find({ order: { sortOrder: 'ASC', name: 'ASC' } }),
     ]);

@@ -8,7 +8,7 @@ import type { PairRegistration, TournamentMatch, ZoneDetail } from '../types';
 
 const dateTimeValue = (value: string | null) => value ? new Date(new Date(value).getTime() - new Date(value).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '';
 const formattedDateTime = (value: string | null) => value ? new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)) : 'Sin horario';
-const pairName = (pair: PairRegistration) => `${pair.playerOneName} / ${pair.playerTwoName} - ${pair.localityName}`;
+const pairName = (pair: PairRegistration) => `${pair.playerOneName} / ${pair.playerTwoName} - ${pair.locality.name}`;
 
 export function AdminZonePage() {
   const { user } = useAuth();

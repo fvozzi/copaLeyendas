@@ -20,7 +20,7 @@ vi.mock('./payment-proof-storage', () => ({ ensurePaymentProofDir: vi.fn() }));
 function setup() {
   const grant = {
     id: 7, token: 'COPA-EXAMPLE1', status: RegistrationAccessGrantStatus.ACTIVE,
-    categoryId: 1, category: { name: 'Damas A' }, localityName: 'Junin',
+    categoryId: 1, category: { name: 'Damas A' }, localityId: 4, locality: { id: 4, name: 'Junin', provinceName: 'Buenos Aires' },
     contactName: 'Contacto', contactPhone: '+5491112345678', feeWaived: true,
     whatsappSentAt: null,
   };
@@ -41,7 +41,7 @@ function setup() {
   const whatsapp = { sendRegistrationToken: vi.fn().mockResolvedValue({ messages: [{ id: 'wamid.test' }] }) };
   const service = new RegistrationsService(
     registrations as never, grants as never, {} as never,
-    { findOne: vi.fn().mockResolvedValue(null) } as never, {} as never,
+    { findOne: vi.fn().mockResolvedValue(null) } as never,
     players as never, { enabled: () => false } as never, whatsapp as never,
   );
   return { service, grant, grants, manager, registrations, players, whatsapp };

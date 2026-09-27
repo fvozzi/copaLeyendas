@@ -5,6 +5,7 @@ import { User, UserRole } from '../auth/user.entity';
 import { ContentPost, ContentSection } from '../posts/content-post.entity';
 import { RegistrationAccessGrant } from '../registrations/registration-access-grant.entity';
 import { Category } from '../categories/category.entity';
+import { Locality } from '../localities/locality.entity';
 import { ensurePaymentProofDir } from '../registrations/payment-proof-storage';
 import {
   RegistrationAccessGrantStatus,
@@ -18,6 +19,7 @@ async function run() {
   const postRepository = dataSource.getRepository(ContentPost);
   const accessGrantRepository = dataSource.getRepository(RegistrationAccessGrant);
   const categoryRepository = dataSource.getRepository(Category);
+  const localityRepository = dataSource.getRepository(Locality);
 
   const adminEmail = (process.env.SEED_ADMIN_EMAIL ?? 'admin@copaleyendas.local').trim().toLowerCase();
   const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'copa123';
@@ -119,13 +121,17 @@ async function run() {
   });
 
   if (!existingGrant && sampleCategory) {
+    let sampleLocality = await localityRepository.findOne({
+      where: { name: 'Ciudad de Buenos Aires', provinceName: 'Buenos Aires', categoryId: sampleCategory.id },
+    });
+    if (!sampleLocality) sampleLocality = await localityRepository.save(localityRepository.create({
+      name: 'Ciudad de Buenos Aires', provinceName: 'Buenos Aires', categoryId: sampleCategory.id, active: true,
+    }));
     await accessGrantRepository.save(
       accessGrantRepository.create({
         token: sampleGrantToken,
         categoryId: sampleCategory.id,
-        localityName: 'Ciudad de Buenos Aires',
-        provinceName: 'Buenos Aires',
-        clubName: 'Club Ejemplo',
+        localityId: sampleLocality.id,
         contactName: 'Delegada Demo',
         contactEmail: 'delegada@copaleyendas.local',
         contactPhone: '1112345678',

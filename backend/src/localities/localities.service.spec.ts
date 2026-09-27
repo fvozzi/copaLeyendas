@@ -4,18 +4,17 @@ import { describe, expect, it, vi } from 'vitest';
 import { Category } from '../categories/category.entity';
 import { Locality } from './locality.entity';
 import { RegistrationAccessGrant } from '../registrations/registration-access-grant.entity';
-import { PairRegistration } from '../registrations/pair-registration.entity';
 import { LocalitiesService } from './localities.service';
 
 vi.mock('./locality.entity', () => ({ Locality: class Locality {} }));
 vi.mock('../categories/category.entity', () => ({ Category: class Category {} }));
 vi.mock('../registrations/registration-access-grant.entity', () => ({ RegistrationAccessGrant: class RegistrationAccessGrant {} }));
-vi.mock('../registrations/pair-registration.entity', () => ({ PairRegistration: class PairRegistration {} }));
 
 function setup() {
   const manager = {
     transaction: vi.fn(async (callback: (manager: unknown) => Promise<unknown>) => callback(manager)),
     find: vi.fn().mockResolvedValue([]),
+    count: vi.fn().mockResolvedValue(0),
     update: vi.fn().mockResolvedValue({ affected: 1 }),
   };
   const localities = {
@@ -70,22 +69,19 @@ describe('LocalitiesService duplicate prevention', () => {
     expect(manager.update).toHaveBeenCalledWith(Locality, 1, expect.objectContaining({ active: false }));
   });
 
-  it('updates the existing row and linked registration names without inserting a locality', async () => {
+  it('updates the referenced team without copying its name into related records', async () => {
     const { service, localities, manager } = setup();
     localities.findOne.mockResolvedValue({ ...existing });
-    manager.find.mockImplementation(async (entity) => entity === Locality ? [{ ...existing }] : [{ id: 7 }]);
     await service.update(1, { name: 'Junin Centro' });
     expect(manager.update).toHaveBeenCalledWith(Locality, 1, expect.objectContaining({ name: 'Junin Centro' }));
-    expect(manager.update).toHaveBeenCalledWith(RegistrationAccessGrant, expect.objectContaining({ localityName: 'Junin', provinceName: 'Buenos Aires' }), { localityId: 1 });
-    expect(manager.update).toHaveBeenCalledWith(RegistrationAccessGrant, { localityId: 1 }, { localityName: 'Junin Centro', provinceName: 'Buenos Aires' });
-    expect(manager.update).toHaveBeenCalledWith(PairRegistration, expect.anything(), { localityName: 'Junin Centro', provinceName: 'Buenos Aires' });
+    expect(manager.update).toHaveBeenCalledTimes(1);
     expect(localities.save).not.toHaveBeenCalled();
   });
 
   it('does not move a registered team to another category', async () => {
     const { service, localities, manager } = setup();
     localities.findOne.mockResolvedValue({ ...existing });
-    manager.find.mockImplementation(async (entity) => entity === Locality ? [{ ...existing }] : [{ id: 7 }]);
+    manager.count.mockResolvedValue(1);
     await expect(service.update(1, { categoryId: 2 })).rejects.toThrow(BadRequestException);
     expect(manager.update).not.toHaveBeenCalledWith(Locality, expect.anything(), expect.anything());
   });

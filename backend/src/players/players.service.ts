@@ -132,12 +132,22 @@ export class PlayersService {
 
   private async importRegisteredPlayers() {
     const registrations = await this.registrationsRepository.find({
-      relations: { category: true },
+      relations: { category: true, locality: true },
       order: { updatedAt: 'ASC', id: 'ASC' },
     });
 
+    const latestRegistrationByDni = new Map<string, number>();
     for (const registration of registrations) {
-      await this.syncRegistrationPlayers(registration);
+      for (const prefix of ['playerOne', 'playerTwo', 'playerThree'] as const) {
+        const dni = registration[`${prefix}Dni`]?.trim();
+        if (dni) latestRegistrationByDni.set(dni, registration.id);
+      }
+    }
+    for (const registration of registrations) {
+      const authoritativeDnis = new Set([...latestRegistrationByDni]
+        .filter(([, registrationId]) => registrationId === registration.id)
+        .map(([dni]) => dni));
+      await this.syncRegistrationPlayers(registration, undefined, authoritativeDnis);
     }
     return registrations;
   }
@@ -163,9 +173,8 @@ export class PlayersService {
     });
   }
 
-  async syncRegistrationPlayers(registration: PairRegistration, correction?: { manager: EntityManager; previous: PairRegistration }) {
+  async syncRegistrationPlayers(registration: PairRegistration, correction?: { manager: EntityManager; previous: PairRegistration }, authoritativeDnis?: ReadonlySet<string>) {
     if (correction) return this.correctRegistrationPlayers(registration, correction.previous, correction.manager);
-    let locality: Locality | null = null;
     const candidates = [
       {
         fullName: registration.playerOneName,
@@ -199,8 +208,13 @@ export class PlayersService {
       if (!candidate) continue;
       const dni = candidate.dni.trim();
       const exists = await this.playersRepository.findOne({ where: { dni } });
-      if (exists) continue;
-      locality ??= await this.findOrCreateLocality(registration.localityName, registration.provinceName);
+      if (exists) {
+        if ((!authoritativeDnis || authoritativeDnis.has(dni)) && exists.localityId !== registration.localityId) {
+          exists.localityId = registration.localityId;
+          await this.playersRepository.save(exists);
+        }
+        continue;
+      }
 
       await this.playersRepository.save(
         this.playersRepository.create({
@@ -210,17 +224,14 @@ export class PlayersService {
           phone: normalizeOptional(candidate.phone),
           instagram: normalizeOptional(candidate.instagram),
           shirtSize: candidate.shirtSize,
-          localityId: locality.id,
+          localityId: registration.localityId,
         }),
       );
     }
   }
 
   private async correctRegistrationPlayers(registration: PairRegistration, previous: PairRegistration, manager: EntityManager) {
-    const localities = manager.getRepository(Locality);
     const players = manager.getRepository(Player);
-    let locality = await localities.findOne({ where: { name: registration.localityName, provinceName: registration.provinceName } });
-    if (!locality) locality = await localities.save(localities.create({ name: registration.localityName, provinceName: registration.provinceName, active: true }));
     const prefixes = ['playerOne', 'playerTwo', 'playerThree'] as const;
     const currentDnis = prefixes.map((prefix) => registration[`${prefix}Dni`]?.trim()).filter(Boolean);
     for (const prefix of prefixes) {
@@ -235,23 +246,13 @@ export class PlayersService {
         if (!otherRegistrations) player = await players.findOne({ where: { dni: oldDni } });
       }
       await players.save(players.create({
-        ...player, dni, fullName: name, localityId: locality.id,
+        ...player, dni, fullName: name, localityId: registration.localityId,
         birthDate: registration[`${prefix}BirthDate`], phone: registration[`${prefix}Phone`],
         instagram: registration[`${prefix}Instagram`], shirtSize: registration[`${prefix}ShirtSize`],
       }));
     }
   }
 
-  private async findOrCreateLocality(name: string, provinceName: string) {
-    const existing = await this.localitiesRepository.findOne({
-      where: { name, provinceName },
-    });
-    if (existing) return existing;
-
-    return this.localitiesRepository.save(
-      this.localitiesRepository.create({ name, provinceName, active: true }),
-    );
-  }
 }
 
 function normalizeOptional(value?: string | null) {

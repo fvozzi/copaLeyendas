@@ -9,12 +9,11 @@ import { Locality } from '../localities/locality.entity';
 import { PlayersModule } from '../players/players.module';
 import { GoogleDrivePhotoStorageService } from './google-drive-photo-storage.service';
 import { Tournament } from '../tournaments/tournament.entity';
-import { Category } from '../categories/category.entity';
 import { WhatsAppModule } from '../whatsapp/whatsapp.module';
 import { RegistrationPayment } from './registration-payment.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([PairRegistration, RegistrationPayment, RegistrationAccessGrant, Locality, Tournament, Category]), PlayersModule, WhatsAppModule],
+  imports: [TypeOrmModule.forFeature([PairRegistration, RegistrationPayment, RegistrationAccessGrant, Locality, Tournament]), PlayersModule, WhatsAppModule],
   controllers: [RegistrationsController, PublicRegistrationsController],
   providers: [RegistrationsService, GoogleDrivePhotoStorageService],
   exports: [RegistrationsService, TypeOrmModule],

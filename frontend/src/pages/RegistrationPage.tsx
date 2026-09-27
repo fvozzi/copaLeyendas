@@ -127,7 +127,7 @@ export function RegistrationPage() {
       setAccess(result);
       setForm({
         ...initialForm,
-        representingText: `${result.localityName}, ${result.provinceName}`,
+        representingText: `${result.locality.name}, ${result.locality.provinceName}`,
         ...result.registration?.fields,
         accessToken: result.token,
       });
@@ -242,9 +242,9 @@ export function RegistrationPage() {
           <section className="grant-card">
             <div>
               <p className="eyebrow">Localidad habilitada</p>
-              <h2>{access.localityName}</h2>
+              <h2>{access.locality.name}</h2>
               <p>
-                {access.category.name} - {access.provinceName}
+                {access.category.name} - {access.locality.provinceName}
               </p>
               {access.feeWaived ? <p>Inscripcion bonificada por la organizacion.</p> : null}
               {access.paymentDeferredUntilConfirmed ? <p>Ingreso a lista de espera: no hace falta comprobante ahora. El pago se solicitara si la inscripcion es confirmada.</p> : null}

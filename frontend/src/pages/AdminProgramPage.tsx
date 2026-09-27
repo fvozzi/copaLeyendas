@@ -14,7 +14,7 @@ const matchLabel = (slot: TournamentScheduleSlot, allSlots: TournamentScheduleSl
     const match = slot.match;
     const participant = (side: 'home' | 'away') => {
       const pair = side === 'home' ? match.homeRegistration : match.awayRegistration;
-      if (pair) return `${pair.playerOneName} / ${pair.playerTwoName} (${pair.localityName})`;
+      if (pair) return `${pair.playerOneName} / ${pair.playerTwoName} (${pair.locality.name})`;
       const sourceId = side === 'home' ? match.homeSourceMatchId : match.awaySourceMatchId;
       const source = side === 'home' ? match.homeSource : match.awaySource;
       if (sourceId) return `${source === 'LOSER' ? 'Perdedora' : 'Ganadora'} P${allSlots.find((item) => item.matchId === sourceId)?.sequence ?? '?'}`;

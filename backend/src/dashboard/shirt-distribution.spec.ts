@@ -3,23 +3,23 @@ import { distributeShirts } from './shirt-distribution';
 import type { PairRegistration } from '../registrations/pair-registration.entity';
 import { ShirtSize } from '../registrations/registration.enums';
 
-const request = (size: ShirtSize, brand = '') => ({ playerOneName: 'Jugadora', playerOneShirtSize: size, playerOneHasCommercialAgreement: Boolean(brand), playerOneCommercialAgreementDetails: brand }) as PairRegistration;
+const request = (size: ShirtSize, brand = '') => ({ locality: { name: 'Equipo' }, playerOneName: 'Jugadora', playerOneShirtSize: size, playerOneHasCommercialAgreement: Boolean(brand), playerOneCommercialAgreementDetails: brand }) as unknown as PairRegistration;
 const copies = (quantity: number, size: ShirtSize, brand = '') => Array.from({ length: quantity }, () => request(size, brand));
 const pair = (id: number, category: string, brand = '', secondBrand = '', thirdBrand?: string) => ({
-  id, categoryId: 1, category: { name: category }, localityName: `Equipo ${id}`,
+  id, categoryId: 1, category: { name: category }, locality: { name: `Equipo ${id}` },
   playerOneName: `Uno ${id}`, playerOneShirtSize: ShirtSize.M, playerOneHasCommercialAgreement: Boolean(brand), playerOneCommercialAgreementDetails: brand,
   playerTwoName: `Dos ${id}`, playerTwoShirtSize: ShirtSize.L, playerTwoHasCommercialAgreement: Boolean(secondBrand), playerTwoCommercialAgreementDetails: secondBrand,
   playerThreeName: thirdBrand === undefined ? null : `Tres ${id}`, playerThreeShirtSize: ShirtSize.S,
   playerThreeHasCommercialAgreement: Boolean(thirdBrand), playerThreeCommercialAgreementDetails: thirdBrand ?? null,
-}) as PairRegistration;
+}) as unknown as PairRegistration;
 const assignedModels = (result: ReturnType<typeof distributeShirts>, registrationId: number) => result.models.filter(model => model.players.some(player => player.registrationId === registrationId));
 
 describe('shirt distribution', () => {
   it('keeps the exact players behind each count, respecting brand and stable identities', () => {
     const registrations = Array.from({ length: 12 }, (_, index) => ({
       ...request(index % 2 ? ShirtSize.S : ShirtSize.M, index < 4 ? 'Guastavino' : index < 7 ? 'Dabber' : ''),
-      id: index + 1, playerOneName: `Jugadora ${index + 1}`, localityName: 'Equipo', category: { name: 'Damas A' },
-    })) as PairRegistration[];
+      id: index + 1, playerOneName: `Jugadora ${index + 1}`, locality: { name: 'Equipo' }, category: { name: 'Damas A' },
+    })) as unknown as PairRegistration[];
     const result = distributeShirts(registrations);
     expect(result).toEqual(distributeShirts([...registrations].reverse()));
     const players = result.models.flatMap(model => model.players);

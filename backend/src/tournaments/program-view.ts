@@ -2,7 +2,7 @@ import type { TournamentMatch } from './tournament-match.entity';
 import type { TournamentScheduleSlot } from './tournament-schedule-slot.entity';
 import { programCapacityWarnings } from './program-capacity';
 
-export const programRelations = { court: { venue: true }, tournamentCategory: { category: true }, match: { zone: true, homeRegistration: true, awayRegistration: true } } as const;
+export const programRelations = { court: { venue: true }, tournamentCategory: { category: true }, match: { zone: true, homeRegistration: { locality: true }, awayRegistration: { locality: true } } } as const;
 
 export function matchView(match: TournamentMatch, slot = match.scheduleSlot) {
   const { scheduleSlot: _scheduleSlot, ...data } = match;

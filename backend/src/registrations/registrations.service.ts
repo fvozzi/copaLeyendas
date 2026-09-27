@@ -31,7 +31,6 @@ import { PlayersService } from '../players/players.service';
 import { GoogleDrivePhotoStorageService } from './google-drive-photo-storage.service';
 import { Tournament } from '../tournaments/tournament.entity';
 import { TournamentStatus } from '../tournaments/tournament.enums';
-import { Category } from '../categories/category.entity';
 import { WhatsAppService } from '../whatsapp/whatsapp.service';
 import { WhatsAppDelivery } from '../whatsapp/whatsapp-delivery.entity';
 
@@ -55,8 +54,6 @@ export class RegistrationsService {
     private readonly localitiesRepository: Repository<Locality>,
     @InjectRepository(Tournament)
     private readonly tournamentsRepository: Repository<Tournament>,
-    @InjectRepository(Category)
-    private readonly categoriesRepository: Repository<Category>,
     private readonly playersService: PlayersService,
     private readonly googleDrivePhotos: GoogleDrivePhotoStorageService,
     private readonly whatsAppService: WhatsAppService,
@@ -64,27 +61,20 @@ export class RegistrationsService {
 
   async createAccessGrant(dto: CreateAccessGrantDto) {
     const token = await this.generateUniqueToken();
-    const locality = dto.localityId
-      ? await this.localitiesRepository.findOne({ where: { id: dto.localityId }, relations: { category: true } })
-      : null;
-    if (dto.localityId && !locality) throw new NotFoundException('Localidad no encontrada');
-    if (locality && !locality.active) {
+    const locality = await this.localitiesRepository.findOne({ where: { id: dto.localityId }, relations: { category: true } });
+    if (!locality) throw new NotFoundException('Localidad no encontrada');
+    if (!locality.active) {
       throw new BadRequestException('La localidad debe tener una categoria activa para habilitarse');
     }
-    const category = locality?.category ?? (dto.categoryId
-      ? await this.categoriesRepository.findOne({ where: { id: dto.categoryId } })
-      : null);
+    const category = locality.category;
     if (!category) throw new BadRequestException('Debe seleccionar una categoria');
     if (!category.active) throw new BadRequestException('La categoria seleccionada no esta activa');
-    const localityName = locality?.name ?? dto.localityName?.trim() ?? '';
     const grant = this.accessGrantsRepository.create({
       token,
-      localityId: locality?.id ?? null,
+      localityId: locality.id,
+      locality,
       categoryId: category.id,
       category,
-      localityName,
-      provinceName: locality?.provinceName ?? dto.provinceName?.trim() ?? '',
-      clubName: normalizeOptional(dto.clubName) ?? localityName,
       contactName: normalizeOptional(dto.contactName),
       contactEmail: normalizeOptional(dto.contactEmail),
       contactPhone: normalizeOptional(dto.contactPhone),
@@ -101,6 +91,7 @@ export class RegistrationsService {
 
   async listAccessGrants(query: QueryAccessGrantsDto) {
     const qb = this.accessGrantsRepository.createQueryBuilder('grant').leftJoinAndSelect('grant.category', 'category')
+      .leftJoinAndSelect('grant.locality', 'locality')
       .leftJoin('grant.registrations', 'registration')
       .addSelect(['registration.id', 'registration.status', 'registration.feeWaived', 'registration.paymentDeferredUntilConfirmed', 'registration.paymentProofStoredName'])
       .leftJoinAndMapOne('grant.whatsappDelivery', WhatsAppDelivery, 'delivery', 'delivery.messageId = grant.whatsappMessageId');
@@ -118,9 +109,8 @@ export class RegistrationsService {
       qb.andWhere(
         new Brackets((inner) => {
           inner
-            .where('LOWER(grant.localityName) LIKE :term', { term })
-            .orWhere('LOWER(grant.provinceName) LIKE :term', { term })
-            .orWhere('LOWER(grant.clubName) LIKE :term', { term })
+            .where('LOWER(locality.name) LIKE :term', { term })
+            .orWhere('LOWER(locality.provinceName) LIKE :term', { term })
             .orWhere('LOWER(grant.token) LIKE :term', { term });
         }),
       );
@@ -153,7 +143,7 @@ export class RegistrationsService {
   }
 
   async sendAccessGrantTokenByWhatsApp(id: number, siteUrl: string) {
-    const grant = await this.accessGrantsRepository.findOne({ where: { id }, relations: { category: true } });
+    const grant = await this.accessGrantsRepository.findOne({ where: { id }, relations: { category: true, locality: true } });
 
     if (!grant) {
       throw new NotFoundException('Equipo habilitado no encontrado');
@@ -167,12 +157,12 @@ export class RegistrationsService {
       throw new BadRequestException('Solo se pueden enviar tokens activos');
     }
 
-    const contactName = grant.contactName?.trim() || grant.localityName;
+    const contactName = grant.contactName?.trim() || grant.locality.name;
     const result = await this.whatsAppService.sendRegistrationToken(
       grant.contactPhone,
       contactName,
       grant.token,
-      grant.localityName,
+      grant.locality.name,
       siteUrl,
       grant.category.name,
     );
@@ -223,9 +213,8 @@ export class RegistrationsService {
       token: grant.token,
       categoryId: grant.categoryId,
       category: grant.category,
-      localityName: grant.localityName,
-      provinceName: grant.provinceName,
-      clubName: grant.clubName,
+      localityId: grant.localityId,
+      locality: grant.locality,
       contactName: grant.contactName,
       contactEmail: grant.contactEmail,
       contactPhone: grant.contactPhone,
@@ -248,6 +237,7 @@ export class RegistrationsService {
       saved = await this.registrationsRepository.manager.transaction(async (manager) => {
         const grant = await manager.findOne(RegistrationAccessGrant, {
           where: { token: dto.accessToken.trim().toUpperCase() },
+          relations: { locality: true },
           lock: { mode: 'pessimistic_write' },
         });
         if (!grant || grant.status !== RegistrationAccessGrantStatus.ACTIVE) {
@@ -286,9 +276,8 @@ export class RegistrationsService {
           ...existing,
           accessGrantId: grant.id,
           categoryId: grant.categoryId,
-          localityName: grant.localityName,
-          provinceName: grant.provinceName,
-          clubName: grant.clubName,
+          localityId: grant.localityId,
+          locality: grant.locality,
           heardAboutSource: dto.heardAboutSource,
           heardAboutOtherText: normalizeOptional(dto.heardAboutOtherText),
           tournamentAvailabilityConfirmed: dto.tournamentAvailabilityConfirmed,
@@ -392,7 +381,7 @@ export class RegistrationsService {
   }
 
   async list(query: QueryRegistrationsDto) {
-    const qb = this.registrationsRepository.createQueryBuilder('registration').leftJoinAndSelect('registration.category', 'category').leftJoinAndSelect('registration.payments', 'payments');
+    const qb = this.registrationsRepository.createQueryBuilder('registration').leftJoinAndSelect('registration.category', 'category').leftJoinAndSelect('registration.locality', 'locality').leftJoinAndSelect('registration.payments', 'payments');
 
     if (query.categoryId) {
       qb.andWhere('registration.categoryId = :categoryId', { categoryId: query.categoryId });
@@ -409,8 +398,7 @@ export class RegistrationsService {
           inner
             .where('LOWER(registration.playerOneName) LIKE :term', { term })
             .orWhere('LOWER(registration.playerTwoName) LIKE :term', { term })
-            .orWhere('LOWER(registration.clubName) LIKE :term', { term })
-            .orWhere('LOWER(registration.localityName) LIKE :term', { term })
+            .orWhere('LOWER(locality.name) LIKE :term', { term })
             .orWhere('LOWER(COALESCE(registration.playerThreeName, \'\')) LIKE :term', { term });
         }),
       );
@@ -427,6 +415,7 @@ export class RegistrationsService {
       relations: {
         accessGrant: true,
         category: true,
+        locality: true,
         payments: true,
       },
     });
@@ -533,7 +522,7 @@ export class RegistrationsService {
     const normalizedToken = token.trim().toUpperCase();
     const grant = await this.accessGrantsRepository.findOne({
       where: { token: normalizedToken },
-      relations: { category: true },
+      relations: { category: true, locality: true },
     });
 
     if (!grant) {

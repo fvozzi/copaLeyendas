@@ -43,7 +43,7 @@ describe('registered player agreements', () => {
     ] as never);
     const result = await service.list({});
     expect(result.map((item) => item.categoryName)).toEqual(['Silvina Cimadamore', 'Damas B', null]);
-    expect(registrations.find).toHaveBeenCalledWith(expect.objectContaining({ relations: { category: true } }));
+    expect(registrations.find).toHaveBeenCalledWith(expect.objectContaining({ relations: { category: true, locality: true } }));
   });
 
   it('matches each player by DNI, including the third player, and uses the latest declaration', async () => {
@@ -63,7 +63,7 @@ describe('registered player agreements', () => {
     vi.spyOn(service, 'syncRegistrationPlayers').mockResolvedValue();
     query.getMany.mockResolvedValue([player]);
     registrations.find.mockResolvedValue([{
-      id: 9, categoryId: 1, category: { name: 'Damas A' }, localityName: 'Equipo',
+      id: 9, categoryId: 1, category: { name: 'Damas A' }, locality: { name: 'Equipo' },
       playerOneName: player.fullName, playerOneDni: player.dni, playerOneShirtSize: 'M',
       playerOneHasCommercialAgreement: true, playerOneCommercialAgreementDetails: 'Guastavino',
     }] as never);
@@ -116,17 +116,18 @@ describe('registered player photos', () => {
 });
 
 describe('registration player synchronization', () => {
-  it('does not recreate an old locality after its team was renamed when players already exist', async () => {
-    const players = { findOne: vi.fn().mockResolvedValue({ id: 1, dni: '123' }), save: vi.fn() };
+  it('keeps existing players linked to the locality referenced by their registration', async () => {
+    const players = { findOne: vi.fn().mockResolvedValue({ id: 1, dni: '123', localityId: 2 }), save: vi.fn() };
     const localities = { findOne: vi.fn(), save: vi.fn() };
     const service = new PlayersService(players as never, localities as never, {} as never, {} as never, {} as never, {} as never, {} as never);
     await service.syncRegistrationPlayers({
-      localityName: 'Nombre anterior', provinceName: 'Buenos Aires',
+      localityId: 9,
       playerOneName: 'Ana', playerOneDni: '123',
       playerTwoName: 'Bea', playerTwoDni: '456',
       playerThreeName: null, playerThreeDni: null,
     } as never);
     expect(players.findOne).toHaveBeenCalledTimes(2);
+    expect(players.save).toHaveBeenCalledWith(expect.objectContaining({ dni: '123', localityId: 9 }));
     expect(localities.findOne).not.toHaveBeenCalled();
     expect(localities.save).not.toHaveBeenCalled();
   });

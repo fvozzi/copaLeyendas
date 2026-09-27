@@ -71,7 +71,7 @@ export function distributeShirts(registrations: PairRegistration[], zoneEntries:
       totals[size] = (totals[size] ?? 0) + 1;
       players.push({
         registrationId: registration.id, position: prefix, name: registration[`${prefix}Name`]!.trim(), size,
-        team: registration.localityName, category: registration.category?.name ?? '', zone: zone?.zoneName ?? null,
+        team: registration.locality.name, category: registration.category?.name ?? '', zone: zone?.zoneName ?? null,
         brand: registration[`${prefix}HasCommercialAgreement`] ? registration[`${prefix}CommercialAgreementDetails`]?.trim() || null : null,
       });
     }

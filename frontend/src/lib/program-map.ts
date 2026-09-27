@@ -44,7 +44,7 @@ export function mapParticipant(slot: TournamentScheduleSlot, side: 'home' | 'awa
   const match = slot.match;
   if (!match) return 'A definir';
   const pair = side === 'home' ? match.homeRegistration : match.awayRegistration;
-  if (pair) return `${pair.localityName} · ${pair.playerOneName} / ${pair.playerTwoName}`;
+  if (pair) return `${pair.locality.name} · ${pair.playerOneName} / ${pair.playerTwoName}`;
   const qualifier = side === 'home' ? match.homeQualifierZoneId : match.awayQualifierZoneId;
   const rank = side === 'home' ? match.homeQualifierRank : match.awayQualifierRank;
   if (qualifier) return `${rank ?? '?'}.ª de ${zones.find((zone) => zone.id === qualifier)?.name ?? 'zona a definir'}`;

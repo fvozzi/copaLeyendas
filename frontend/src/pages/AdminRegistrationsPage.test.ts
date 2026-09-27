@@ -33,8 +33,6 @@ const category = { id: 1, name: 'Damas A', active: true, sortOrder: 1 };
 const grantDefaults = {
   categoryId: 1,
   category,
-  provinceName: 'Buenos Aires',
-  clubName: '',
   contactName: null,
   contactEmail: null,
   contactPhone: null,
@@ -47,19 +45,23 @@ const grantDefaults = {
   createdAt: '2026-09-01T12:00:00.000Z',
   updatedAt: '2026-09-01T12:00:00.000Z',
 };
+const locality = (id: number, name: string, provinceName = 'Buenos Aires') => ({
+  id, name, provinceName, active: true, categoryId: 1, category,
+  createdAt: '2026-09-01T12:00:00.000Z', updatedAt: '2026-09-01T12:00:00.000Z',
+});
 
 const grants = [
-  { ...grantDefaults, id: 1, token: 'PENDIENTE', localityName: 'Equipo pendiente', status: 'ACTIVE', consumedAt: null },
-  { ...grantDefaults, id: 2, token: 'USADO', localityName: 'Equipo usado', status: 'ACTIVE', consumedAt: '2026-09-10T12:00:00.000Z' },
-  { ...grantDefaults, id: 3, token: 'REVOCADO', localityName: 'Equipo revocado', status: 'REVOKED', consumedAt: null },
+  { ...grantDefaults, id: 1, token: 'PENDIENTE', localityId: 1, locality: locality(1, 'Equipo pendiente'), status: 'ACTIVE', consumedAt: null },
+  { ...grantDefaults, id: 2, token: 'USADO', localityId: 2, locality: locality(2, 'Equipo usado'), status: 'ACTIVE', consumedAt: '2026-09-10T12:00:00.000Z' },
+  { ...grantDefaults, id: 3, token: 'REVOCADO', localityId: 3, locality: locality(3, 'Equipo revocado'), status: 'REVOKED', consumedAt: null },
 ] as RegistrationAccessGrant[];
 
 const registrations = [{
   id: 10,
   playerOneName: 'Ana Uno',
   playerTwoName: 'Berta Dos',
-  localityName: 'Equipo recibido',
-  provinceName: 'Córdoba',
+  localityId: 10,
+  locality: locality(10, 'Equipo recibido', 'Córdoba'),
   category,
   status: 'RECEIVED',
   feeWaived: false,

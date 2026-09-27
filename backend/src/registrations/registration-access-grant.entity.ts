@@ -11,6 +11,7 @@ import {
 import { PairRegistration } from './pair-registration.entity';
 import { RegistrationAccessGrantStatus } from './registration.enums';
 import { Category } from '../categories/category.entity';
+import { Locality } from '../localities/locality.entity';
 import type { WhatsAppDelivery } from '../whatsapp/whatsapp-delivery.entity';
 
 @Entity('registration_access_grants')
@@ -25,21 +26,16 @@ export class RegistrationAccessGrant {
   @Column({ type: 'integer' })
   categoryId: number;
 
-  @Column({ type: 'integer', nullable: true })
-  localityId: number | null;
+  @Column({ type: 'integer' })
+  localityId: number;
+
+  @ManyToOne(() => Locality, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'localityId' })
+  locality: Locality;
 
   @ManyToOne(() => Category, (category) => category.accessGrants, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'categoryId' })
   category: Category;
-
-  @Column()
-  localityName: string;
-
-  @Column()
-  provinceName: string;
-
-  @Column()
-  clubName: string;
 
   @Column({ type: 'varchar', nullable: true })
   contactName: string | null;

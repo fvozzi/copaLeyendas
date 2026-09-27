@@ -83,7 +83,7 @@ it('creates the configured number of zones even before all pairs are confirmed',
     }),
   };
   const entries = { create: vi.fn((value) => value), save: vi.fn(async (value) => value) };
-  const registrations = { find: vi.fn(async () => [1, 2, 3, 4, 5, 6].map((id) => ({ id, localityName: `Localidad ${id}` }))) };
+  const registrations = { find: vi.fn(async () => [1, 2, 3, 4, 5, 6].map((id) => ({ id, localityId: id, locality: { name: `Localidad ${id}` } }))) };
   const service = new TournamentsService({} as never,
     { findOne: vi.fn(async () => ({ id: 8, categoryId: 3, zoneSize: 4, zoneCount: 2 })) } as never,
     zoneRepository as never, entries as never, {} as never, {} as never, {} as never,
@@ -96,7 +96,7 @@ it('creates the configured number of zones even before all pairs are confirmed',
 it('keeps existing zones if confirmed pairs exceed the configured capacity', async () => {
   const existing = [{ id: 10, tournamentCategoryId: 8 }];
   const zoneRepository = { find: vi.fn(async () => existing), remove: vi.fn(), save: vi.fn() };
-  const registrations = { find: vi.fn(async () => Array.from({ length: 9 }, (_, index) => ({ id: index + 1 }))) };
+  const registrations = { find: vi.fn(async () => Array.from({ length: 9 }, (_, index) => ({ id: index + 1, localityId: index + 1, locality: { name: `Equipo ${index + 1}` } }))) };
   const service = new TournamentsService({} as never,
     { findOne: vi.fn(async () => ({ id: 8, categoryId: 3, zoneSize: 4, zoneCount: 2 })) } as never,
     zoneRepository as never, { count: vi.fn(async () => 0) } as never,

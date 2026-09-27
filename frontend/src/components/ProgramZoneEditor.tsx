@@ -30,7 +30,7 @@ export function ProgramZoneEditor({ zone, venues, slots, onClose, onChanged, onM
     finally { setBusy(false); }
   };
   const played = slots.some((slot) => slot.match?.status === 'PLAYED');
-  const pairLabel = (pair: PairRegistration) => `${pair.localityName} · ${pair.playerOneName} / ${pair.playerTwoName}`;
+  const pairLabel = (pair: PairRegistration) => `${pair.locality.name} · ${pair.playerOneName} / ${pair.playerTwoName}`;
   return <AdminDialog title={`Zona ${zone.name.replace(/^zona\s+/i, '')} · ${zone.tournamentCategory.category.name}`} onClose={() => { if (!busy) onClose(); }}>
     {error && <div className="inline-state" role="alert">{error}</div>}
     <form className="editor-form" onSubmit={(event) => { event.preventDefault(); void run(() => updateTournamentZone(zone.id, { name, venueId, capacity: zone.capacity })); }}>

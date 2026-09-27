@@ -8,6 +8,7 @@ export type RegistrationStatus =
   | 'REJECTED';
 
 export type AccessGrantStatus = 'ACTIVE' | 'USED' | 'REVOKED';
+export type LocalityReference = Pick<Locality, 'id' | 'name' | 'provinceName'>;
 
 export type HeardAboutSource = 'INSTAGRAM' | 'FRIEND' | 'CLUB' | 'OTHER';
 
@@ -92,9 +93,8 @@ export interface RegistrationAccessGrant {
   token: string;
   categoryId: number;
   category: Category;
-  localityName: string;
-  provinceName: string;
-  clubName: string;
+  localityId: number;
+  locality: LocalityReference;
   contactName: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
@@ -115,9 +115,8 @@ export interface PublicAccessGrant {
   token: string;
   categoryId: number;
   category: Category;
-  localityName: string;
-  provinceName: string;
-  clubName: string;
+  localityId: number;
+  locality: LocalityReference;
   contactName: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
@@ -140,9 +139,8 @@ export interface PairRegistration {
   accessGrantId: number;
   categoryId: number;
   category: Category;
-  localityName: string;
-  provinceName: string;
-  clubName: string;
+  localityId: number;
+  locality: LocalityReference;
   heardAboutSource: HeardAboutSource;
   heardAboutOtherText: string | null;
   tournamentAvailabilityConfirmed: boolean;
@@ -246,10 +244,6 @@ export interface RegistrationStatusPayload {
 
 export interface AccessGrantPayload {
   localityId?: number;
-  categoryId?: number;
-  localityName?: string;
-  provinceName?: string;
-  clubName?: string;
   contactName?: string;
   contactEmail?: string;
   contactPhone?: string;

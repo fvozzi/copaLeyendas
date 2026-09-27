@@ -59,7 +59,7 @@ it('summarizes each category and zone once for the entire venue, including its k
 });
 
 it('shows actual pairs and submits results to the real fixture match, not the planning row', async () => {
-  const actual = { ...slot, matchId: 500, match: { id: 500, zoneId: 9, matchOrder: 1, status: 'READY', homeRegistration: { playerOneName: 'Ana', playerTwoName: 'Bea', localityName: 'Junin' }, awayRegistration: { playerOneName: 'Carla', playerTwoName: 'Dora', localityName: 'Salta' }, homeScore: null, awayScore: null } } as TournamentScheduleSlot;
+  const actual = { ...slot, matchId: 500, match: { id: 500, zoneId: 9, matchOrder: 1, status: 'READY', homeRegistration: { playerOneName: 'Ana', playerTwoName: 'Bea', locality: { name: 'Junin' } }, awayRegistration: { playerOneName: 'Carla', playerTwoName: 'Dora', locality: { name: 'Salta' } }, homeScore: null, awayScore: null } } as TournamentScheduleSlot;
   vi.mocked(redistributeTournamentCourts).mockResolvedValue([actual]);
   await click('Completar sin cambiar horarios');
   expect(container.textContent).toContain('Ana / Bea (Junin) vs Carla / Dora (Salta)');

@@ -14,7 +14,7 @@ beforeEach(() => {
   container = document.createElement('div'); document.body.append(container); root = createRoot(container);
   vi.mocked(getZone).mockResolvedValue({ id: 1, name: 'A', capacity: 4, entries: [], tournamentCategoryId: 2, tournamentCategory: { category: { name: 'Damas A' } } } as never);
   vi.mocked(getZoneMatches).mockResolvedValue([]);
-  vi.mocked(getAvailableZoneRegistrations).mockResolvedValue([{ id: 10, playerOneName: 'One', playerTwoName: 'Two', localityName: 'Junin' }] as never);
+  vi.mocked(getAvailableZoneRegistrations).mockResolvedValue([{ id: 10, playerOneName: 'One', playerTwoName: 'Two', locality: { name: 'Junin' } }] as never);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.clearAllMocks(); });
 async function render() {

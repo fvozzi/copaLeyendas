@@ -40,12 +40,12 @@ export class CashService {
       this.getSettings(),
       this.expenses.find({ order: { createdAt: 'DESC' } }),
       this.manualIncomes.find({ order: { createdAt: 'DESC' } }),
-      this.registrations.find({ relations: { payments: true }, order: { createdAt: 'DESC' } }),
+      this.registrations.find({ relations: { payments: true, locality: true }, order: { createdAt: 'DESC' } }),
       this.tournaments.findOne({ where: { status: TournamentStatus.ACTIVE }, order: { startsAt: 'ASC', id: 'ASC' } }),
     ]);
     const registrationIncomes = registrations.flatMap((item) => item.payments.filter((payment) => payment.amount > 0).map((payment) => ({
       id: payment.id, source: 'REGISTRATION' as const, manualIncomeId: null, registrationId: item.id,
-      team: item.localityName, players: payment.players, amount: payment.amount,
+      team: item.locality.name, players: payment.players, amount: payment.amount,
       paidAt: payment.createdAt as Date | string | null, expectedAt: null as string | null,
       status: 'REALIZED' as const, createdAt: payment.createdAt,
       concept: payment.kind === 'ADDITIONAL' ? 'Jugadora adicional' : 'Inscripción',

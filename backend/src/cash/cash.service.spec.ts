@@ -7,7 +7,7 @@ vi.mock('./cash-expense.entity', () => ({ CashExpense: class {} }));
 vi.mock('./cash-income.entity', () => ({ CashIncome: class {} }));
 
 it('adds each payment once using its recorded amount, independently of the current roster', async () => {
-  const registration = { id: 8, localityName: 'Junín', playerThreeName: null, feePerPlayer: 99999, payments: [
+  const registration = { id: 8, locality: { name: 'Junín' }, playerThreeName: null, feePerPlayer: 99999, payments: [
     { id: 1, kind: 'INITIAL', players: 2, amount: 30000, createdAt: new Date('2026-09-01') },
     { id: 2, kind: 'ADDITIONAL', players: 1, amount: 15000, createdAt: new Date('2026-09-16') },
     { id: 3, kind: 'REPLACEMENT', players: 0, amount: 0, createdAt: new Date('2026-09-17') },
@@ -15,7 +15,7 @@ it('adds each payment once using its recorded amount, independently of the curre
   const service = new CashService({ findOneBy: vi.fn().mockResolvedValue({ feePerPlayer: 15000 }) } as never,
     { find: vi.fn().mockResolvedValue([{ amount: 5000 }]) } as never,
     { find: vi.fn().mockResolvedValue([]) } as never,
-    { find: vi.fn().mockResolvedValue([registration, { id: 9, payments: [] }]) } as never,
+    { find: vi.fn().mockResolvedValue([registration, { id: 9, locality: { name: 'Otro' }, payments: [] }]) } as never,
     { findOne: vi.fn().mockResolvedValue(null) } as never);
   const summary = await service.summary();
   expect(summary).toMatchObject({ totalIncome: 45000, totalExpense: 5000, balance: 40000 });
@@ -36,7 +36,7 @@ it('separates effective and projected amounts without counting registration paym
       { id: 1, concept: 'Auspicio', payer: 'Dabber', amount: 100, status: 'PROJECTED', expectedAt: '2026-10-01', occurredAt: null, createdAt: new Date('2026-09-01') },
       { id: 2, concept: 'Donación', payer: null, amount: 50, status: 'REALIZED', expectedAt: null, occurredAt: '2026-09-02', createdAt: new Date('2026-09-01') },
     ]) } as never,
-    { find: vi.fn().mockResolvedValue([{ id: 4, localityName: 'Junín', payments: [{ id: 3, amount: 30, players: 2, kind: 'INITIAL', createdAt: new Date('2026-09-03') }] }]) } as never,
+    { find: vi.fn().mockResolvedValue([{ id: 4, locality: { name: 'Junín' }, payments: [{ id: 3, amount: 30, players: 2, kind: 'INITIAL', createdAt: new Date('2026-09-03') }] }]) } as never,
     { findOne: vi.fn().mockResolvedValue(null) } as never,
   );
   const summary = await service.summary();
@@ -48,10 +48,10 @@ it('separates effective and projected amounts without counting registration paym
 
 it('calculates the minimum paid pairs needed to cover final projected expenses and excludes waived pairs', async () => {
   const registrations = [
-    { id: 1, feeWaived: false, feePerPlayer: 15000, localityName: 'Paga', payments: [{ id: 1, amount: 30000, players: 2, kind: 'INITIAL', createdAt: new Date('2026-09-01') }] },
-    { id: 2, feeWaived: true, feePerPlayer: 15000, localityName: 'Bonificada', payments: [] },
-    { id: 3, feeWaived: false, feePerPlayer: 15000, localityName: 'Pendiente A', payments: [] },
-    { id: 4, feeWaived: false, feePerPlayer: 15000, localityName: 'Pendiente B', payments: [] },
+    { id: 1, feeWaived: false, feePerPlayer: 15000, locality: { name: 'Paga' }, payments: [{ id: 1, amount: 30000, players: 2, kind: 'INITIAL', createdAt: new Date('2026-09-01') }] },
+    { id: 2, feeWaived: true, feePerPlayer: 15000, locality: { name: 'Bonificada' }, payments: [] },
+    { id: 3, feeWaived: false, feePerPlayer: 15000, locality: { name: 'Pendiente A' }, payments: [] },
+    { id: 4, feeWaived: false, feePerPlayer: 15000, locality: { name: 'Pendiente B' }, payments: [] },
   ];
   const service = new CashService(
     { findOneBy: vi.fn().mockResolvedValue({ feePerPlayer: 15000 }) } as never,

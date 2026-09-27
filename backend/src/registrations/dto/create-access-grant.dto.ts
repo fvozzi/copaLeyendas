@@ -8,8 +8,6 @@ import {
   IsString,
   Matches,
   MaxLength,
-  MinLength,
-  ValidateIf,
 } from 'class-validator';
 
 function toBoolean(value: unknown) {
@@ -17,32 +15,9 @@ function toBoolean(value: unknown) {
 }
 
 export class CreateAccessGrantDto {
-  @IsOptional()
   @Type(() => Number)
   @IsInt()
-  localityId?: number;
-  @ValidateIf((dto: CreateAccessGrantDto) => !dto.localityId)
-  @Type(() => Number)
-  @IsInt()
-  categoryId?: number;
-
-  @ValidateIf((dto: CreateAccessGrantDto) => !dto.localityId)
-  @IsString()
-  @MinLength(2)
-  @MaxLength(120)
-  localityName?: string;
-
-  @ValidateIf((dto: CreateAccessGrantDto) => !dto.localityId)
-  @IsString()
-  @MinLength(2)
-  @MaxLength(120)
-  provinceName?: string;
-
-  @IsOptional()
-  @IsString()
-  @MinLength(2)
-  @MaxLength(160)
-  clubName?: string;
+  localityId: number;
 
   @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsString()

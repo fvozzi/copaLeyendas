@@ -1,13 +1,12 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, In, IsNull, Repository } from 'typeorm';
+import { Brackets, IsNull, Repository } from 'typeorm';
 import { CreateLocalityDto } from './dto/create-locality.dto';
 import { QueryLocalitiesDto } from './dto/query-localities.dto';
 import { UpdateLocalityDto } from './dto/update-locality.dto';
 import { Locality } from './locality.entity';
 import { Category } from '../categories/category.entity';
 import { RegistrationAccessGrant } from '../registrations/registration-access-grant.entity';
-import { PairRegistration } from '../registrations/pair-registration.entity';
 
 @Injectable()
 export class LocalitiesService {
@@ -69,37 +68,18 @@ export class LocalitiesService {
       await this.ensureUnique(name, provinceName, categoryId, id);
     }
     await this.localitiesRepository.manager.transaction(async (manager) => {
-      // Older grants stored the team name but never saved the locality ID.
-      const sameIdentity = (await manager.find(Locality, { where: { categoryId: locality.categoryId ?? IsNull() } }))
-        .filter((item) => normalizeName(item.name) === normalizeName(locality.name)
-          && normalizeName(item.provinceName) === normalizeName(locality.provinceName));
-      if (sameIdentity.length === 1) {
-        await manager.update(RegistrationAccessGrant, {
-          localityId: IsNull(), categoryId: locality.categoryId ?? IsNull(),
-          localityName: locality.name, provinceName: locality.provinceName,
-        }, { localityId: id });
-      }
-      const grants = await manager.find(RegistrationAccessGrant, { where: { localityId: id }, select: { id: true } });
-      if (categoryId !== locality.categoryId && grants.length) {
+      const grants = await manager.count(RegistrationAccessGrant, { where: { localityId: id } });
+      if (categoryId !== locality.categoryId && grants) {
         throw new BadRequestException('Este equipo tiene habilitaciones o inscripciones. No se puede cambiar su categoria.');
       }
       await manager.update(Locality, id, { name, provinceName, categoryId, active: dto.active ?? locality.active });
-      if (name !== locality.name || provinceName !== locality.provinceName) {
-        await manager.update(RegistrationAccessGrant, { localityId: id }, { localityName: name, provinceName });
-        if (grants.length) {
-          await manager.update(PairRegistration, { accessGrantId: In(grants.map((grant) => grant.id)) }, { localityName: name, provinceName });
-        }
-      }
     });
     return this.getById(id);
   }
 
   async remove(id: number) {
     const locality = await this.getById(id);
-    const grants = await this.accessGrantsRepository.count({ where: [
-      { localityId: id },
-      { localityId: IsNull(), localityName: locality.name, provinceName: locality.provinceName, categoryId: locality.categoryId ?? IsNull() },
-    ] });
+    const grants = await this.accessGrantsRepository.count({ where: { localityId: id } });
     if (grants) {
       throw new BadRequestException('Este equipo tiene habilitaciones o inscripciones. Eliminalas primero en Inscripciones, o desactiva el equipo.');
     }

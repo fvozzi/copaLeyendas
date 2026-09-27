@@ -10,7 +10,7 @@ vi.mock('../categories/category.entity', () => ({ Category: class Category {} })
 
 describe('shirt summary', () => {
   it('ignores a saved default size when the third player is absent, but counts actual third players', async () => {
-    const registration = { playerOneName: 'One', playerTwoName: 'Two', playerThreeName: ' ', playerOneShirtSize: 'M', playerTwoShirtSize: 'M', playerThreeShirtSize: 'M' };
+    const registration = { locality: { name: 'Equipo' }, playerOneName: 'One', playerTwoName: 'Two', playerThreeName: ' ', playerOneShirtSize: 'M', playerTwoShirtSize: 'M', playerThreeShirtSize: 'M' };
     const empty = { find: vi.fn(async () => []) };
     const service = new DashboardService(empty as never, { find: vi.fn(async () => [registration]) } as never, empty as never, { findOne: vi.fn(async () => null) } as never, empty as never, empty as never, empty as never);
     expect((await service.getSummary()).registrations.shirtSizes).toEqual({ M: 2 });
@@ -18,7 +18,7 @@ describe('shirt summary', () => {
     expect((await service.getSummary()).registrations.shirtSizes).toEqual({ M: 3 });
   });
   it('passes active tournament zone assignments into the shirt distribution', async () => {
-    const registration = { id: 12, categoryId: 3, category: { name: 'Goma A' }, localityName: 'Equipo',
+    const registration = { id: 12, categoryId: 3, category: { name: 'Goma A' }, locality: { name: 'Equipo' },
       playerOneName: 'Ana', playerOneShirtSize: 'M', playerTwoName: 'Bea', playerTwoShirtSize: 'L' };
     const zone = { id: 5, name: 'Zona B', venue: { name: 'Club' }, tournamentCategory: { categoryId: 3, category: { name: 'Goma A' } } };
     const empty = { find: vi.fn(async () => []) };

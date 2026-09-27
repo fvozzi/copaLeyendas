@@ -9,7 +9,7 @@ import { RegistrationPage } from './RegistrationPage';
 vi.mock('../lib/api', () => ({ getPublicRegistrationAccess: vi.fn(), createPublicRegistration: vi.fn() }));
 
 const grant = {
-  enabled: true, token: 'COPA-TEST', localityName: 'Junin', provinceName: 'Buenos Aires',
+  enabled: true, token: 'COPA-TEST', localityId: 4, locality: { id: 4, name: 'Junin', provinceName: 'Buenos Aires' },
   category: { name: 'Damas A' }, feeWaived: true,
 } as PublicAccessGrant;
 
