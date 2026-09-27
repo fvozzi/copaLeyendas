@@ -1154,6 +1154,20 @@ textarea {
 }
 
 .cash-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.cash-total-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--white);
+}
+.cash-total-summary article { display: grid; gap: 0.3rem; padding: 1.15rem 1.3rem; border-right: 1px solid var(--line); }
+.cash-total-summary article:last-child { border-right: 0; }
+.cash-total-summary span { color: var(--ink-soft); font-size: 0.85rem; font-weight: 700; text-transform: uppercase; }
+.cash-total-summary strong { color: var(--forest); font-size: clamp(1.35rem, 2.2vw, 2rem); }
+.cash-total-summary strong.is-negative { color: #b33e2e; }
+.cash-total-summary small { color: var(--ink-soft); line-height: 1.35; }
 .cash-coverage-summary { display: grid; gap: 1rem; }
 .cash-coverage-summary h2, .cash-coverage-summary p { margin: 0; }
 .cash-coverage-summary p { margin-top: 0.35rem; color: var(--ink-soft); }
@@ -1189,6 +1203,10 @@ textarea {
 .cash-projection-totals strong { color: var(--ink); }
 .cash-tabs { margin: 0; }
 .cash-page .admin-data-grid-actions { min-width: 12rem; }
+
+.registrations-section-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem 1rem; }
+.registrations-section-heading h2 { margin: 0; }
+.registration-grant-filters { margin: 0; }
 
 .inline-form {
   display: flex;
@@ -1870,7 +1888,15 @@ textarea {
     justify-content: flex-start;
   }
 
+  .cash-total-summary { grid-template-columns: 1fr; }
+  .cash-total-summary article { border-right: 0; border-bottom: 1px solid var(--line); }
+  .cash-total-summary article:last-child { border-bottom: 0; }
   .cash-coverage-values { grid-template-columns: 1fr; }
+
+  .registrations-page .data-card { padding: 0.75rem; }
+  .registrations-section-heading { align-items: stretch; }
+  .registration-grant-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  .registration-grant-filters button { min-height: 2.65rem; padding-inline: 0.65rem; }
 
   .admin-data-grid-wrap.preserve-table-mobile {
     overflow-x: auto;
@@ -1884,6 +1910,8 @@ textarea {
 
   .localities-data-card .preserve-table-mobile .admin-data-grid { min-width: 720px; }
   .players-data-card .preserve-table-mobile .admin-data-grid { min-width: 1260px; }
+  .registrations-grants-card .preserve-table-mobile .admin-data-grid { min-width: 1320px; }
+  .registrations-received-card .preserve-table-mobile .admin-data-grid { min-width: 900px; }
 
   .preserve-table-mobile .admin-data-grid thead { display: table-header-group; }
   .preserve-table-mobile .admin-data-grid tbody { display: table-row-group; width: auto; }
@@ -1896,4 +1924,6 @@ textarea {
   }
   .preserve-table-mobile .admin-data-grid td::before { display: none; }
   .preserve-table-mobile .admin-data-grid-actions { display: table-cell; }
+  .registrations-page .preserve-table-mobile .admin-data-grid th,
+  .registrations-page .preserve-table-mobile .admin-data-grid td { padding: 0.55rem 0.6rem; font-size: 0.82rem; }
 }

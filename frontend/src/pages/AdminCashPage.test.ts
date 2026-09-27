@@ -44,6 +44,10 @@ async function type(input: HTMLInputElement, value: string) {
 
 it('shows effective totals, projected chart and separate income and expense tabs', async () => {
   await render();
+  const totalSummary = container.querySelectorAll('.cash-total-summary strong');
+  expect(totalSummary[0].textContent).toContain('140.000');
+  expect(totalSummary[1].textContent).toContain('120.000');
+  expect(totalSummary[2].textContent).toContain('20.000');
   expect(container.querySelectorAll('.cash-stats strong')[0].textContent).toContain('30.000');
   expect(container.querySelectorAll('.cash-stats strong')[2].textContent).toContain('120.000');
   expect(container.querySelectorAll('.cash-stats strong')[3].textContent).toContain('60.000');

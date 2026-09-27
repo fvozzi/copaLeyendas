@@ -91,6 +91,25 @@ export function AdminCashPage() {
   return <div className="admin-panel cash-page">
     <div className="panel-header"><div><p className="eyebrow">Administración</p><h1>Caja</h1></div></div>
     {error && <div className="inline-state" role="alert">{error}</div>}
+    {summary ? <section className="cash-total-summary" aria-label="Resumen total de caja">
+      <article>
+        <span>Entrada total</span>
+        <strong>{money.format(summary.forecastIncome + summary.calculatedIncome)}</strong>
+        <small>Cobrado + proyectado + ingresos calculados</small>
+      </article>
+      <article>
+        <span>Salida total</span>
+        <strong>{money.format(summary.forecastExpense)}</strong>
+        <small>Pagado + proyectado</small>
+      </article>
+      <article>
+        <span>Saldo final</span>
+        <strong className={summary.forecastIncome + summary.calculatedIncome - summary.forecastExpense < 0 ? 'is-negative' : ''}>
+          {money.format(summary.forecastIncome + summary.calculatedIncome - summary.forecastExpense)}
+        </strong>
+        <small>Entrada total menos salida total</small>
+      </article>
+    </section> : null}
     <section className="stats-grid cash-stats">
       <article className="metric-card"><p>Ingresos</p><strong>{money.format(summary?.totalIncome ?? 0)}</strong><span>Cobrados, incluidas inscripciones</span></article>
       <article className="metric-card"><p>Egresos</p><strong>{money.format(summary?.totalExpense ?? 0)}</strong><span>Pagados</span></article>
