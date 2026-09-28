@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ContentPost } from '../posts/content-post.entity';
@@ -11,6 +11,7 @@ import { ZoneEntry } from '../tournaments/zone-entry.entity';
 import { Category } from '../categories/category.entity';
 import { RegistrationStatus } from '../registrations/registration.enums';
 import { distributeShirts } from './shirt-distribution';
+import { buildShirtProjectionWorkbook } from './shirt-projection';
 
 @Injectable()
 export class DashboardService {
@@ -70,6 +71,15 @@ export class DashboardService {
         })), 'status'),
       },
       matchesByVenue: summarizeMatchesByVenue(tournament?.name ?? null, zones),
+    };
+  }
+
+  async exportShirtProjection() {
+    const distribution = (await this.getSummary()).registrations.shirtDistribution;
+    if (!distribution.total) throw new BadRequestException('No hay una distribución actual de talles para proyectar.');
+    return {
+      filename: 'proyeccion-camisetas-200.xlsx',
+      content: await buildShirtProjectionWorkbook(distribution, 50),
     };
   }
 }

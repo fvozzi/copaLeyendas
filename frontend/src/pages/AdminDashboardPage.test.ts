@@ -6,7 +6,7 @@ import { AdminDashboardPage } from './AdminDashboardPage';
 import { getDashboardSummary } from '../lib/api';
 
 vi.mock('../lib/auth', () => ({ useAuth: () => ({ user: { role: 'DIRECTOR' } }) }));
-vi.mock('../lib/api', () => ({ getDashboardSummary: vi.fn() }));
+vi.mock('../lib/api', () => ({ getDashboardSummary: vi.fn(), downloadShirtProjection: vi.fn() }));
 let root: Root;
 let container: HTMLDivElement;
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.clearAllMocks(); });

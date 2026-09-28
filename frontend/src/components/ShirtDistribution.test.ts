@@ -1,6 +1,6 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { ShirtDistribution } from './ShirtDistribution';
 
 let root: Root;
@@ -26,4 +26,16 @@ it('opens the players in the double-clicked model and supports the model button 
   await act(async () => (dialog.querySelector('.dialog-close') as HTMLButtonElement).click());
   await act(async () => container.querySelector('.shirt-distribution-table tfoot tr')!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })));
   expect(container.querySelectorAll('.shirt-players-table tbody tr')).toHaveLength(2);
+});
+
+it('downloads the 200-shirt projection from the summary card', async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  container = document.createElement('div'); document.body.append(container); root = createRoot(container);
+  const onDownload = vi.fn(async () => undefined);
+  await act(async () => root.render(createElement(ShirtDistribution, {
+    distribution: { sizes: ['M'], totals: { M: 2 }, total: 2, models: [{ name: 'Modelo', total: 2, sizes: { M: 2 }, players: [] }] },
+    onDownload,
+  })));
+  await act(async () => (container.querySelector('.shirt-distribution-header button') as HTMLButtonElement).click());
+  expect(onDownload).toHaveBeenCalledOnce();
 });

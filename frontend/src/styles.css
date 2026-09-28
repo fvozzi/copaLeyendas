@@ -1312,12 +1312,16 @@ textarea {
 }
 
 .shirt-distribution { grid-column: 1 / -1; min-width: 0; }
+.shirt-distribution-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.8rem 1rem; }
+.shirt-distribution-header h2, .shirt-distribution-header p { margin: 0; }
 .shirt-detail-button { text-align: left; font-weight: 700; padding: 0; }
 .shirt-distribution-table tbody tr, .shirt-distribution-table tfoot tr { cursor: pointer; }
 .shirt-distribution-table tbody tr:hover { background: #173f3908; }
 .shirt-players-table { width: 100%; border-collapse: collapse; }
 .shirt-players-table th, .shirt-players-table td { text-align: left; padding: 0.65rem; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
 @media (max-width: 600px) {
+  .shirt-distribution-header { align-items: stretch; flex-direction: column; }
+  .shirt-distribution-header .secondary-button { width: 100%; }
   .shirt-players-table thead { display: none; }
   .shirt-players-table tr { display: grid; grid-template-columns: 1fr; margin-bottom: 1rem; border: 1px solid var(--line); }
   .shirt-players-table td::before { content: attr(data-label); display: block; font-size: 0.75rem; color: var(--ink-soft); }

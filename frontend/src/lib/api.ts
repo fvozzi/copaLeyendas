@@ -238,6 +238,20 @@ export function getDashboardSummary() {
   return request<DashboardSummary>('/dashboard/summary', {}, true);
 }
 
+export async function downloadShirtProjection() {
+  const token = getToken();
+  const response = await fetch(`${API_URL}/dashboard/shirts/projection.xlsx`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!response.ok) throw new Error(await readError(response));
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'proyeccion-camisetas-200.xlsx';
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export function getCash() { return request<CashSummary>('/cash', {}, true); }
 export function updateCashFee(feePerPlayer: number) { return request<{ id: number; feePerPlayer: number }>('/cash/fee', { method: 'PATCH', body: JSON.stringify({ feePerPlayer }) }, true); }
 export function createCashIncome(payload: CashIncomePayload) { return request<{ id: number }>('/cash/incomes', { method: 'POST', body: JSON.stringify(payload) }, true); }

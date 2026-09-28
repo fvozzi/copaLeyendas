@@ -1,14 +1,25 @@
 import type { DashboardSummary } from '../types';
 import { useState } from 'react';
 import { AdminDialog } from './AdminDialog';
+import { downloadShirtProjection } from '../lib/api';
 
-export function ShirtDistribution({ distribution }: { distribution: DashboardSummary['registrations']['shirtDistribution'] }) {
+export function ShirtDistribution({ distribution, onDownload = downloadShirtProjection }: { distribution: DashboardSummary['registrations']['shirtDistribution']; onDownload?: () => Promise<void> }) {
   const [selected, setSelected] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const selectedModels = distribution?.models.filter(model => selected === '__all__' || model.name === selected) ?? [];
   const players = selectedModels.flatMap(model => (model.players ?? []).map(player => ({ ...player, model: model.name })))
     .sort((a, b) => (distribution?.sizes.indexOf(a.size) ?? 0) - (distribution?.sizes.indexOf(b.size) ?? 0) || a.name.localeCompare(b.name, 'es'));
+  const download = async () => {
+    if (downloading) return;
+    setDownloading(true); setDownloadError(null);
+    try { await onDownload(); }
+    catch (reason) { setDownloadError(reason instanceof Error ? reason.message : 'No se pudo descargar la proyección.'); }
+    finally { setDownloading(false); }
+  };
   return <section className="data-card shirt-distribution">
-    <h2>Camisetas por modelo y talle</h2>
+    <div className="shirt-distribution-header"><div><h2>Camisetas por modelo y talle</h2><p className="field-hint">Proyección de compra: 200 camisetas, 50 por modelo.</p></div>{distribution ? <button type="button" className="secondary-button" disabled={downloading} onClick={() => void download()}>{downloading ? 'Generando Excel...' : 'Descargar Excel proyectado'}</button> : null}</div>
+    {downloadError ? <p className="form-error" role="alert">{downloadError}</p> : null}
     <p className="field-hint">Las integrantes de una pareja reciben el mismo color, salvo que tengan acuerdos con marcas distintas. En cada zona se priorizan colores diferentes para posibles rivales y la misma marca en los partidos iniciales. Los acuerdos de marca siempre se respetan; “Otra” no restringe el reparto.</p>
     {distribution ? <table className="shirt-distribution-table" aria-label="Camisetas por modelo y talle">
       <thead><tr><th scope="col">Modelo</th>{distribution.sizes.map(size => <th scope="col" key={size}>{size}</th>)}<th scope="col">Total</th></tr></thead>
