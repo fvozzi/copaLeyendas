@@ -41,7 +41,7 @@ describe('shirt projection', () => {
   it('creates a readable workbook with projected and source sheets', async () => {
     const content = await buildShirtProjectionWorkbook(distribution as never);
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(content);
+    await workbook.xlsx.load(Uint8Array.from(content).buffer);
     expect(workbook.worksheets.map((sheet) => sheet.name)).toEqual(['Proyección 200', 'Base actual']);
     const projected = workbook.getWorksheet('Proyección 200')!;
     expect(projected.getCell('A1').value).toBe('Proyección de camisetas para envío');
