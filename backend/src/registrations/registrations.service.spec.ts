@@ -6,6 +6,7 @@ import { PairRegistration } from './pair-registration.entity';
 import { RegistrationPayment } from './registration-payment.entity';
 import { RegistrationAccessGrantStatus, RegistrationStatus } from './registration.enums';
 import { RegistrationsService } from './registrations.service';
+import { Locality } from '../localities/locality.entity';
 
 vi.mock('./pair-registration.entity', () => ({ PairRegistration: class PairRegistration {} }));
 vi.mock('./registration-payment.entity', () => ({ RegistrationPayment: class RegistrationPayment {} }));
@@ -29,6 +30,7 @@ function setup() {
     find: vi.fn().mockResolvedValue([]),
     create: vi.fn((_entity, value) => value),
     findOne: vi.fn(async (entity) => entity === RegistrationAccessGrant ? grant : null),
+    findOneBy: vi.fn(async (entity) => entity === Locality ? grant.locality : null),
     update: vi.fn().mockResolvedValue({ affected: 1 }),
     save: vi.fn(async (_entity, registration) => ({ ...registration, id: 10 })),
   };
@@ -94,6 +96,16 @@ describe('registration tracking', () => {
       { id: 7 },
       { status: RegistrationAccessGrantStatus.USED, consumedAt: expect.any(Date) });
     expect(manager.save).toHaveBeenCalledOnce();
+  });
+
+  it('locks only the token row and loads its locality separately', async () => {
+    const { service, grant, manager } = setup();
+    await service.createPublic(registrationDto);
+    expect(manager.findOne).toHaveBeenCalledWith(RegistrationAccessGrant, {
+      where: { token: grant.token },
+      lock: { mode: 'pessimistic_write' },
+    });
+    expect(manager.findOneBy).toHaveBeenCalledWith(Locality, { id: grant.localityId });
   });
 
   it('does not save a second registration when another request has consumed the token', async () => {
