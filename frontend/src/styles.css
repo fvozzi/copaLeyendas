@@ -1397,6 +1397,30 @@ textarea {
   color: #614a18;
 }
 
+.activity-filters {
+  align-items: stretch;
+}
+
+.activity-error-detail {
+  display: block;
+  max-width: 46rem;
+  margin-top: 0.35rem;
+  color: #9e3a22;
+  overflow-wrap: anywhere;
+}
+
+.activity-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.activity-pagination .secondary-button {
+  width: auto;
+}
+
 .checkbox-row {
   display: flex;
   gap: 0.7rem;

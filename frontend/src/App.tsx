@@ -20,6 +20,7 @@ import { AdminUsersPage } from './pages/AdminUsersPage';
 import { AdminCashPage } from './pages/AdminCashPage';
 import { AdminProgramPage } from './pages/AdminProgramPage';
 import { AdminPlayingCourtsPage } from './pages/AdminPlayingCourtsPage';
+import { AdminActivityPage } from './pages/AdminActivityPage';
 import { HomePage } from './pages/HomePage';
 import { PostPage } from './pages/PostPage';
 import { RegistrationPage } from './pages/RegistrationPage';
@@ -56,6 +57,7 @@ export default function App() {
               <Route path="zonas/:id" element={<AdminZonePage />} />
               <Route path="usuarios" element={<AdminUsersPage />} />
               <Route path="backups" element={<AdminBackupsPage />} />
+              <Route path="actividad" element={<AdminActivityPage />} />
             </Route>
           </Route>
         </Routes>

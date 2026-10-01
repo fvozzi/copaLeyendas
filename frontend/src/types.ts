@@ -23,6 +23,30 @@ export interface AuthUser {
   role: UserRole;
 }
 
+export interface ActivityLog {
+  id: number;
+  requestId: string;
+  level: 'INFO' | 'WARNING' | 'ERROR';
+  source: 'PUBLIC' | 'ADMIN';
+  method: string;
+  path: string;
+  message: string;
+  statusCode: number;
+  durationMs: number;
+  actorUserId: number | null;
+  actorName: string | null;
+  detail: string | null;
+  createdAt: string;
+}
+
+export interface ActivityLogPage {
+  items: ActivityLog[];
+  total: number;
+  page: number;
+  pageSize: number;
+  pages: number;
+}
+
 export interface AdminUser {
   id: number;
   email: string;

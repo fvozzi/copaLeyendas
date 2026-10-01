@@ -21,6 +21,7 @@ import type {
   PlayerPayload,
   Category, CategoryPayload, Court, CourtPayload, Venue, VenuePayload,
   Tournament, TournamentPayload, TournamentDetail, TournamentMatch, ZoneDetail, AdminUser, AdminUserPayload, CashExpense, CashExpensePayload, CashIncomePayload, CashSummary, TournamentScheduleSlot,
+  ActivityLogPage,
 } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
@@ -28,6 +29,7 @@ const TOKEN_KEY = 'copa_leyendas_token';
 const USER_KEY = 'copa_leyendas_user';
 
 export function getBackups() { return request<BackupOverview>('/backups', {}, true); }
+export function getActivity(params: { page?: number; pageSize?: number; level?: string; method?: string; search?: string }) { return request<ActivityLogPage>(`/activity${buildQuery(params)}`, {}, true); }
 export function updateBackupSettings(settings: BackupSettings) { return request<BackupOverview>('/backups/settings', { method: 'PATCH', body: JSON.stringify(settings) }, true); }
 export function createBackup() { return request<{ id: number; status: 'RUNNING' }>('/backups', { method: 'POST' }, true); }
 export async function downloadBackup(backup: DatabaseBackup) {
@@ -83,11 +85,12 @@ async function readError(response: Response) {
   }
 
   try {
-    const parsed = JSON.parse(body) as { message?: string | string[] };
+    const parsed = JSON.parse(body) as { message?: string | string[]; requestId?: string };
     if (Array.isArray(parsed.message)) {
       return parsed.message.join('\n');
     }
-    return parsed.message ?? body;
+    const message = parsed.message ?? body;
+    return parsed.requestId ? `${message} (código ${parsed.requestId.slice(0, 8)})` : message;
   } catch {
     return body;
   }
