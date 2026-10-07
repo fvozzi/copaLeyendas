@@ -124,6 +124,19 @@ describe('registration tracking', () => {
     await expect(service.updateAccessGrantStatus(7, { status: RegistrationAccessGrantStatus.USED })).rejects.toThrow(BadRequestException);
   });
 
+  it('marks an existing registration and its access grant as fee-waived', async () => {
+    const { service, grant, manager, registrations } = setup();
+    grant.feeWaived = false;
+    const registration = { id: 42, accessGrantId: grant.id, status: RegistrationStatus.RECEIVED, feeWaived: false, adminNotes: null };
+    registrations.findOne.mockResolvedValue(registration);
+    manager.findOne.mockImplementation(async (entity) => (entity === RegistrationAccessGrant ? grant : registration) as never);
+    await service.updateStatus(registration.id, { status: RegistrationStatus.CONFIRMED, feeWaived: true });
+    expect(manager.update).toHaveBeenCalledWith(PairRegistration, { id: registration.id }, {
+      status: RegistrationStatus.CONFIRMED, feeWaived: true, adminNotes: null,
+    });
+    expect(manager.update).toHaveBeenCalledWith(RegistrationAccessGrant, { id: grant.id }, { feeWaived: true });
+  });
+
   it('only returns editable data while the token is enabled, without internal notes or storage identifiers', async () => {
     const { service, grant, registrations } = setup();
     registrations.findOne.mockResolvedValue({ ...registrationDto, adminNotes: 'Private', paymentProofStoredName: 'secret.pdf', paymentProofOriginalName: 'pago.pdf', playerOnePhotoStoredName: 'drive:secret', playerOnePhotoOriginalName: 'foto.jpg' });

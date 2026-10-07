@@ -264,6 +264,7 @@ export interface PostPayload {
 export interface RegistrationStatusPayload {
   status: RegistrationStatus;
   adminNotes?: string;
+  feeWaived?: boolean;
 }
 
 export interface AccessGrantPayload {

@@ -2,7 +2,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { AdminRegistrationsPage } from './AdminRegistrationsPage';
-import { getAccessGrants, getCategories, getLocalities, getRegistrations } from '../lib/api';
+import { getAccessGrants, getCategories, getLocalities, getRegistrations, updateRegistrationStatus } from '../lib/api';
 import type { PairRegistration, RegistrationAccessGrant } from '../types';
 
 vi.mock('../lib/api', () => ({
@@ -101,4 +101,18 @@ it('filters active access grants that have not been used', async () => {
   expect(grid.textContent).toContain('Equipo pendiente');
   expect(grid.textContent).not.toContain('Equipo usado');
   expect(grid.textContent).not.toContain('Equipo revocado');
+});
+
+it('allows Direction to waive an existing registration so Caja stops counting it', async () => {
+  await render();
+  vi.mocked(updateRegistrationStatus).mockResolvedValue({ ...registrations[0], feeWaived: true });
+  const edit = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'Editar')!;
+  await act(async () => edit.click());
+  const dialog = document.querySelector('[role="dialog"]')!;
+  const waived = dialog.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+  expect(waived.checked).toBe(false);
+  expect(dialog.textContent).toContain('dejan de computarse como ingresos en Caja');
+  await act(async () => waived.click());
+  await act(async () => dialog.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+  expect(updateRegistrationStatus).toHaveBeenCalledWith(10, expect.objectContaining({ status: 'RECEIVED', feeWaived: true }));
 });

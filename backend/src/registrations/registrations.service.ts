@@ -443,8 +443,12 @@ export class RegistrationsService {
       if (!grant || !registration) throw new NotFoundException('Registration not found');
       await manager.update(PairRegistration, { id }, {
         status: dto.status,
+        feeWaived: dto.feeWaived ?? registration.feeWaived,
         adminNotes: dto.adminNotes === undefined ? registration.adminNotes : dto.adminNotes.trim() || null,
       });
+      if (dto.feeWaived !== undefined && dto.feeWaived !== grant.feeWaived) {
+        await manager.update(RegistrationAccessGrant, { id: grant.id }, { feeWaived: dto.feeWaived });
+      }
       if (dto.status === RegistrationStatus.CONFIRMED) {
         await manager.update(RegistrationAccessGrant, { id: grant.id }, {
           status: RegistrationAccessGrantStatus.USED,

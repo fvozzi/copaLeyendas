@@ -49,7 +49,7 @@ it('separates effective and projected amounts without counting registration paym
 it('calculates the minimum paid pairs needed to cover final projected expenses and excludes waived pairs', async () => {
   const registrations = [
     { id: 1, feeWaived: false, feePerPlayer: 15000, locality: { name: 'Paga' }, payments: [{ id: 1, amount: 30000, players: 2, kind: 'INITIAL', createdAt: new Date('2026-09-01') }] },
-    { id: 2, feeWaived: true, feePerPlayer: 15000, locality: { name: 'Bonificada' }, payments: [] },
+    { id: 2, feeWaived: true, feePerPlayer: 15000, locality: { name: 'Bonificada' }, payments: [{ id: 2, amount: 30000, players: 2, kind: 'INITIAL', createdAt: new Date('2026-09-01') }] },
     { id: 3, feeWaived: false, feePerPlayer: 15000, locality: { name: 'Pendiente A' }, payments: [] },
     { id: 4, feeWaived: false, feePerPlayer: 15000, locality: { name: 'Pendiente B' }, payments: [] },
   ];

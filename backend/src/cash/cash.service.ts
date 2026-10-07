@@ -43,7 +43,7 @@ export class CashService {
       this.registrations.find({ relations: { payments: true, locality: true }, order: { createdAt: 'DESC' } }),
       this.tournaments.findOne({ where: { status: TournamentStatus.ACTIVE }, order: { startsAt: 'ASC', id: 'ASC' } }),
     ]);
-    const registrationIncomes = registrations.flatMap((item) => item.payments.filter((payment) => payment.amount > 0).map((payment) => ({
+    const registrationIncomes = registrations.filter((item) => !item.feeWaived).flatMap((item) => item.payments.filter((payment) => payment.amount > 0).map((payment) => ({
       id: payment.id, source: 'REGISTRATION' as const, manualIncomeId: null, registrationId: item.id,
       team: item.locality.name, players: payment.players, amount: payment.amount,
       paidAt: payment.createdAt as Date | string | null, expectedAt: null as string | null,
