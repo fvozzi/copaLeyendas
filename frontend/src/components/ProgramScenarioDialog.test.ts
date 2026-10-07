@@ -29,7 +29,10 @@ it('loads every zone and knockout stage and applies only after preview', async (
   await act(async () => { semi.value = 'FINALS'; semi.dispatchEvent(new Event('change', { bubbles: true })); });
   await click('Calcular vista previa');
   expect(previewProgramScenario).toHaveBeenCalledWith(1, expect.objectContaining({ mainDay: '2026-11-20', finalsDay: '2026-11-21', rules: expect.arrayContaining([expect.objectContaining({ categoryId: 1, stage: 'SEMIFINAL', day: 'FINALS' })]) }));
-  expect(vi.mocked(previewProgramScenario).mock.calls[0][1].rules.every((rule) => rule.courtId === null)).toBe(true);
+  const rules = vi.mocked(previewProgramScenario).mock.calls[0][1].rules;
+  expect(rules.every((rule) => rule.courtId === null)).toBe(true);
+  expect(rules.filter((rule) => rule.categoryId === 1 && rule.stage === 'QUARTERFINAL').map((rule) => rule.venueId)).toEqual([1, 2, 1, 2]);
+  expect(rules.filter((rule) => rule.categoryId === 1 && rule.stage === 'SEMIFINAL').map((rule) => rule.venueId)).toEqual([1, 1]);
   expect(applyProgramScenario).not.toHaveBeenCalled();
   await click('Aplicar escenario');
   expect(applyProgramScenario).toHaveBeenCalledWith(1, expect.objectContaining({ baseVersion: result.baseVersion }));

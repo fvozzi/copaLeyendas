@@ -4,9 +4,44 @@ import type { TournamentScheduleSlot } from './tournament-schedule-slot.entity';
 import type { Zone } from './zone.entity';
 import { BadRequestException } from '@nestjs/common';
 
-// Zone games follow their configured venue. Knockouts retain their chosen venue.
+function branchZone(slot: TournamentScheduleSlot, slots: TournamentScheduleSlot[], zones: Zone[]) {
+  const categoryZones = zones
+    .filter((zone) => zone.tournamentCategoryId === slot.tournamentCategoryId)
+    .sort((left, right) => left.name.localeCompare(right.name, 'es', { numeric: true }));
+  if (slot.stage === 'ZONE') {
+    return slot.match?.zoneId
+      ? categoryZones.find((zone) => zone.id === slot.match!.zoneId)
+      : categoryZones.find((zone) => zone.name === slot.zoneName);
+  }
+
+  const qualifierZoneId = slot.match?.homeQualifierZoneId ?? slot.match?.awayQualifierZoneId;
+  if (qualifierZoneId) return categoryZones.find((zone) => zone.id === qualifierZoneId);
+
+  if (slot.stage === 'SEMIFINAL') {
+    const sourceMatchId = slot.match?.homeSourceMatchId ?? slot.match?.awaySourceMatchId;
+    const source = sourceMatchId ? slots.find((candidate) => candidate.matchId === sourceMatchId) : undefined;
+    if (source) return branchZone(source, slots, zones);
+  }
+
+  const index = slot.stage === 'SEMIFINAL' && categoryZones.length >= 4
+    ? (slot.matchOrder - 1) * 2
+    : slot.matchOrder - 1;
+  return categoryZones[index] ?? categoryZones[0];
+}
+
+function assignedVenue(slot: TournamentScheduleSlot, slots: TournamentScheduleSlot[], zones: Zone[], courts: Court[]) {
+  const zone = branchZone(slot, slots, zones);
+  const originalVenue = courts.find((court) => court.id === slot.courtId)?.venue;
+  // Quarterfinals and semifinals stay with the branch that feeds them. Finals may
+  // retain an explicitly chosen central venue because both branches meet there.
+  const venue = slot.stage === 'FINAL' ? originalVenue ?? zone?.venue : zone?.venue;
+  return { zone, venue };
+}
+
+// Zone games follow their configured venue. Knockout branches follow their feeder zones.
 // Fixed games reserve their courts and times when moving only part of a program.
 export function redistributeExistingCourts(slots: TournamentScheduleSlot[], zones: Zone[], courts: Court[], fixedSlots: TournamentScheduleSlot[] = [], moveConflicts = false) {
+  const program = [...fixedSlots, ...slots];
   const counts = new Map<number, number>();
   const occupied = new Map<number, { start: number; end: number }[]>();
   const zoneEnds = new Map<number, Map<number, number>>();
@@ -28,11 +63,7 @@ export function redistributeExistingCourts(slots: TournamentScheduleSlot[], zone
   for (const slot of [...slots].sort((a, b) => moveConflicts
     ? a.matchOrder - b.matchOrder || a.sequence - b.sequence
     : (a.scheduledAt?.getTime() ?? Infinity) - (b.scheduledAt?.getTime() ?? Infinity) || a.sequence - b.sequence)) {
-    const originalCourt = courts.find((court) => court.id === slot.courtId);
-    const zone = slot.stage === 'ZONE' && slot.match?.zoneId
-      ? zones.find((item) => item.id === slot.match!.zoneId)
-      : zones.find((item) => item.tournamentCategoryId === slot.tournamentCategoryId && (slot.stage !== 'ZONE' || item.name === slot.zoneName));
-    const venue = slot.stage === 'ZONE' ? zone?.venue : originalCourt?.venue ?? zone?.venue;
+    const { zone, venue } = assignedVenue(slot, program, zones, courts);
     if (!venue?.active) throw new BadRequestException(`El partido ${slot.sequence} no tiene una sede activa.`);
     const priorOrders = zone?.capacity === 3
       ? Array.from({ length: Math.max(0, slot.matchOrder - 1) }, (_, index) => index + 1)
@@ -73,6 +104,7 @@ export function distributeProgramCourts(
   dateAt: (venue: Venue, index: number) => Date | null,
   fixedSlots: TournamentScheduleSlot[] = [],
 ) {
+  const program = [...fixedSlots, ...slots];
   const nextIndex = new Map<number, number>();
   const ends = new Map<TournamentScheduleSlot, number | null>();
   const previous: TournamentScheduleSlot[] = [...fixedSlots];
@@ -84,10 +116,7 @@ export function distributeProgramCourts(
     if (court && end !== null) occupied.set(court.id, [...(occupied.get(court.id) ?? []), { start: slot.scheduledAt!.getTime(), end }]);
   }
   for (const slot of slots) {
-    const zone = slot.stage === 'ZONE' && slot.match?.zoneId
-      ? zones.find((item) => item.id === slot.match!.zoneId)
-      : zones.find((item) => item.tournamentCategoryId === slot.tournamentCategoryId && (slot.stage !== 'ZONE' || item.name === slot.zoneName));
-    const venue = (slot.stage !== 'ZONE' ? courts.find((court) => court.id === slot.courtId)?.venue : null) ?? zone?.venue;
+    const { zone, venue } = assignedVenue(slot, program, zones, courts);
     const available = courts.filter((court) => court.active && court.venueId === venue?.id && venue?.active);
     const categoryGames = previous.filter((item) => item.tournamentCategoryId === slot.tournamentCategoryId);
     const priorStage = slot.stage === 'QUARTERFINAL' || (slot.stage === 'SEMIFINAL' && !categoryGames.some((item) => item.stage === 'QUARTERFINAL')) ? 'ZONE' : slot.stage === 'SEMIFINAL' ? 'QUARTERFINAL' : 'SEMIFINAL';

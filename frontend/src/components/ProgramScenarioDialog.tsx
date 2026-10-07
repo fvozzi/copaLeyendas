@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { AdminDialog } from './AdminDialog';
 import { ProgramScenarioPreviewTable } from './ProgramScenarioPreview';
 import { applyProgramScenario, getTournament, getTournamentScheduleGrid, previewProgramScenario } from '../lib/api';
+import { feederVenueId } from '../lib/program-venues';
 import type { Court, ProgramScenario, ProgramScenarioPreview, ProgramScenarioRule, TournamentDetail, TournamentScheduleSlot, Venue } from '../types';
 
 const stageNames = { ZONE: 'Partidos de zona', QUARTERFINAL: 'Cuartos de final', SEMIFINAL: 'Semifinales', FINAL: 'Final' };
@@ -39,7 +40,8 @@ export function ProgramScenarioDialog({ tournamentId, courts, venues, onClose, o
           const games = slots.filter((slot) => slot.tournamentCategoryId === category.id && slot.stage === stage);
           for (const game of games) {
             const matchOrder = game.matchOrder;
-            const venueId = game?.court?.venueId ?? zones[0]?.venueId ?? venues.find((venue) => venue.active)?.id ?? 0;
+            const venueId = (stage === 'FINAL' ? game?.court?.venueId : feederVenueId(game, slots, zones))
+              ?? game?.court?.venueId ?? zones[0]?.venueId ?? venues.find((venue) => venue.active)?.id ?? 0;
             const recordedDay = dayOf(game?.scheduledAt);
             const day = stage === 'QUARTERFINAL' && recordedDay !== finalsDay ? 'MAIN' : 'FINALS';
             rules.push({ categoryId: category.id, stage, matchOrder, venueId, courtId: null, day });

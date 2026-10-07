@@ -21,10 +21,11 @@ describe('existing program redistribution', () => {
     expect(slots.filter((slot) => slot.courtId === 2)).toHaveLength(19);
     expect(slots.map(({ courtId: _courtId, ...slot }) => slot)).toEqual(before);
   });
-  it('keeps a manually selected venue for knockouts and avoids overlapping games on the same court', () => {
+  it('moves a quarterfinal back to its feeder-zone venue and avoids overlapping games on the same court', () => {
     const otherVenue = { ...venue, id: 2 };
-    const slots = [0, 1].map((index) => ({ ...games()[0], stage: 'QUARTERFINAL', sequence: index + 1, courtId: 4, scheduledAt: new Date(start + index * 10 * 60_000) }));
-    redistributeExistingCourts(slots, zones, [...courts.map((court) => ({ ...court, venue: court.venueId === 2 ? otherVenue : venue })), { id: 5, active: true, venueId: 2, venue: otherVenue } as Court]);
+    const slots = [0, 1].map((index) => ({ ...games()[0], stage: 'QUARTERFINAL', sequence: index + 1, courtId: 1, scheduledAt: new Date(start + index * 10 * 60_000) }));
+    const branch = [{ ...zones[0], venueId: 2, venue: otherVenue }];
+    redistributeExistingCourts(slots, branch, [...courts.map((court) => ({ ...court, venue: court.venueId === 2 ? otherVenue : venue })), { id: 5, active: true, venueId: 2, venue: otherVenue } as Court]);
     expect(slots.map((slot) => slot.courtId)).toEqual([4, 5]);
   });
   it('moves a renamed zone to its current venue instead of retaining its old court venue', () => {
@@ -114,5 +115,21 @@ describe('program court allocation', () => {
     const slots = games();
     distributeProgramCourts(slots, zones, [], dateAt);
     expect(slots.every((slot) => slot.courtId === null && slot.scheduledAt === null)).toBe(true);
+  });
+  it('keeps each quarterfinal and semifinal branch at the venue of its feeder zones', () => {
+    const otherVenue = { ...venue, id: 2, name: 'GEBA' };
+    const branchZones = ['A', 'B', 'C', 'D'].map((name, index) => ({
+      ...zones[0], id: index + 1, name, venueId: index < 2 ? 1 : 2, venue: index < 2 ? venue : otherVenue,
+    }));
+    const branchCourts = [
+      { id: 1, venueId: 1, active: true, venue }, { id: 2, venueId: 1, active: true, venue },
+      { id: 4, venueId: 2, active: true, venue: otherVenue }, { id: 5, venueId: 2, active: true, venue: otherVenue },
+    ] as Court[];
+    const slots = [
+      ...[1, 2, 3, 4].map((matchOrder) => ({ stage: 'QUARTERFINAL', tournamentCategoryId: 1, matchOrder } as TournamentScheduleSlot)),
+      ...[1, 2].map((matchOrder) => ({ stage: 'SEMIFINAL', tournamentCategoryId: 1, matchOrder } as TournamentScheduleSlot)),
+    ];
+    distributeProgramCourts(slots, branchZones, branchCourts, dateAt);
+    expect(slots.map((slot) => slot.courtId)).toEqual([1, 2, 4, 5, 1, 4]);
   });
 });
