@@ -98,6 +98,20 @@ describe('registration tracking', () => {
     expect(manager.save).toHaveBeenCalledOnce();
   });
 
+  it('normalizes an agreement without a selected brand instead of persisting an inconsistent substitute', async () => {
+    const { service, manager } = setup();
+    await service.createPublic({
+      ...registrationDto,
+      playerThreeName: 'Tres',
+      playerThreeHasCommercialAgreement: true,
+      playerThreeCommercialAgreementDetails: undefined,
+    });
+    expect(manager.save).toHaveBeenCalledWith(PairRegistration, expect.objectContaining({
+      playerThreeHasCommercialAgreement: false,
+      playerThreeCommercialAgreementDetails: null,
+    }));
+  });
+
   it('locks only the token row and loads its locality separately', async () => {
     const { service, grant, manager } = setup();
     await service.createPublic(registrationDto);

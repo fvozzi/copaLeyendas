@@ -111,6 +111,26 @@ describe('registration form', () => {
     expect(error?.textContent).toContain('El celular debe tener al menos 6 caracteres');
   });
 
+  it('does not require a brand when a legacy substitute has an agreement flag without a selected brand', async () => {
+    vi.mocked(getPublicRegistrationAccess).mockResolvedValue({ ...grant, registration: {
+      fields: { representingText: 'Junín', heardAboutSource: 'CLUB', tournamentAvailabilityConfirmed: true,
+        playerOneName: 'Jugadora Uno', playerOneDni: '11111111', playerOneBirthDate: '1980-01-01', playerOnePhone: '1111111111', playerOneShirtSize: 'L',
+        playerTwoName: 'Jugadora Dos', playerTwoDni: '22222222', playerTwoBirthDate: '1981-01-01', playerTwoPhone: '2222222222', playerTwoShirtSize: 'M',
+        playerThreeName: 'Jugadora Tres', playerThreeDni: '33333333', playerThreeBirthDate: '1982-01-01', playerThreePhone: '3333333333', playerThreeShirtSize: 'M',
+        playerThreeHasCommercialAgreement: true, playerThreeCommercialAgreementDetails: '',
+      }, photos: { playerOne: null, playerTwo: null, playerThree: null }, paymentProofName: 'pago.pdf',
+    } });
+    vi.mocked(createPublicRegistration).mockResolvedValue({ id: 42, status: 'CONFIRMED', message: 'Inscripción actualizada con éxito.' });
+    await renderPage();
+    const thirdBrandInputs = container.querySelectorAll<HTMLInputElement>('.player-agreement-options')[2].querySelectorAll('input');
+    expect(Array.from(thirdBrandInputs).every((input) => !input.checked)).toBe(true);
+    await act(async () => container.querySelector('.registration-form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+    expect(createPublicRegistration).toHaveBeenCalledWith(expect.objectContaining({
+      playerThreeName: 'Jugadora Tres', playerThreeHasCommercialAgreement: false,
+    }));
+    expect(container.querySelector('.registration-submit-error')).toBeNull();
+  });
+
   it('offers three brands per player, permits one or none and keeps players independent', async () => {
     await renderPage();
     const groups = container.querySelectorAll('.player-agreement-options');

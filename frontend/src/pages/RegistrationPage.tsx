@@ -125,10 +125,14 @@ export function RegistrationPage() {
       }
 
       setAccess(result);
+      const registrationFields = result.registration?.fields;
       setForm({
         ...initialForm,
         representingText: `${result.locality.name}, ${result.locality.provinceName}`,
-        ...result.registration?.fields,
+        ...registrationFields,
+        playerOneHasCommercialAgreement: Boolean(registrationFields?.playerOneHasCommercialAgreement && registrationFields.playerOneCommercialAgreementDetails?.trim()),
+        playerTwoHasCommercialAgreement: Boolean(registrationFields?.playerTwoHasCommercialAgreement && registrationFields.playerTwoCommercialAgreementDetails?.trim()),
+        playerThreeHasCommercialAgreement: Boolean(registrationFields?.playerThreeHasCommercialAgreement && registrationFields.playerThreeCommercialAgreementDetails?.trim()),
         accessToken: result.token,
       });
       setPaymentProof(null);

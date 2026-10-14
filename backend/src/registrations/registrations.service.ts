@@ -227,6 +227,9 @@ export class RegistrationsService {
   }
 
   async createPublic(dto: CreatePublicRegistrationDto, files: RegistrationFiles = {}) {
+    const playerOneAgreementDetails = normalizeOptional(dto.playerOneCommercialAgreementDetails);
+    const playerTwoAgreementDetails = normalizeOptional(dto.playerTwoCommercialAgreementDetails);
+    const playerThreeAgreementDetails = normalizeOptional(dto.playerThreeCommercialAgreementDetails);
     ensurePaymentProofDir();
     const { paymentProof, playerOnePhoto, playerTwoPhoto, playerThreePhoto } = files;
     const replacedFiles: string[] = [];
@@ -295,8 +298,8 @@ export class RegistrationsService {
           playerOnePhone: dto.playerOnePhone.trim(),
           playerOneInstagram: normalizeOptional(dto.playerOneInstagram),
           playerOneShirtSize: dto.playerOneShirtSize,
-          playerOneHasCommercialAgreement: dto.playerOneHasCommercialAgreement,
-          playerOneCommercialAgreementDetails: normalizeOptional(dto.playerOneCommercialAgreementDetails),
+          playerOneHasCommercialAgreement: Boolean(dto.playerOneHasCommercialAgreement && playerOneAgreementDetails),
+          playerOneCommercialAgreementDetails: dto.playerOneHasCommercialAgreement ? playerOneAgreementDetails : null,
           playerOnePhotoStoredName: drivePhotos.playerOne ?? playerOnePhoto?.filename ?? existing?.playerOnePhotoStoredName ?? null,
           playerOnePhotoOriginalName: playerOnePhoto?.originalname ?? existing?.playerOnePhotoOriginalName ?? null,
           playerOnePhotoMimeType: playerOnePhoto?.mimetype ?? existing?.playerOnePhotoMimeType ?? null,
@@ -307,8 +310,8 @@ export class RegistrationsService {
           playerTwoPhone: dto.playerTwoPhone.trim(),
           playerTwoInstagram: normalizeOptional(dto.playerTwoInstagram),
           playerTwoShirtSize: dto.playerTwoShirtSize,
-          playerTwoHasCommercialAgreement: dto.playerTwoHasCommercialAgreement,
-          playerTwoCommercialAgreementDetails: normalizeOptional(dto.playerTwoCommercialAgreementDetails),
+          playerTwoHasCommercialAgreement: Boolean(dto.playerTwoHasCommercialAgreement && playerTwoAgreementDetails),
+          playerTwoCommercialAgreementDetails: dto.playerTwoHasCommercialAgreement ? playerTwoAgreementDetails : null,
           playerTwoPhotoStoredName: drivePhotos.playerTwo ?? playerTwoPhoto?.filename ?? existing?.playerTwoPhotoStoredName ?? null,
           playerTwoPhotoOriginalName: playerTwoPhoto?.originalname ?? existing?.playerTwoPhotoOriginalName ?? null,
           playerTwoPhotoMimeType: playerTwoPhoto?.mimetype ?? existing?.playerTwoPhotoMimeType ?? null,
@@ -319,8 +322,8 @@ export class RegistrationsService {
           playerThreePhone: normalizeOptional(dto.playerThreePhone),
           playerThreeInstagram: normalizeOptional(dto.playerThreeInstagram),
           playerThreeShirtSize: dto.playerThreeName?.trim() ? dto.playerThreeShirtSize ?? null : null,
-          playerThreeHasCommercialAgreement: dto.playerThreeHasCommercialAgreement ?? false,
-          playerThreeCommercialAgreementDetails: normalizeOptional(dto.playerThreeCommercialAgreementDetails),
+          playerThreeHasCommercialAgreement: Boolean(dto.playerThreeHasCommercialAgreement && playerThreeAgreementDetails),
+          playerThreeCommercialAgreementDetails: dto.playerThreeHasCommercialAgreement ? playerThreeAgreementDetails : null,
           playerThreePhotoStoredName: drivePhotos.playerThree ?? playerThreePhoto?.filename ?? existing?.playerThreePhotoStoredName ?? null,
           playerThreePhotoOriginalName: playerThreePhoto?.originalname ?? existing?.playerThreePhotoOriginalName ?? null,
           playerThreePhotoMimeType: playerThreePhoto?.mimetype ?? existing?.playerThreePhotoMimeType ?? null,
