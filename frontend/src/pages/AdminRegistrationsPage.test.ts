@@ -92,6 +92,10 @@ it('keeps both registration lists as sortable tables on mobile', async () => {
 
 it('filters active access grants that have not been used', async () => {
   await render();
+  const reopened = [...container.querySelectorAll('.registrations-grants-card tbody tr')]
+    .find((row) => row.textContent?.includes('Equipo usado'))!;
+  expect(reopened.textContent).toContain('Habilitado');
+  expect(reopened.textContent).toContain('Habilitado para rectificar');
   const filter = [...container.querySelectorAll<HTMLButtonElement>('.registration-grant-filters button')]
     .find((button) => button.textContent?.includes('Activos aún no usados'))!;
   expect(filter.textContent).toContain('(1)');

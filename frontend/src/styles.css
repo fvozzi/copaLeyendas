@@ -1204,6 +1204,17 @@ textarea {
 .cash-total-summary strong { color: var(--forest); font-size: clamp(1.35rem, 2.2vw, 2rem); }
 .cash-total-summary strong.is-negative { color: #b33e2e; }
 .cash-total-summary small { color: var(--ink-soft); line-height: 1.35; }
+.cash-total-summary .cash-balance-today { background: rgba(23, 63, 57, 0.07); }
+.cash-total-summary .cash-balance-today strong { font-size: clamp(1.75rem, 3vw, 2.7rem); }
+.cash-section-heading { display: grid; gap: 0.2rem; margin-bottom: -0.35rem; }
+.cash-section-heading h2, .cash-section-heading p { margin: 0; }
+.cash-section-heading h2 { font-size: 1.3rem; }
+.cash-section-heading p { color: var(--ink-soft); }
+.cash-stats .metric-card { display: flex; flex-direction: column; align-items: flex-start; gap: 0.45rem; }
+.cash-stats .metric-card p, .cash-stats .metric-card strong, .cash-stats .metric-card span { margin: 0; }
+.cash-stats .metric-card strong { display: block; color: var(--forest); font-size: 1.45rem; line-height: 1.15; }
+.cash-stats .metric-card strong.is-negative { color: #b33e2e; }
+.cash-stats .metric-card span { display: block; color: var(--ink-soft); line-height: 1.4; }
 .cash-coverage-summary { display: grid; gap: 1rem; }
 .cash-coverage-summary h2, .cash-coverage-summary p { margin: 0; }
 .cash-coverage-summary p { margin-top: 0.35rem; color: var(--ink-soft); }

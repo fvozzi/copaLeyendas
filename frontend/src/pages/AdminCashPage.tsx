@@ -91,30 +91,32 @@ export function AdminCashPage() {
   return <div className="admin-panel cash-page">
     <div className="panel-header"><div><p className="eyebrow">Administración</p><h1>Caja</h1></div></div>
     {error && <div className="inline-state" role="alert">{error}</div>}
-    {summary ? <section className="cash-total-summary" aria-label="Resumen total de caja">
-      <article>
-        <span>Entrada total</span>
-        <strong>{money.format(summary.forecastIncome + summary.calculatedIncome)}</strong>
-        <small>Cobrado + proyectado + ingresos calculados</small>
+    {summary ? <section className="cash-total-summary" aria-label="Dinero disponible hoy">
+      <article className="cash-balance-today">
+        <span>Disponible hoy</span>
+        <strong className={summary.balance < 0 ? 'is-negative' : ''}>{money.format(summary.balance)}</strong>
+        <small>Dinero cobrado menos gastos pagados</small>
       </article>
       <article>
-        <span>Salida total</span>
-        <strong>{money.format(summary.forecastExpense)}</strong>
-        <small>Pagado + proyectado</small>
+        <span>Ingresos cobrados</span>
+        <strong>{money.format(summary.totalIncome)}</strong>
+        <small>Incluye inscripciones y otros ingresos efectivos</small>
       </article>
       <article>
-        <span>Saldo final</span>
-        <strong className={summary.forecastIncome + summary.calculatedIncome - summary.forecastExpense < 0 ? 'is-negative' : ''}>
-          {money.format(summary.forecastIncome + summary.calculatedIncome - summary.forecastExpense)}
-        </strong>
-        <small>Entrada total menos salida total</small>
+        <span>Egresos pagados</span>
+        <strong>{money.format(summary.totalExpense)}</strong>
+        <small>Gastos que ya fueron efectivizados</small>
       </article>
     </section> : null}
-    <section className="stats-grid cash-stats">
-      <article className="metric-card"><p>Ingresos</p><strong>{money.format(summary?.totalIncome ?? 0)}</strong><span>Cobrados, incluidas inscripciones</span></article>
-      <article className="metric-card"><p>Egresos</p><strong>{money.format(summary?.totalExpense ?? 0)}</strong><span>Pagados</span></article>
-      <article className="metric-card"><p>Egresos proyectados</p><strong>{money.format(summary?.projectedExpense ?? 0)}</strong><span>Total final: {money.format(summary?.forecastExpense ?? 0)}</span></article>
-      <article className="metric-card"><p>Ingresos calculados</p><strong>{money.format(summary?.calculatedIncome ?? 0)}</strong><span>{summary?.minimumPairsToCharge == null
+    <div className="cash-section-heading">
+      <h2>Proyección</h2>
+      <p>Estos importes todavía no forman parte del dinero disponible hoy.</p>
+    </div>
+    <section className="stats-grid cash-stats" aria-label="Proyección de caja">
+      <article className="metric-card"><p>Saldo proyectado</p><strong className={(summary?.forecastBalance ?? 0) < 0 ? 'is-negative' : ''}>{money.format(summary?.forecastBalance ?? 0)}</strong><span>Disponible hoy + ingresos por cobrar − egresos por pagar</span></article>
+      <article className="metric-card"><p>Ingresos por cobrar</p><strong>{money.format(summary?.projectedIncome ?? 0)}</strong><span>Total previsto: {money.format(summary?.forecastIncome ?? 0)}</span></article>
+      <article className="metric-card"><p>Egresos por pagar</p><strong>{money.format(summary?.projectedExpense ?? 0)}</strong><span>Total previsto: {money.format(summary?.forecastExpense ?? 0)}</span></article>
+      <article className="metric-card"><p>Inscripciones necesarias</p><strong>{money.format(summary?.calculatedIncome ?? 0)}</strong><span>{summary?.minimumPairsToCharge == null
         ? 'No se puede calcular sin valor de inscripción'
         : summary.minimumPairsToCharge === 0
           ? 'Los ingresos actuales y proyectados ya cubren los gastos'

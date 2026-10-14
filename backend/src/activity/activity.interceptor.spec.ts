@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { firstValueFrom, of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { ActivityInterceptor } from './activity.interceptor';
@@ -32,6 +33,15 @@ describe('ActivityInterceptor', () => {
     await expect(firstValueFrom(interceptor.intercept(context as never, { handle: () => throwError(() => new Error('database failed')) }))).rejects.toThrow('database failed');
     expect(activity.record).toHaveBeenCalledWith(expect.objectContaining({
       level: 'ERROR', statusCode: 500, message: 'Falló el envío de una inscripción', detail: 'Error: database failed',
+    }));
+  });
+
+  it('records the useful reason for rejected public submissions', async () => {
+    const { activity, context, interceptor } = setup({ method: 'POST', originalUrl: '/api/public/registrations' });
+    const failure = new BadRequestException(['playerTwoPhone must be longer than or equal to 6 characters']);
+    await expect(firstValueFrom(interceptor.intercept(context as never, { handle: () => throwError(() => failure) }))).rejects.toThrow();
+    expect(activity.record).toHaveBeenCalledWith(expect.objectContaining({
+      level: 'WARNING', statusCode: 400, detail: 'BadRequestException: playerTwoPhone must be longer than or equal to 6 characters',
     }));
   });
 });

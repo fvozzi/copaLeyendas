@@ -42,15 +42,18 @@ async function type(input: HTMLInputElement, value: string) {
   });
 }
 
-it('shows effective totals, projected chart and separate income and expense tabs', async () => {
+it('shows cash available today separately from projections and movement tabs', async () => {
   await render();
   const totalSummary = container.querySelectorAll('.cash-total-summary strong');
-  expect(totalSummary[0].textContent).toContain('140.000');
-  expect(totalSummary[1].textContent).toContain('120.000');
-  expect(totalSummary[2].textContent).toContain('20.000');
-  expect(container.querySelectorAll('.cash-stats strong')[0].textContent).toContain('30.000');
+  expect(totalSummary[0].textContent).toContain('30.000');
+  expect(totalSummary[1].textContent).toContain('30.000');
+  expect(totalSummary[2].textContent).toContain('0');
+  expect(container.querySelector('.cash-total-summary')?.textContent).toContain('Dinero cobrado menos gastos pagados');
+  expect(container.querySelectorAll('.cash-stats strong')[0].textContent).toContain('40.000');
+  expect(container.querySelectorAll('.cash-stats strong')[1].textContent).toContain('50.000');
   expect(container.querySelectorAll('.cash-stats strong')[2].textContent).toContain('120.000');
   expect(container.querySelectorAll('.cash-stats strong')[3].textContent).toContain('60.000');
+  expect(container.querySelector('.cash-section-heading')?.textContent).toContain('todavía no forman parte');
   expect(container.querySelector('.cash-stats')?.textContent).toContain('2 parejas más a cobrar');
   expect(container.querySelector('.cash-coverage-summary')?.textContent).toContain('Parejas bonificadas2');
   expect(container.querySelector('.cash-chart[role="img"]')).toBeTruthy();

@@ -33,7 +33,7 @@ export class ActivityInterceptor implements NestInterceptor {
       durationMs: Date.now() - startedAt,
       actorUserId: request.user?.sub ?? null,
       actorName: request.user?.name ?? null,
-      detail: error instanceof Error ? `${error.name}: ${error.message}`.slice(0, 2000) : null,
+      detail: activityErrorDetail(error),
     });
 
     return next.handle().pipe(tap({
@@ -41,6 +41,15 @@ export class ActivityInterceptor implements NestInterceptor {
       error: (error: unknown) => save(error instanceof HttpException ? error.getStatus() : 500, error),
     }));
   }
+}
+
+function activityErrorDetail(error: unknown) {
+  if (!(error instanceof Error)) return null;
+  if (!(error instanceof HttpException)) return `${error.name}: ${error.message}`.slice(0, 2000);
+  const response = error.getResponse();
+  const detail = typeof response === 'string' ? response : (response as { message?: string | string[] }).message;
+  const message = Array.isArray(detail) ? detail.join('; ') : detail || error.message;
+  return `${error.name}: ${message}`.slice(0, 2000);
 }
 
 function safeRoute(request: Request) {

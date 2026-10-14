@@ -96,6 +96,21 @@ describe('registration form', () => {
     expect(container.querySelector('.registration-form')).toBeNull();
   });
 
+  it('shows rectification validation beside the save button without sending an invisible request', async () => {
+    vi.mocked(getPublicRegistrationAccess).mockResolvedValue({ ...grant, registration: {
+      fields: { representingText: 'Junín', heardAboutSource: 'CLUB', tournamentAvailabilityConfirmed: true,
+        playerOneName: 'Jugadora Uno', playerOneDni: '11111111', playerOneBirthDate: '1980-01-01', playerOnePhone: '1111111111', playerOneShirtSize: 'L',
+        playerTwoName: 'Jugadora Dos', playerTwoDni: '22222222', playerTwoBirthDate: '1981-01-01', playerTwoPhone: '', playerTwoShirtSize: 'M',
+      }, photos: { playerOne: null, playerTwo: null, playerThree: null }, paymentProofName: null,
+    } });
+    await renderPage();
+    await act(async () => container.querySelector('.registration-form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+    expect(createPublicRegistration).not.toHaveBeenCalled();
+    const error = container.querySelector('.registration-submit-error');
+    expect(error?.textContent).toContain('No se pudo guardar');
+    expect(error?.textContent).toContain('El celular debe tener al menos 6 caracteres');
+  });
+
   it('offers three brands per player, permits one or none and keeps players independent', async () => {
     await renderPage();
     const groups = container.querySelectorAll('.player-agreement-options');

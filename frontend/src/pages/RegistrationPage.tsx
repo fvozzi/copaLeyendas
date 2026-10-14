@@ -162,7 +162,8 @@ export function RegistrationPage() {
     if (additionalPlayers && !paymentProof) errors.paymentProof = 'Adjuntá un nuevo comprobante por la suplente agregada.';
     if (Object.keys(errors).length) {
       setFieldErrors(errors);
-      setError('Revisa los campos marcados para continuar.');
+      const reasons = [...new Set(Object.values(errors).filter((message): message is string => Boolean(message)))];
+      setError(`No se pudo guardar. ${reasons.join(' ')}`);
       return;
     }
     setSubmitting(true);
@@ -423,6 +424,7 @@ export function RegistrationPage() {
             </div>
 
             <div className="span-2 form-actions">
+              {error ? <p className="form-error registration-submit-error" role="alert">{error}</p> : null}
               <button type="submit" className="primary-button" disabled={submitting}>
                 {submitting ? 'Enviando...' : access.registration ? 'Guardar rectificación' : 'Enviar inscripcion'}
               </button>
