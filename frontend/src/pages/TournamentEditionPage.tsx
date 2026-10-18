@@ -85,7 +85,7 @@ function LegendSection({ name, post, loading }: { name: string; post?: ContentPo
 
 function PhotoSection({ name, photos }: { name: string; photos: { src: string; alt: string }[] }) {
   if (!photos.length) return <div className="edition-empty"><p className="eyebrow">Archivo fotográfico</p><h2>Fotos de {name}</h2><p>La galería está preparada y se completará cuando estén seleccionadas las fotos de esta edición.</p></div>;
-  return <div className="edition-photo-grid">{photos.map((photo) => <figure key={photo.src}><img src={photo.src} alt={photo.alt} loading="lazy" /><figcaption>{photo.alt}</figcaption></figure>)}</div>;
+  return <section><div className="edition-panel-heading"><p className="eyebrow">Archivo fotográfico</p><h2>Fotos de {name}</h2><p>Una selección de momentos de esta edición. Abrí una foto para verla en tamaño completo.</p></div><div className="edition-photo-grid">{photos.map((photo) => <figure key={photo.src}><a href={photo.src} target="_blank" rel="noreferrer"><img src={photo.src} alt={photo.alt} loading="lazy" /></a><figcaption>{photo.alt}</figcaption></figure>)}</div></section>;
 }
 
 function HistoricalResults({ editionName, finals }: { editionName: string; finals: { category: string; champion: { locality: string; players: string }; finalist: { locality: string; players: string } }[] }) {

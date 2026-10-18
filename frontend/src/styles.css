@@ -711,6 +711,19 @@ img {
   aspect-ratio: 4 / 3;
   object-fit: cover;
   border-radius: 10px;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.edition-photo-grid a {
+  display: block;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.edition-photo-grid a:hover img,
+.edition-photo-grid a:focus-visible img {
+  transform: scale(1.025);
+  box-shadow: 0 10px 28px rgba(18, 35, 40, 0.18);
 }
 
 .edition-photo-grid figcaption {

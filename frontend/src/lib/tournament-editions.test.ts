@@ -9,6 +9,8 @@ describe('tournament editions archive', () => {
   it('stores every historical final from the supplied results', () => {
     expect(getTournamentEdition('2025')?.finals).toHaveLength(5);
     expect(getTournamentEdition('2026')?.finals).toHaveLength(6);
+    expect(getTournamentEdition('2025')?.photos).toHaveLength(12);
+    expect(getTournamentEdition('2026')?.photos).toHaveLength(12);
     expect(getTournamentEdition('2025')?.finals.find((final) => final.category === 'Damas')?.champion.locality).toBe('Plottier');
     expect(getTournamentEdition('2026')?.finals.find((final) => final.category === '1ra')?.champion.locality).toBe('Venado Tuerto');
   });
