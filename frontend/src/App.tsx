@@ -25,6 +25,7 @@ import { HomePage } from './pages/HomePage';
 import { PostPage } from './pages/PostPage';
 import { RegistrationPage } from './pages/RegistrationPage';
 import { SectionPage } from './pages/SectionPage';
+import { TournamentEditionPage } from './pages/TournamentEditionPage';
 
 export default function App() {
   return (
@@ -34,6 +35,7 @@ export default function App() {
           <Route element={<SiteLayout />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/secciones/:section" element={<SectionPage />} />
+            <Route path="/torneos/:edition" element={<TournamentEditionPage />} />
             <Route path="/post/:slug" element={<PostPage />} />
             <Route path="/inscripcion" element={<RegistrationPage />} />
           </Route>

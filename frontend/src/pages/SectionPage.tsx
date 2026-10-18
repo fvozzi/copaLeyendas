@@ -1,32 +1,37 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
-import { getPublicCurrentTournament, getPublicPosts } from '../lib/api';
+import { getPublicPosts } from '../lib/api';
 import { sectionMeta } from '../lib/content';
-import { PublicProgramMap } from '../components/PublicProgramMap';
-import type { ContentPost, ContentSection, PublicCurrentTournament, PublicTournamentZone } from '../types';
-
-const regulations = ['Partidos en zona de grupos y finales a 25. Cuartos y semifinales a 21.', 'Cada pareja dispone de 2 minutos por partido, con flexibilidad ante la necesidad.', 'En caso de lesion se podra realizar un cambio por un jugador del mismo club o ciudad que este jugando el torneo en una categoria igual o inferior.', 'Es obligatorio el uso de protectores oculares.', 'Se informara el horario de inicio de cada partido. Los equipos tendran 15 minutos de tolerancia antes de darles el encuentro por perdido.', 'Sistema de desempate por diferencia de puntos, seguido por el encuentro disputado entre si. De persistir la igualdad, se define por moneda.', 'El saque se jugara con media.', 'El saque en Nucleo se hara del 2 a pasar el 2. En Goma del 3 a pasar el 3.'];
+import { tournamentEditions } from '../lib/tournament-editions';
+import type { ContentPost, ContentSection } from '../types';
 
 export function SectionPage() {
   const { section } = useParams<{ section: ContentSection }>();
-  const [posts, setPosts] = useState<ContentPost[]>([]); const [loading, setLoading] = useState(true); const [currentTournament, setCurrentTournament] = useState<PublicCurrentTournament | null>(null); const [tournamentError, setTournamentError] = useState<string | null>(null);
-  if (!section || !(section in sectionMeta)) return <Navigate to="/" replace />;
-  useEffect(() => { getPublicPosts({ section }).then(setPosts).finally(() => setLoading(false)); if (section === 'torneos') { setCurrentTournament(null); setTournamentError(null); getPublicCurrentTournament().then(setCurrentTournament).catch(() => setTournamentError('No se pudo cargar el torneo actual.')); } }, [section]);
-  return <section className="content-band section-page"><div className="section-heading"><p className="eyebrow">{sectionMeta[section].label}</p><h1>{sectionMeta[section].intro}</h1></div>{section === 'torneos' && currentTournament?.tournament ? <CurrentTournament tournament={currentTournament} /> : null}{section === 'torneos' && currentTournament && !currentTournament.tournament ? <div className="inline-state public-tournament-state">No hay un torneo activo para mostrar.</div> : null}{section === 'torneos' && tournamentError ? <div className="inline-state public-tournament-state">{tournamentError}</div> : null}{section === 'torneos' ? <TournamentRegulations /> : null}{loading ? <div className="inline-state">Cargando publicaciones...</div> : posts.length === 0 ? <div className="inline-state">No hay publicaciones publicadas en esta seccion.</div> : <div className="post-grid">{posts.map((post) => <article key={post.id} className="post-card"><h2>{post.title}</h2><p>{post.excerpt}</p><Link to={`/post/${post.slug}`} className="inline-link">Leer nota</Link></article>)}</div>}</section>;
+  const [posts, setPosts] = useState<ContentPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const validSection = section && section in sectionMeta ? section : undefined;
+
+  useEffect(() => {
+    if (!validSection) return;
+    setLoading(true);
+    getPublicPosts({ section: validSection }).then(setPosts).catch(() => setPosts([])).finally(() => setLoading(false));
+  }, [validSection]);
+
+  if (!validSection) return <Navigate to="/" replace />;
+
+  return (
+    <section className="content-band section-page">
+      <div className="section-heading">
+        <p className="eyebrow">{sectionMeta[validSection].label}</p>
+        <h1>{sectionMeta[validSection].intro}</h1>
+      </div>
+      {validSection === 'torneos' && <TournamentArchive />}
+      {validSection === 'torneos' && posts.length > 0 && <div className="section-subheading"><p className="eyebrow">Actualidad</p><h2>Noticias y convocatorias</h2></div>}
+      {loading ? <div className="inline-state">Cargando publicaciones...</div> : posts.length === 0 ? validSection === 'torneos' ? null : <div className="inline-state">No hay publicaciones publicadas en esta sección.</div> : <div className="post-grid">{posts.map((post) => <article key={post.id} className="post-card"><h2>{post.title}</h2><p>{post.excerpt}</p><Link to={`/post/${post.slug}`} className="inline-link">Leer nota</Link></article>)}</div>}
+    </section>
+  );
 }
 
-function TournamentRegulations() { return <section className="tournament-regulations" aria-labelledby="reglamento-title"><div className="tournament-regulations-heading"><div><p className="eyebrow">Copa Leyendas</p><h2 id="reglamento-title">Reglamento</h2></div><img src="/LogoFemme.png" alt="Copa Leyendas Femme" /></div><ol>{regulations.map((rule) => <li key={rule}>{rule}</li>)}</ol></section>; }
-
-function CurrentTournament({ tournament: current }: { tournament: PublicCurrentTournament }) {
-  const [tab, setTab] = useState<'results' | 'courts' | 'map'>('results'); const tournament = current.tournament!; const categories = [...new Set(tournament.zones.map((zone) => zone.category))]; const [category, setCategory] = useState(categories[0] ?? ''); const state = getTournamentState(tournament.startsAt, tournament.endsAt); const zones = tournament.zones.filter((zone) => zone.category === category);
-  return <section className="public-tournament public-tournament-femme"><div className="public-tournament-heading"><div><p className="eyebrow">{state.heading}</p><h2>{tournament.name}</h2><p className={state.live ? 'tournament-date is-live' : 'tournament-date'}>{state.live && <span className="live-dot" />}{formatDates(tournament.startsAt, tournament.endsAt)}{tournament.city ? ` · ${tournament.city}` : ''}</p></div><img className="public-tournament-logo" src="/LogoFemme.png" alt="Copa Leyendas Femme" /><span className={`status-chip ${state.live ? 'status-live tournament-live-chip' : 'status-review'}`}>{state.label}</span></div><div className="public-tournament-tabs"><button type="button" className={tab === 'results' ? 'is-selected' : ''} onClick={() => setTab('results')}>Resultados</button><button type="button" className={tab === 'courts' ? 'is-selected' : ''} onClick={() => setTab('courts')}>Canchas</button><button type="button" className={tab === 'map' ? 'is-selected' : ''} onClick={() => setTab('map')}>Mapa</button></div>{tab === 'results' ? <><div className="public-category-tabs">{categories.map((item) => <button key={item} type="button" className={category === item ? 'is-selected' : ''} onClick={() => setCategory(item)}>{item}</button>)}</div><div className="tournament-zone-grid">{zones.map((zone) => <ZoneResults key={zone.id} zone={zone} />)}</div><KnockoutBracket category={category} /></> : tab === 'map' ? <PublicProgramMap /> : <div className="court-public-grid">{current.courts.length ? current.courts.map((court) => <article key={court.id} className="court-public-card"><p className="post-section">Cancha habilitada</p><h3>{court.name}</h3><p>{[court.address, court.city, court.provinceName].filter(Boolean).join(', ') || 'Ubicacion a confirmar'}</p><a className="inline-link" href={googleMapsLink(court)} target="_blank" rel="noreferrer">Abrir en Google Maps</a></article>) : <p className="empty-copy">No hay canchas asignadas todavia.</p>}</div>}</section>;
+function TournamentArchive() {
+  return <div className="tournament-archive"><div className="tournament-archive-note"><p className="eyebrow">El camino continúa</p><p>La Copa Leyendas Femme 2026 es una edición especial y única. Desde 2027, mujeres y varones compartirán una sola edición.</p></div><div className="edition-card-grid">{tournamentEditions.map((edition) => <article key={edition.slug} className={`edition-card ${edition.specialEdition ? 'is-femme' : ''}`}><div className="edition-card-top"><span className={`edition-status ${edition.status}`}>{edition.status === 'finished' ? 'Finalizada' : 'Próximamente'}</span><span>{edition.dateLabel}</span></div><div><p className="eyebrow">{edition.specialEdition ? 'Edición especial' : `Copa Leyendas ${edition.year}`}</p><h2>{edition.name}</h2><p>{edition.summary}</p></div><div className="edition-card-legend"><span>Leyenda</span><strong>{edition.legendName}</strong></div><Link to={`/torneos/${edition.slug}`} className="primary-button">Ver edición</Link></article>)}</div></div>;
 }
-
-function ZoneResults({ zone }: { zone: PublicTournamentZone }) { return <article className="tournament-public-card"><p className="post-section">{zone.category} · {zone.name}</p><h3>{zone.venue.name}</h3>{zone.matches.length ? <ul className="match-list">{zone.matches.map((match) => <li key={match.id}><div><strong>{teamName(match.homeRegistration)}</strong><span>{teamName(match.awayRegistration)}</span></div><div className="match-score">{match.homeScore === null || match.awayScore === null ? 'Pendiente' : `${match.homeScore} - ${match.awayScore}`}<small>{formatMatchDate(match.scheduledAt)}</small></div></li>)}</ul> : <p className="empty-copy">Fixture en preparacion.</p>}</article>; }
-function KnockoutBracket({ category }: { category: string }) { return <section className="knockout-section"><div><p className="eyebrow">{category}</p><h3>Cruces finales</h3></div><div className="knockout-bracket"><div className="bracket-round"><p>Semifinales</p><BracketMatch home="Ganador de cuarto 1" away="Ganador de cuarto 2" /><BracketMatch home="Ganador de cuarto 3" away="Ganador de cuarto 4" /></div><div className="bracket-round bracket-final"><p>Final</p><BracketMatch home="Ganador semifinal 1" away="Ganador semifinal 2" /></div></div></section>; }
-function BracketMatch({ home, away }: { home: string; away: string }) { return <div className="bracket-match"><span>{home}</span><span>{away}</span></div>; }
-function teamName(registration: { playerOneName: string; playerTwoName: string; locality: { name: string } } | null) { return registration ? `${registration.playerOneName} / ${registration.playerTwoName} · ${registration.locality.name}` : 'A definir'; }
-function formatDates(startsAt: string | null, endsAt: string | null) { if (!startsAt) return 'Fechas a confirmar'; return endsAt && endsAt !== startsAt ? `${startsAt} al ${endsAt}` : startsAt; }
-function formatMatchDate(value: string | null) { return value ? new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)) : ''; }
-function googleMapsLink(court: { name: string; address: string | null; city: string | null; provinceName: string | null }) { return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([court.name, court.address, court.city, court.provinceName].filter(Boolean).join(', '))}`; }
-function getTournamentState(startsAt: string | null, endsAt: string | null) { if (!startsAt) return { heading: 'Proximo torneo', label: 'Proximamente', live: false }; const today = new Date(); today.setHours(0, 0, 0, 0); const start = new Date(`${startsAt}T00:00:00`); const end = new Date(`${endsAt ?? startsAt}T23:59:59`); if (today < start) return { heading: 'Proximo torneo', label: 'Proximamente', live: false }; if (today <= end) return { heading: 'Torneo en curso', label: 'En juego', live: true }; return { heading: 'Torneo finalizado', label: 'Finalizado', live: false }; }
