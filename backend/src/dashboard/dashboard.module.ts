@@ -9,9 +9,10 @@ import { DashboardController } from './dashboard.controller';
 import { DashboardService } from './dashboard.service';
 import { Category } from '../categories/category.entity';
 import { ZoneEntry } from '../tournaments/zone-entry.entity';
+import { PlayersModule } from '../players/players.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ContentPost, PairRegistration, RegistrationAccessGrant, Tournament, Zone, ZoneEntry, Category])],
+  imports: [TypeOrmModule.forFeature([ContentPost, PairRegistration, RegistrationAccessGrant, Tournament, Zone, ZoneEntry, Category]), PlayersModule],
   controllers: [DashboardController],
   providers: [DashboardService],
 })

@@ -3,6 +3,7 @@ import type {
   ContentSection,
   HeardAboutSource,
   RegistrationStatus,
+  ShirtModel,
   ShirtSize,
 } from '../types';
 
@@ -53,6 +54,7 @@ export const heardAboutLabels: Record<HeardAboutSource, string> = {
 };
 
 export const shirtSizeLabels: ShirtSize[] = ['S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'XXXXL', 'XXXXXL'];
+export const shirtModelLabels: ShirtModel[] = ['Guastavino Color 1', 'Guastavino Color 2', 'Dabber Color 3', 'Dabber Color 4'];
 
 export const tournamentHighlights = [
   'Edicion de noviembre dedicada a Damas',

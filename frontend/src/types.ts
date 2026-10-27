@@ -13,6 +13,7 @@ export type LocalityReference = Pick<Locality, 'id' | 'name' | 'provinceName'>;
 export type HeardAboutSource = 'INSTAGRAM' | 'FRIEND' | 'CLUB' | 'OTHER';
 
 export type ShirtSize = 'S' | 'M' | 'L' | 'XL' | 'XXL' | 'XXXL' | 'XXXXL' | 'XXXXXL';
+export type ShirtModel = 'Guastavino Color 1' | 'Guastavino Color 2' | 'Dabber Color 3' | 'Dabber Color 4';
 
 export type UserRole = 'DIRECTOR' | 'ASSISTANT' | 'EDITOR';
 
@@ -330,7 +331,7 @@ export interface TournamentScheduleSlot { capacityWarning?: string | null; id: n
 export interface Player {
   hasPhoto?: boolean;
   categoryName?: string | null;
-  shirtModel?: string | null;
+  shirtModel: ShirtModel | null;
   hasCommercialAgreement?: boolean | null;
   commercialAgreementDetails?: string | null;
   id: number;
@@ -363,6 +364,7 @@ export interface PlayerPayload {
   phone?: string;
   instagram?: string;
   shirtSize?: ShirtSize | '';
+  shirtModel?: ShirtModel | '' | null;
   localityId?: number | null;
 }
 

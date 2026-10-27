@@ -1,6 +1,7 @@
 import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { Locality } from '../localities/locality.entity';
 import { ShirtSize } from '../registrations/registration.enums';
+import { ShirtModel } from './shirt-model';
 
 @Entity('players')
 export class Player {
@@ -24,6 +25,9 @@ export class Player {
 
   @Column({ type: 'enum', enum: ShirtSize, enumName: 'shirt_size', nullable: true })
   shirtSize: ShirtSize | null;
+
+  @Column({ type: 'enum', enum: ShirtModel, enumName: 'shirt_model', nullable: true })
+  shirtModel: ShirtModel | null;
 
   @Column({ type: 'integer', nullable: true })
   localityId: number | null;

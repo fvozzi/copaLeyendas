@@ -13,17 +13,17 @@ vi.mock('../registrations/google-drive-photo-storage.service', () => ({ GoogleDr
 vi.mock('node:fs', async (original) => ({ ...await original<typeof import('node:fs')>(), existsSync: vi.fn(), createReadStream: vi.fn() }));
 
 function setup(storedName = 'drive:photo-id') {
-  const player = { id: 4, dni: '12345678', fullName: 'Test player' };
+  const player = { id: 4, dni: '12345678', fullName: 'Test player', shirtModel: null as string | null };
   const registration = { playerOneName: player.fullName, playerOneDni: player.dni, playerOnePhotoStoredName: storedName, playerOnePhotoOriginalName: 'photo.webp', playerOnePhotoMimeType: 'image/webp' };
   const query = { orderBy: vi.fn().mockReturnThis(), getMany: vi.fn(async () => [player]), leftJoinAndSelect: vi.fn().mockReturnThis() };
-  const players = { findOne: vi.fn(async () => player), createQueryBuilder: vi.fn(() => query) };
+  const players = { findOne: vi.fn(async () => player), createQueryBuilder: vi.fn(() => query), update: vi.fn().mockResolvedValue({ affected: 1 }) };
   const registrations = { find: vi.fn(async () => [registration]) };
   const tournaments = { findOne: vi.fn().mockResolvedValue(null) };
   const zones = { find: vi.fn().mockResolvedValue([]) };
   const zoneEntries = { find: vi.fn().mockResolvedValue([]) };
   const drive = { download: vi.fn(async () => Buffer.from('photo-content')) };
   const service = new PlayersService(players as never, {} as never, registrations as never, tournaments as never, zones as never, zoneEntries as never, drive as never);
-  return { service, registrations, tournaments, zones, zoneEntries, drive, registration, player, query };
+  return { service, players, registrations, tournaments, zones, zoneEntries, drive, registration, player, query };
 }
 
 afterEach(() => vi.restoreAllMocks());
@@ -49,7 +49,7 @@ describe('registered player agreements', () => {
   it('matches each player by DNI, including the third player, and uses the latest declaration', async () => {
     const { service, registrations, query, player } = setup();
     vi.spyOn(service, 'syncRegistrationPlayers').mockResolvedValue();
-    query.getMany.mockResolvedValue([player, { id: 5, dni: '222', fullName: 'Two' }, { id: 6, dni: '333', fullName: 'Three' }, { id: 7, dni: '444', fullName: 'Manual' }]);
+    query.getMany.mockResolvedValue([player, { id: 5, dni: '222', fullName: 'Two', shirtModel: null }, { id: 6, dni: '333', fullName: 'Three', shirtModel: null }, { id: 7, dni: '444', fullName: 'Manual', shirtModel: null }]);
     registrations.find.mockResolvedValue([
       { playerOneDni: player.dni, playerOneName: player.fullName, playerOneHasCommercialAgreement: true, playerOneCommercialAgreementDetails: 'Dabber', playerTwoDni: '222', playerTwoName: 'Two', playerTwoHasCommercialAgreement: true, playerTwoCommercialAgreementDetails: 'Guastavino', playerThreeDni: '333', playerThreeName: 'Three', playerThreeHasCommercialAgreement: true, playerThreeCommercialAgreementDetails: 'Otra' },
       { playerTwoDni: player.dni, playerTwoName: player.fullName, playerTwoHasCommercialAgreement: false, playerTwoCommercialAgreementDetails: 'Dabber' },
@@ -59,7 +59,7 @@ describe('registered player agreements', () => {
   });
 
   it('returns the same shirt model and color calculated for the active tournament', async () => {
-    const { service, registrations, tournaments, zones, zoneEntries, query, player } = setup();
+    const { service, players, registrations, tournaments, zones, zoneEntries, query, player } = setup();
     vi.spyOn(service, 'syncRegistrationPlayers').mockResolvedValue();
     query.getMany.mockResolvedValue([player]);
     registrations.find.mockResolvedValue([{
@@ -71,14 +71,31 @@ describe('registered player agreements', () => {
     zones.find.mockResolvedValue([{ id: 5, name: 'A', tournamentCategory: { categoryId: 1 } }]);
     zoneEntries.find.mockResolvedValue([{ zoneId: 5, registrationId: 9, seed: 1 }]);
     await expect(service.list({})).resolves.toEqual([expect.objectContaining({ shirtModel: 'Guastavino Color 1' })]);
+    expect(players.update).toHaveBeenCalledWith(expect.objectContaining({ id: player.id }), { shirtModel: 'Guastavino Color 1' });
+  });
+
+  it('keeps a manually edited shirt model instead of recalculating it', async () => {
+    const { service, players, registrations, query, player } = setup();
+    vi.spyOn(service, 'syncRegistrationPlayers').mockResolvedValue();
+    player.shirtModel = 'Dabber Color 4';
+    query.getMany.mockResolvedValue([player]);
+    registrations.find.mockResolvedValue([{
+      id: 9, categoryId: 1, category: { name: 'Damas A' }, locality: { name: 'Equipo' },
+      playerOneName: player.fullName, playerOneDni: player.dni, playerOneShirtSize: 'M',
+      playerOneHasCommercialAgreement: true, playerOneCommercialAgreementDetails: 'Guastavino',
+    }] as never);
+    await expect(service.list({})).resolves.toEqual([expect.objectContaining({ shirtModel: 'Dabber Color 4' })]);
+    expect(players.update).not.toHaveBeenCalled();
   });
 
   it('includes the declared brand in the full export and leaves the insurance export focused on identity', async () => {
     const { service } = setup();
-    vi.spyOn(service, 'list').mockResolvedValue([{ id: 4, fullName: 'Test', dni: '12345678', birthDate: '1980-04-03', hasCommercialAgreement: true, commercialAgreementDetails: 'Dabber', createdAt: new Date('2026-09-01'), updatedAt: new Date('2026-09-01') }] as never);
+    vi.spyOn(service, 'list').mockResolvedValue([{ id: 4, fullName: 'Test', dni: '12345678', birthDate: '1980-04-03', hasCommercialAgreement: true, commercialAgreementDetails: 'Dabber', shirtModel: 'Dabber Color 4', createdAt: new Date('2026-09-01'), updatedAt: new Date('2026-09-01') }] as never);
     const full = await service.export('full');
     expect(full.content).toContain('"Marca / acuerdo"');
     expect(full.content).toContain('"Dabber"');
+    expect(full.content).toContain('"Modelo asignado"');
+    expect(full.content).toContain('"Dabber Color 4"');
     const insurance = await service.export('insurance');
     expect(insurance.content).not.toContain('Dabber');
     expect(insurance.content).toContain('1980-04-03');

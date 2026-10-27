@@ -2,7 +2,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AdminPlayersPage } from './AdminPlayersPage';
-import { getLocalities, getPlayerPhoto, getPlayers } from '../lib/api';
+import { getLocalities, getPlayerPhoto, getPlayers, updatePlayer } from '../lib/api';
 vi.mock('../lib/api', () => ({ getLocalities: vi.fn(), getPlayerPhoto: vi.fn(), getPlayers: vi.fn(), createPlayer: vi.fn(), deletePlayer: vi.fn(), downloadPlayersExport: vi.fn(), updatePlayer: vi.fn() }));
 let container: HTMLDivElement;
 let root: Root;
@@ -78,4 +78,24 @@ it('shows the assigned shirt brand and color', async () => {
   const rows = container.querySelectorAll('tbody tr');
   expect(rows[0].querySelector('[data-label="Camiseta"]')?.textContent).toBe('Guastavino Color 2');
   expect(rows[1].querySelector('[data-label="Camiseta"]')?.textContent).toBe('Sin asignar');
+});
+
+it('allows changing the persisted shirt model from the player editor', async () => {
+  vi.mocked(getPlayers).mockResolvedValue([{
+    id: 1, fullName: 'Player One', dni: '12345678', localityId: null,
+    shirtModel: 'Guastavino Color 2',
+  }] as never);
+  vi.mocked(updatePlayer).mockResolvedValue({} as never);
+  await act(async () => root.render(createElement(AdminPlayersPage)));
+  const edit = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Editar')!;
+  await act(async () => edit.click());
+  const modelSelect = Array.from(document.querySelectorAll('label')).find((label) => label.textContent?.includes('Modelo asignado'))!.querySelector('select')!;
+  expect(modelSelect.value).toBe('Guastavino Color 2');
+  await act(async () => {
+    modelSelect.value = 'Dabber Color 4';
+    modelSelect.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  const save = Array.from(document.querySelectorAll('button')).find((button) => button.textContent === 'Guardar')!;
+  await act(async () => save.click());
+  expect(updatePlayer).toHaveBeenCalledWith(1, expect.objectContaining({ shirtModel: 'Dabber Color 4' }));
 });

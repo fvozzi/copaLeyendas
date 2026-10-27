@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import { AdminDataGrid } from '../components/AdminDataGrid';
 import { AdminDialog } from '../components/AdminDialog';
 import { createPlayer, deletePlayer, downloadPlayersExport, getLocalities, getPlayerPhoto, getPlayers, updatePlayer } from '../lib/api';
-import { shirtSizeLabels } from '../lib/content';
+import { shirtModelLabels, shirtSizeLabels } from '../lib/content';
 import type { Locality, Player, PlayerPayload } from '../types';
 
-const initialForm: PlayerPayload = { fullName: '', dni: '', birthDate: '', phone: '', instagram: '', shirtSize: '', localityId: null };
+const initialForm: PlayerPayload = { fullName: '', dni: '', birthDate: '', phone: '', instagram: '', shirtSize: '', shirtModel: '', localityId: null };
 
 export function AdminPlayersPage() {
   const [players, setPlayers] = useState<Player[]>([]);
@@ -37,9 +37,9 @@ export function AdminPlayersPage() {
   const load = () => getPlayers(search || undefined).then(setPlayers).catch((reason: Error) => setError(reason.message));
   useEffect(() => { load(); getLocalities().then(setLocalities).catch((reason: Error) => setError(reason.message)); }, []);
   const openCreate = () => { setEditing(null); setForm(initialForm); setError(null); setDialogOpen(true); };
-  const openEdit = (player: Player) => { setEditing(player); setForm({ fullName: player.fullName, dni: player.dni, birthDate: player.birthDate ?? '', phone: player.phone ?? '', instagram: player.instagram ?? '', shirtSize: player.shirtSize ?? '', localityId: player.localityId }); setError(null); setDialogOpen(true); };
+  const openEdit = (player: Player) => { setEditing(player); setForm({ fullName: player.fullName, dni: player.dni, birthDate: player.birthDate ?? '', phone: player.phone ?? '', instagram: player.instagram ?? '', shirtSize: player.shirtSize ?? '', shirtModel: player.shirtModel ?? '', localityId: player.localityId }); setError(null); setDialogOpen(true); };
   const closeDialog = () => { setDialogOpen(false); setEditing(null); setForm(initialForm); };
-  const toPayload = (): PlayerPayload => ({ ...form, birthDate: form.birthDate || undefined, phone: form.phone || undefined, instagram: form.instagram || undefined, shirtSize: form.shirtSize || undefined });
+  const toPayload = (): PlayerPayload => ({ ...form, birthDate: form.birthDate || undefined, phone: form.phone || undefined, instagram: form.instagram || undefined, shirtSize: form.shirtSize || undefined, shirtModel: form.shirtModel || null });
   const save = async (event: React.FormEvent<HTMLFormElement>) => { event.preventDefault(); setError(null); try { if (editing) await updatePlayer(editing.id, toPayload()); else await createPlayer(toPayload()); closeDialog(); load(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo guardar la jugadora.'); } };
   const remove = async (player: Player) => { if (!window.confirm(`Se eliminara la ficha de ${player.fullName}.`)) return; try { await deletePlayer(player.id); load(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo eliminar la jugadora.'); } };
   const exportPlayers = async (kind: 'full' | 'insurance') => { try { await downloadPlayersExport(kind); } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo descargar el archivo.'); } };
@@ -69,6 +69,7 @@ export function AdminPlayersPage() {
       <label>Instagram<input value={form.instagram ?? ''} onChange={(event) => setForm({ ...form, instagram: event.target.value })} /></label>
       <label>Localidad / equipo<select value={form.localityId ?? ''} onChange={(event) => setForm({ ...form, localityId: event.target.value ? Number(event.target.value) : null })}><option value="">Sin asignar</option>{localities.map((locality) => <option key={locality.id} value={locality.id}>{locality.name}, {locality.provinceName}</option>)}</select></label>
       <label>Talle de camiseta<select value={form.shirtSize ?? ''} onChange={(event) => setForm({ ...form, shirtSize: event.target.value as PlayerPayload['shirtSize'] })}><option value="">Sin definir</option>{shirtSizeLabels.map((size) => <option key={size} value={size}>{size}</option>)}</select></label>
+      <label>Modelo asignado<select value={form.shirtModel ?? ''} onChange={(event) => setForm({ ...form, shirtModel: event.target.value as PlayerPayload['shirtModel'] })}><option value="">Asignar automáticamente</option>{shirtModelLabels.map((model) => <option key={model} value={model}>{model}</option>)}</select></label>
       <div className="form-actions span-2"><button type="submit" className="primary-button">Guardar</button></div>
     </form></AdminDialog> : null}
     {photo ? <AdminDialog title={photo.name} onClose={() => setPhoto(null)}><img src={photo.url} alt={`Foto de ${photo.name}`} style={{ display: 'block', maxWidth: '100%', maxHeight: '70vh', margin: 'auto', objectFit: 'contain' }} /></AdminDialog> : null}

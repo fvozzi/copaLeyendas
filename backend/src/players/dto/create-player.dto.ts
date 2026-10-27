@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import { IsDateString, IsEnum, IsInt, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { ShirtSize } from '../../registrations/registration.enums';
+import { ShirtModel } from '../shirt-model';
 
 export class CreatePlayerDto {
   @IsString()
@@ -30,6 +31,10 @@ export class CreatePlayerDto {
   @IsOptional()
   @IsEnum(ShirtSize)
   shirtSize?: ShirtSize;
+
+  @IsOptional()
+  @IsEnum(ShirtModel)
+  shirtModel?: ShirtModel | null;
 
   @IsOptional()
   @Type(() => Number)

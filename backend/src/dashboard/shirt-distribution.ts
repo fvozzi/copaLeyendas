@@ -1,11 +1,12 @@
 import type { PairRegistration } from '../registrations/pair-registration.entity';
+import { ShirtModel } from '../players/shirt-model';
 import { ShirtSize } from '../registrations/registration.enums';
 
 const models = [
-  { name: 'Guastavino Color 1', brand: 'guastavino' },
-  { name: 'Guastavino Color 2', brand: 'guastavino' },
-  { name: 'Dabber Color 3', brand: 'dabber' },
-  { name: 'Dabber Color 4', brand: 'dabber' },
+  { name: ShirtModel.GUASTAVINO_COLOR_1, brand: 'guastavino' },
+  { name: ShirtModel.GUASTAVINO_COLOR_2, brand: 'guastavino' },
+  { name: ShirtModel.DABBER_COLOR_3, brand: 'dabber' },
+  { name: ShirtModel.DABBER_COLOR_4, brand: 'dabber' },
 ] as const;
 type ShirtBrand = (typeof models)[number]['brand'];
 
@@ -20,6 +21,7 @@ export interface ShirtZoneEntry {
 export interface ShirtPlayer {
   registrationId: number;
   position: 'playerOne' | 'playerTwo' | 'playerThree';
+  dni: string | null;
   name: string;
   size: ShirtSize;
   team: string;
@@ -35,6 +37,7 @@ interface ShirtPair {
   zoneSeed: number;
   players: ShirtPlayer[];
   requiredBrands: ShirtBrand[];
+  preferredModels: ShirtModel[];
 }
 
 function shirtBrand(value: string | null): ShirtBrand | null {
@@ -46,7 +49,7 @@ function categoryKey(value: string) {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es').replace(/[^a-z0-9]/g, '');
 }
 
-export function distributeShirts(registrations: PairRegistration[], zoneEntries: ShirtZoneEntry[] = []) {
+export function distributeShirts(registrations: PairRegistration[], zoneEntries: ShirtZoneEntry[] = [], savedAssignments: ReadonlyMap<string, ShirtModel> = new Map()) {
   const sizes = Object.values(ShirtSize);
   const totals: Record<string, number> = {};
   const zonesByRegistration = new Map(zoneEntries.map(entry => [entry.registrationId, entry]));
@@ -70,7 +73,8 @@ export function distributeShirts(registrations: PairRegistration[], zoneEntries:
       if (!registration[`${prefix}Name`]?.trim() || !size || !sizes.includes(size)) continue;
       totals[size] = (totals[size] ?? 0) + 1;
       players.push({
-        registrationId: registration.id, position: prefix, name: registration[`${prefix}Name`]!.trim(), size,
+        registrationId: registration.id, position: prefix, dni: registration[`${prefix}Dni`]?.trim() || null,
+        name: registration[`${prefix}Name`]!.trim(), size,
         team: registration.locality.name, category: registration.category?.name ?? '', zone: zone?.zoneName ?? null,
         brand: registration[`${prefix}HasCommercialAgreement`] ? registration[`${prefix}CommercialAgreementDetails`]?.trim() || null : null,
       });
@@ -79,10 +83,14 @@ export function distributeShirts(registrations: PairRegistration[], zoneEntries:
       registrationId: registration.id, category: registration.category?.name ?? '', zoneId: zone?.zoneId ?? null,
       zoneSeed: zone?.seed ?? registration.id ?? 0,
       players, requiredBrands: [...new Set(players.map(player => shirtBrand(player.brand)).filter((brand): brand is ShirtBrand => brand !== null))],
+      preferredModels: [],
     });
   }
 
   const rows = models.map(model => ({ ...model, sizes: Object.fromEntries(sizes.map(size => [size, 0])), total: 0, players: [] as ShirtPlayer[] }));
+  const cimaGuastavino = pairs.filter(pair => categoryKey(pair.category).includes('cimadamore') && pair.requiredBrands.includes('guastavino')).length;
+  const gomaDabberAgreements = pairs.filter(pair => categoryKey(pair.category).includes('gomaa') && pair.requiredBrands.includes('dabber')).length;
+  let gomaDabberCompensation = Math.max(0, cimaGuastavino - 4 - gomaDabberAgreements);
   const usedColors = new Map<number, Map<string, number>>();
   const countBrand = (brand: ShirtBrand) => rows.filter(row => row.brand === brand).reduce((sum, row) => sum + row.total, 0);
   const assign = (pair: ShirtPair, players: ShirtPlayer[], target: (typeof rows)[number]) => {
@@ -97,6 +105,22 @@ export function distributeShirts(registrations: PairRegistration[], zoneEntries:
       usedColors.set(pair.zoneId, colors);
     }
   };
+  const assigned = new Set<ShirtPair>();
+  for (const pair of pairs) {
+    const pinned = pair.players.filter((player) => player.dni && savedAssignments.has(player.dni));
+    if (!pinned.length) continue;
+    const pinnedSet = new Set(pinned);
+    const byModel = new Map<ShirtModel, ShirtPlayer[]>();
+    for (const player of pinned) {
+      const model = savedAssignments.get(player.dni!)!;
+      byModel.set(model, [...(byModel.get(model) ?? []), player]);
+    }
+    for (const [model, players] of byModel) assign(pair, players, rows.find((row) => row.name === model)!);
+    pair.preferredModels = [...byModel.keys()];
+    pair.players = pair.players.filter((player) => !pinnedSet.has(player));
+    pair.requiredBrands = [...new Set(pair.players.map((player) => shirtBrand(player.brand)).filter((brand): brand is ShirtBrand => brand !== null))];
+    if (!pair.players.length) assigned.add(pair);
+  }
   const allocate = (pair: ShirtPair, players: ShirtPlayer[], brand: ShirtBrand) => {
     const colors = pair.zoneId === null ? null : usedColors.get(pair.zoneId) ?? new Map<string, number>();
     const eligible = rows.filter(row => row.brand === brand);
@@ -121,14 +145,11 @@ export function distributeShirts(registrations: PairRegistration[], zoneEntries:
     });
   };
 
-  const cimaGuastavino = pairs.filter(pair => categoryKey(pair.category).includes('cimadamore') && pair.requiredBrands.includes('guastavino')).length;
-  const gomaDabberAgreements = pairs.filter(pair => categoryKey(pair.category).includes('gomaa') && pair.requiredBrands.includes('dabber')).length;
-  let gomaDabberCompensation = Math.max(0, cimaGuastavino - 4 - gomaDabberAgreements);
   const byZone = new Map<number, ShirtPair[]>();
   for (const pair of pairs) if (pair.zoneId !== null) byZone.set(pair.zoneId, [...(byZone.get(pair.zoneId) ?? []), pair]);
-  const assigned = new Set<ShirtPair>();
   for (const zonePairs of [...byZone.entries()].sort(([left], [right]) => left - right).map(([, value]) => value)) {
-    const ordered = [...zonePairs].sort((a, b) => a.zoneSeed - b.zoneSeed || a.registrationId - b.registrationId);
+    const ordered = [...zonePairs].filter((pair) => !assigned.has(pair)).sort((a, b) => a.zoneSeed - b.zoneSeed || a.registrationId - b.registrationId);
+    if (!ordered.length) continue;
     const forcedDabber = new Set(ordered.filter(pair => !pair.requiredBrands.length && categoryKey(pair.category).includes('gomaa')).slice(0, gomaDabberCompensation));
     gomaDabberCompensation -= forcedDabber.size;
     for (const pair of ordered.filter(pair => pair.requiredBrands.length > 1)) {
@@ -139,6 +160,8 @@ export function distributeShirts(registrations: PairRegistration[], zoneEntries:
     const candidates = ordered.filter(pair => pair.requiredBrands.length <= 1);
     const choices = candidates.map(pair => {
       const required = pair.requiredBrands[0] ?? (forcedDabber.has(pair) ? 'dabber' : null);
+      const preferred = pair.preferredModels.length === 1 ? rows.find((row) => row.name === pair.preferredModels[0]) : undefined;
+      if (preferred && (!required || preferred.brand === required)) return [preferred];
       return rows.filter(row => !required || row.brand === required);
     });
     let bestModels: typeof rows = [];
@@ -185,6 +208,11 @@ export function distributeShirts(registrations: PairRegistration[], zoneEntries:
     if (assigned.has(pair)) continue;
     if (pair.requiredBrands.length > 1) {
       allocateConflictingPair(pair);
+      continue;
+    }
+    const preferred = pair.preferredModels.length === 1 ? rows.find((row) => row.name === pair.preferredModels[0]) : undefined;
+    if (preferred && (!pair.requiredBrands.length || preferred.brand === pair.requiredBrands[0])) {
+      assign(pair, pair.players, preferred);
       continue;
     }
     let brand = pair.requiredBrands[0] ?? (countBrand('guastavino') <= countBrand('dabber') ? 'guastavino' : 'dabber');

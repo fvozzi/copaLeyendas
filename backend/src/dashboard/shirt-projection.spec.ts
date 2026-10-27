@@ -38,11 +38,19 @@ describe('shirt projection', () => {
     expect(result.models[0].sizes.M).toBeGreaterThan(result.models[0].sizes.XXL);
   });
 
-  it('creates a readable workbook with projected and source sheets', async () => {
-    const content = await buildShirtProjectionWorkbook(distribution as never);
+  it('creates a readable workbook with projected, source and gift bag sheets', async () => {
+    const withPlayers = structuredClone(distribution);
+    withPlayers.models[0].players = [
+      { name: 'Zulema Pérez', team: 'Azul', size: 'M' },
+      { name: 'Ana Gómez', team: 'Azul', size: 'S' },
+    ] as never;
+    withPlayers.models[2].players = [
+      { name: 'Beatriz López', team: 'Belgrano', size: 'L' },
+    ] as never;
+    const content = await buildShirtProjectionWorkbook(withPlayers as never);
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(Uint8Array.from(content).buffer);
-    expect(workbook.worksheets.map((sheet) => sheet.name)).toEqual(['Proyección 200', 'Base actual']);
+    expect(workbook.worksheets.map((sheet) => sheet.name)).toEqual(['Proyección 200', 'Base actual', 'Bolsas de regalos']);
     const projected = workbook.getWorksheet('Proyección 200')!;
     expect(projected.getCell('A1').value).toBe('Proyección de camisetas para envío');
     expect(projected.getCell('A5').value).toBe('Guastavino Color 1');
@@ -53,5 +61,12 @@ describe('shirt projection', () => {
     expect(projected.views[0]).toMatchObject({ state: 'frozen', xSplit: 1, ySplit: 4 });
     expect(projected.autoFilter).toBe('A4:J8');
     expect(workbook.getWorksheet('Base actual')!.getCell('J9').value).toEqual({ formula: 'SUM(J5:J8)', result: 73 });
+    const bags = workbook.getWorksheet('Bolsas de regalos')!;
+    expect(bags.getRow(4).values).toEqual([undefined, 'Jugadora', 'Equipo', 'Talle', 'Modelo asignado']);
+    expect(bags.getRow(5).values).toEqual([undefined, 'Ana Gómez', 'Azul', 'S', 'Guastavino Color 1']);
+    expect(bags.getRow(6).values).toEqual([undefined, 'Zulema Pérez', 'Azul', 'M', 'Guastavino Color 1']);
+    expect(bags.getRow(7).values).toEqual([undefined, 'Beatriz López', 'Belgrano', 'L', 'Dabber Color 3']);
+    expect(bags.autoFilter).toBe('A4:D7');
+    expect(bags.views[0]).toMatchObject({ state: 'frozen', xSplit: 2, ySplit: 4 });
   });
 });

@@ -4,7 +4,7 @@ import { basename, join } from 'node:path';
 import { GoogleDrivePhotoStorageService } from '../registrations/google-drive-photo-storage.service';
 import { resolvePaymentProofDir } from '../registrations/payment-proof-storage';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, EntityManager, Not, Repository } from 'typeorm';
+import { Brackets, EntityManager, IsNull, Not, Repository } from 'typeorm';
 import { Locality } from '../localities/locality.entity';
 import { PairRegistration } from '../registrations/pair-registration.entity';
 import { CreatePlayerDto } from './dto/create-player.dto';
@@ -16,6 +16,7 @@ import { Tournament } from '../tournaments/tournament.entity';
 import { TournamentStatus } from '../tournaments/tournament.enums';
 import { Zone } from '../tournaments/zone.entity';
 import { ZoneEntry } from '../tournaments/zone-entry.entity';
+import { ShirtModel } from './shirt-model';
 
 @Injectable()
 export class PlayersService {
@@ -46,12 +47,11 @@ export class PlayersService {
     const photos = registeredPhotos(registrations);
     const agreements = registeredAgreements(registrations);
     const categories = registeredCategories(registrations);
-    const shirtModels = registeredShirtModels(registrations, distributeShirts(registrations, await this.getShirtZoneEntries()));
     const players = await qb.orderBy('player.fullName', 'ASC').getMany();
+    await this.getShirtDistribution(registrations, await this.getShirtZoneEntries(), players);
     return players.map((player) => ({
       ...player, hasPhoto: photos.has(player.dni.trim()),
       categoryName: categories.get(player.dni.trim()) ?? player.locality?.category?.name ?? null,
-      shirtModel: shirtModels.get(player.dni.trim()) ?? null,
       ...(agreements.get(player.dni.trim()) ?? { hasCommercialAgreement: null, commercialAgreementDetails: null }),
     }));
   }
@@ -85,6 +85,7 @@ export class PlayersService {
     return this.playersRepository.save(this.playersRepository.create({
       fullName: dto.fullName.trim(), dni: dto.dni.trim(), birthDate: normalizeOptional(dto.birthDate),
       phone: normalizeOptional(dto.phone), instagram: normalizeOptional(dto.instagram), shirtSize: dto.shirtSize ?? null,
+      shirtModel: dto.shirtModel ?? null,
       localityId: locality?.id ?? null,
     }));
   }
@@ -98,6 +99,7 @@ export class PlayersService {
     if (dto.phone !== undefined) player.phone = normalizeOptional(dto.phone);
     if (dto.instagram !== undefined) player.instagram = normalizeOptional(dto.instagram);
     if (dto.shirtSize !== undefined) player.shirtSize = dto.shirtSize;
+    if (dto.shirtModel !== undefined) player.shirtModel = dto.shirtModel;
     return this.playersRepository.save(player);
   }
 
@@ -117,10 +119,27 @@ export class PlayersService {
     if (kind === 'full') {
       return {
         filename: 'jugadoras-completo.csv',
-        content: toCsv(['ID', 'Nombre completo', 'DNI', 'Fecha nacimiento', 'Celular', 'Instagram', 'Marca / acuerdo', 'Talle camiseta', 'Localidad / equipo', 'Provincia', 'Fecha de alta', 'Ultima actualizacion'], players.map((player) => [player.id, player.fullName, player.dni, player.birthDate ?? '', player.phone ?? '', player.instagram ?? '', player.hasCommercialAgreement === null ? 'Sin datos' : player.hasCommercialAgreement ? player.commercialAgreementDetails ?? 'Marca no especificada' : 'Sin acuerdo', player.shirtSize ?? '', player.locality?.name ?? '', player.locality?.provinceName ?? '', player.createdAt.toISOString(), player.updatedAt.toISOString()])),
+        content: toCsv(['ID', 'Nombre completo', 'DNI', 'Fecha nacimiento', 'Celular', 'Instagram', 'Marca / acuerdo', 'Talle camiseta', 'Modelo asignado', 'Localidad / equipo', 'Provincia', 'Fecha de alta', 'Ultima actualizacion'], players.map((player) => [player.id, player.fullName, player.dni, player.birthDate ?? '', player.phone ?? '', player.instagram ?? '', player.hasCommercialAgreement === null ? 'Sin datos' : player.hasCommercialAgreement ? player.commercialAgreementDetails ?? 'Marca no especificada' : 'Sin acuerdo', player.shirtSize ?? '', player.shirtModel ?? '', player.locality?.name ?? '', player.locality?.provinceName ?? '', player.createdAt.toISOString(), player.updatedAt.toISOString()])),
       };
     }
     throw new BadRequestException('Tipo de exportacion invalido');
+  }
+
+  async getShirtDistribution(registrations: PairRegistration[], zoneEntries: ShirtZoneEntry[], players?: Player[]) {
+    const currentPlayers = players ?? await this.playersRepository.find();
+    const savedAssignments = new Map(currentPlayers
+      .filter((player): player is Player & { shirtModel: ShirtModel } => Boolean(player.shirtModel))
+      .map((player) => [player.dni.trim(), player.shirtModel]));
+    const distribution = distributeShirts(registrations, zoneEntries, savedAssignments);
+    const computedAssignments = shirtModelsByDni(distribution);
+    for (const player of currentPlayers) {
+      if (player.shirtModel) continue;
+      const shirtModel = computedAssignments.get(player.dni.trim());
+      if (!shirtModel) continue;
+      const updated = await this.playersRepository.update({ id: player.id, shirtModel: IsNull() }, { shirtModel });
+      if (updated.affected !== 0) player.shirtModel = shirtModel;
+    }
+    return distribution;
   }
 
   private async resolveLocality(localityId?: number | null) {
@@ -272,21 +291,18 @@ function registeredCategories(registrations: PairRegistration[]) {
   return categories;
 }
 
-function registeredShirtModels(registrations: PairRegistration[], distribution: ReturnType<typeof distributeShirts>) {
-  const byRegistrationPlayer = new Map<string, string>();
+function shirtModelsByDni(distribution: ReturnType<typeof distributeShirts>) {
+  const assignments = new Map<string, { registrationId: number; model: ShirtModel }>();
   for (const model of distribution.models) {
-    for (const player of model.players) byRegistrationPlayer.set(`${player.registrationId}:${player.position}`, model.name);
-  }
-  const assignments = new Map<string, string>();
-  // Registrations arrive oldest first, so the most recent assignment wins for a repeated DNI.
-  for (const registration of registrations) {
-    for (const prefix of ['playerOne', 'playerTwo', 'playerThree'] as const) {
-      const dni = registration[`${prefix}Dni`]?.trim();
-      const model = byRegistrationPlayer.get(`${registration.id}:${prefix}`);
-      if (dni && model) assignments.set(dni, model);
+    for (const player of model.players) {
+      if (!player.dni) continue;
+      const current = assignments.get(player.dni);
+      if (!current || player.registrationId >= current.registrationId) {
+        assignments.set(player.dni, { registrationId: player.registrationId, model: model.name });
+      }
     }
   }
-  return assignments;
+  return new Map([...assignments].map(([dni, assignment]) => [dni, assignment.model]));
 }
 
 function registeredAgreements(registrations: PairRegistration[]) {

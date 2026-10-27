@@ -2,14 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { distributeShirts } from './shirt-distribution';
 import type { PairRegistration } from '../registrations/pair-registration.entity';
 import { ShirtSize } from '../registrations/registration.enums';
+import { ShirtModel } from '../players/shirt-model';
 
 const request = (size: ShirtSize, brand = '') => ({ locality: { name: 'Equipo' }, playerOneName: 'Jugadora', playerOneShirtSize: size, playerOneHasCommercialAgreement: Boolean(brand), playerOneCommercialAgreementDetails: brand }) as unknown as PairRegistration;
 const copies = (quantity: number, size: ShirtSize, brand = '') => Array.from({ length: quantity }, () => request(size, brand));
 const pair = (id: number, category: string, brand = '', secondBrand = '', thirdBrand?: string) => ({
   id, categoryId: 1, category: { name: category }, locality: { name: `Equipo ${id}` },
-  playerOneName: `Uno ${id}`, playerOneShirtSize: ShirtSize.M, playerOneHasCommercialAgreement: Boolean(brand), playerOneCommercialAgreementDetails: brand,
-  playerTwoName: `Dos ${id}`, playerTwoShirtSize: ShirtSize.L, playerTwoHasCommercialAgreement: Boolean(secondBrand), playerTwoCommercialAgreementDetails: secondBrand,
-  playerThreeName: thirdBrand === undefined ? null : `Tres ${id}`, playerThreeShirtSize: ShirtSize.S,
+  playerOneName: `Uno ${id}`, playerOneDni: `${id}-1`, playerOneShirtSize: ShirtSize.M, playerOneHasCommercialAgreement: Boolean(brand), playerOneCommercialAgreementDetails: brand,
+  playerTwoName: `Dos ${id}`, playerTwoDni: `${id}-2`, playerTwoShirtSize: ShirtSize.L, playerTwoHasCommercialAgreement: Boolean(secondBrand), playerTwoCommercialAgreementDetails: secondBrand,
+  playerThreeName: thirdBrand === undefined ? null : `Tres ${id}`, playerThreeDni: `${id}-3`, playerThreeShirtSize: ShirtSize.S,
   playerThreeHasCommercialAgreement: Boolean(thirdBrand), playerThreeCommercialAgreementDetails: thirdBrand ?? null,
 }) as unknown as PairRegistration;
 const assignedModels = (result: ReturnType<typeof distributeShirts>, registrationId: number) => result.models.filter(model => model.players.some(player => player.registrationId === registrationId));
@@ -153,5 +154,14 @@ describe('shirt distribution', () => {
     const result = distributeShirts([pair(1, 'Goma A', 'Guastavino', 'Otra')]);
     expect(assignedModels(result, 1)).toHaveLength(1);
     expect(assignedModels(result, 1)[0].name).toMatch(/^Guastavino/);
+  });
+  it('pins a saved player model and keeps flexible teammates on that color', () => {
+    const registration = pair(1, 'Goma A');
+    const saved = new Map([['1-1', ShirtModel.DABBER_COLOR_4]]);
+    const result = distributeShirts([registration], [], saved);
+    const assigned = result.models.find(model => model.players.some(player => player.dni === '1-1'));
+    expect(assigned?.name).toBe(ShirtModel.DABBER_COLOR_4);
+    expect(assigned?.players.map(player => player.dni).sort()).toEqual(['1-1', '1-2']);
+    expect(result).toEqual(distributeShirts([registration], [], saved));
   });
 });

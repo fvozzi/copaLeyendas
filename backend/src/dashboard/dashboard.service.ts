@@ -10,7 +10,7 @@ import { Zone } from '../tournaments/zone.entity';
 import { ZoneEntry } from '../tournaments/zone-entry.entity';
 import { Category } from '../categories/category.entity';
 import { RegistrationStatus } from '../registrations/registration.enums';
-import { distributeShirts } from './shirt-distribution';
+import { PlayersService } from '../players/players.service';
 import { buildShirtProjectionWorkbook } from './shirt-projection';
 
 @Injectable()
@@ -30,6 +30,7 @@ export class DashboardService {
     private readonly zoneEntriesRepository: Repository<ZoneEntry>,
     @InjectRepository(Category)
     private readonly categoriesRepository: Repository<Category>,
+    private readonly playersService: PlayersService,
   ) {}
 
   async getSummary() {
@@ -43,7 +44,7 @@ export class DashboardService {
     const zones = tournament ? await this.zonesRepository.find({ where: { tournamentCategory: { tournamentId: tournament.id } }, relations: { venue: true, tournamentCategory: { category: true } } }) : [];
     const zoneEntries = zones.length ? await this.zoneEntriesRepository.find({ where: zones.map(zone => ({ zoneId: zone.id })) }) : [];
     const zonesById = new Map(zones.map(zone => [zone.id, zone]));
-    const shirtDistribution = distributeShirts(registrations, zoneEntries.flatMap(entry => {
+    const shirtDistribution = await this.playersService.getShirtDistribution(registrations, zoneEntries.flatMap(entry => {
       const zone = zonesById.get(entry.zoneId);
       return zone ? [{ registrationId: entry.registrationId, zoneId: zone.id, zoneName: zone.name, categoryId: zone.tournamentCategory.categoryId, seed: entry.seed }] : [];
     }));
