@@ -61,19 +61,19 @@ export async function buildShirtProjectionWorkbook(distribution: ShirtDistributi
 
 function addGiftBagSheet(workbook: ExcelJS.Workbook, distribution: ShirtDistribution) {
   const sheet = workbook.addWorksheet('Bolsas de regalos', { views: [{ state: 'frozen', ySplit: 4, xSplit: 2 }] });
-  sheet.mergeCells('A1:D1');
+  sheet.mergeCells('A1:E1');
   sheet.getCell('A1').value = 'Detalle para armado de bolsas de regalos';
   sheet.getCell('A1').font = { name: 'Aptos Display', size: 18, bold: true, color: { argb: 'FFFFFFFF' } };
   sheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF173F39' } };
   sheet.getCell('A1').alignment = { vertical: 'middle', horizontal: 'left' };
   sheet.getRow(1).height = 30;
-  sheet.mergeCells('A2:D2');
-  sheet.getCell('A2').value = `${distribution.total} jugadoras con camiseta asignada, ordenadas por equipo`;
+  sheet.mergeCells('A2:E2');
+  sheet.getCell('A2').value = `${distribution.total} jugadoras con camiseta asignada, ordenadas por equipo y categoría`;
   sheet.getCell('A2').font = { name: 'Aptos', size: 11, italic: true, color: { argb: 'FF4B5D61' } };
   sheet.getRow(2).height = 22;
   sheet.addRow([]);
 
-  const headerRow = sheet.addRow(['Jugadora', 'Equipo', 'Talle', 'Modelo asignado']);
+  const headerRow = sheet.addRow(['Jugadora', 'Equipo', 'Categoría', 'Talle', 'Modelo asignado']);
   headerRow.font = { name: 'Aptos', bold: true, color: { argb: 'FFFFFFFF' } };
   headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCF6448' } };
   headerRow.alignment = { vertical: 'middle', horizontal: 'left' };
@@ -82,24 +82,28 @@ function addGiftBagSheet(workbook: ExcelJS.Workbook, distribution: ShirtDistribu
   const rows = distribution.models.flatMap((model) => model.players.map((player) => ({
     player: player.name,
     team: player.team,
+    category: player.category,
     size: player.size,
     model: model.name,
-  }))).sort((left, right) => left.team.localeCompare(right.team, 'es') || left.player.localeCompare(right.player, 'es'));
+  }))).sort((left, right) => left.team.localeCompare(right.team, 'es')
+    || left.category.localeCompare(right.category, 'es')
+    || left.player.localeCompare(right.player, 'es'));
   for (const item of rows) {
-    const row = sheet.addRow([item.player, item.team, item.size, item.model]);
+    const row = sheet.addRow([item.player, item.team, item.category, item.size, item.model]);
     row.alignment = { vertical: 'middle', horizontal: 'left' };
     row.height = 22;
-    for (let column = 1; column <= 4; column++) {
+    for (let column = 1; column <= 5; column++) {
       row.getCell(column).border = { bottom: { style: 'thin', color: { argb: 'FFD7DEDA' } } };
     }
   }
 
   sheet.getColumn(1).width = 32;
   sheet.getColumn(2).width = 28;
-  sheet.getColumn(3).width = 12;
-  sheet.getColumn(4).width = 28;
-  sheet.autoFilter = { from: { row: headerRow.number, column: 1 }, to: { row: Math.max(headerRow.number, sheet.lastRow!.number), column: 4 } };
-  sheet.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9, printArea: `A1:D${sheet.lastRow!.number}` };
+  sheet.getColumn(3).width = 22;
+  sheet.getColumn(4).width = 12;
+  sheet.getColumn(5).width = 28;
+  sheet.autoFilter = { from: { row: headerRow.number, column: 1 }, to: { row: Math.max(headerRow.number, sheet.lastRow!.number), column: 5 } };
+  sheet.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9, printArea: `A1:E${sheet.lastRow!.number}` };
 }
 
 function allocateProportionally(counts: number[], target: number) {

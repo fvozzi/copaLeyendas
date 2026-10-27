@@ -41,11 +41,11 @@ describe('shirt projection', () => {
   it('creates a readable workbook with projected, source and gift bag sheets', async () => {
     const withPlayers = structuredClone(distribution);
     withPlayers.models[0].players = [
-      { name: 'Zulema Pérez', team: 'Azul', size: 'M' },
-      { name: 'Ana Gómez', team: 'Azul', size: 'S' },
+      { name: 'Zulema Pérez', team: 'Azul', category: 'Damas A', size: 'M' },
+      { name: 'Ana Gómez', team: 'Azul', category: 'Damas A', size: 'S' },
     ] as never;
     withPlayers.models[2].players = [
-      { name: 'Beatriz López', team: 'Belgrano', size: 'L' },
+      { name: 'Beatriz López', team: 'Belgrano', category: 'Damas B', size: 'L' },
     ] as never;
     const content = await buildShirtProjectionWorkbook(withPlayers as never);
     const workbook = new ExcelJS.Workbook();
@@ -62,11 +62,12 @@ describe('shirt projection', () => {
     expect(projected.autoFilter).toBe('A4:J8');
     expect(workbook.getWorksheet('Base actual')!.getCell('J9').value).toEqual({ formula: 'SUM(J5:J8)', result: 73 });
     const bags = workbook.getWorksheet('Bolsas de regalos')!;
-    expect(bags.getRow(4).values).toEqual([undefined, 'Jugadora', 'Equipo', 'Talle', 'Modelo asignado']);
-    expect(bags.getRow(5).values).toEqual([undefined, 'Ana Gómez', 'Azul', 'S', 'Guastavino Color 1']);
-    expect(bags.getRow(6).values).toEqual([undefined, 'Zulema Pérez', 'Azul', 'M', 'Guastavino Color 1']);
-    expect(bags.getRow(7).values).toEqual([undefined, 'Beatriz López', 'Belgrano', 'L', 'Dabber Color 3']);
-    expect(bags.autoFilter).toBe('A4:D7');
+    expect(bags.getRow(4).values).toEqual([undefined, 'Jugadora', 'Equipo', 'Categoría', 'Talle', 'Modelo asignado']);
+    expect(bags.getRow(5).values).toEqual([undefined, 'Ana Gómez', 'Azul', 'Damas A', 'S', 'Guastavino Color 1']);
+    expect(bags.getRow(6).values).toEqual([undefined, 'Zulema Pérez', 'Azul', 'Damas A', 'M', 'Guastavino Color 1']);
+    expect(bags.getRow(7).values).toEqual([undefined, 'Beatriz López', 'Belgrano', 'Damas B', 'L', 'Dabber Color 3']);
+    expect(bags.autoFilter).toBe('A4:E7');
+    expect(bags.pageSetup.printArea).toBe('A1:E7');
     expect(bags.views[0]).toMatchObject({ state: 'frozen', xSplit: 2, ySplit: 4 });
   });
 });
