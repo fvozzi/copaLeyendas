@@ -26,6 +26,7 @@ export function AdminLayout() {
           <NavLink to="/app" end className="admin-nav-link">
             Resumen
           </NavLink>
+          <NavLink to="/app/resultados" className="admin-nav-link">Cargar resultados</NavLink>
           {isDirector && <NavLink to="/app/contenidos" className="admin-nav-link">
             Contenidos
           </NavLink>}
@@ -45,7 +46,6 @@ export function AdminLayout() {
           {isDirector && <NavLink to="/app/canchas" className="admin-nav-link">Sedes</NavLink>}
           {isDirector && <NavLink to="/app/canchas/internas" className="admin-nav-link">Canchas</NavLink>}
           {isDirector && <NavLink to="/app/torneos" className="admin-nav-link">Torneos</NavLink>}
-          <NavLink to="/app/resultados" className="admin-nav-link">Resultados</NavLink>
           {isDirector && <NavLink to="/app/programa" className="admin-nav-link">Programa</NavLink>}
           {isDirector && <NavLink to="/app/usuarios" className="admin-nav-link">Usuarios</NavLink>}
           {isDirector && <NavLink to="/app/backups" className="admin-nav-link">Backups</NavLink>}

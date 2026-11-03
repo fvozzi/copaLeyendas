@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
 import { UserRole } from '../user.entity';
 
 export class UpdateUserDto {
@@ -17,6 +17,6 @@ export class UpdateUserDto {
   password?: string;
 
   @IsOptional()
-  @IsEnum([UserRole.DIRECTOR, UserRole.COURT_LEADER])
+  @IsIn([UserRole.DIRECTOR, UserRole.COURT_LEADER], { message: 'El rol debe ser Director o Lider de cancha.' })
   role?: UserRole.DIRECTOR | UserRole.COURT_LEADER;
 }

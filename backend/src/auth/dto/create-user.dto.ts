@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsIn, IsString, MinLength } from 'class-validator';
 import { UserRole } from '../user.entity';
 
 export class CreateUserDto {
@@ -13,6 +13,6 @@ export class CreateUserDto {
   @MinLength(8)
   password: string;
 
-  @IsEnum([UserRole.DIRECTOR, UserRole.COURT_LEADER])
+  @IsIn([UserRole.DIRECTOR, UserRole.COURT_LEADER], { message: 'El rol debe ser Director o Lider de cancha.' })
   role: UserRole.DIRECTOR | UserRole.COURT_LEADER;
 }
