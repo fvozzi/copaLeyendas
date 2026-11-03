@@ -5,15 +5,15 @@ import type { Court } from '../courts/court.entity';
 import type { PairRegistration } from '../registrations/pair-registration.entity';
 import type { TournamentCategory } from './tournament-category.entity';
 
-const publicPair = (pair: PairRegistration | null) => pair ? ({
+export const publicPair = (pair: PairRegistration | null) => pair ? ({
   id: pair.id, playerOneName: pair.playerOneName, playerTwoName: pair.playerTwoName,
   locality: { id: pair.locality.id, name: pair.locality.name, provinceName: pair.locality.provinceName },
 }) : null;
-const publicVenue = (venue: Venue) => ({
+export const publicVenue = (venue: Venue) => ({
   id: venue.id, name: venue.name, address: venue.address, city: venue.city, provinceName: venue.provinceName,
   startsAt: venue.startsAt, matchDurationMinutes: venue.matchDurationMinutes, matchesPerDay: venue.matchesPerDay, active: venue.active,
 });
-const publicCourt = (court: Court | null) => court ? ({
+export const publicCourt = (court: Court | null) => court ? ({
   id: court.id, name: court.name, venueId: court.venueId, venue: court.venue ? publicVenue(court.venue) : undefined,
   active: court.active,
 }) : null;

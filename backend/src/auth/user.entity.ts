@@ -8,6 +8,8 @@ import {
 
 export enum UserRole {
   DIRECTOR = 'DIRECTOR',
+  COURT_LEADER = 'COURT_LEADER',
+  // Kept while existing installations migrate old assistant accounts.
   ASSISTANT = 'ASSISTANT',
   // Kept while existing installations migrate old editor accounts.
   EDITOR = 'EDITOR',

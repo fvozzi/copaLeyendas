@@ -10,9 +10,9 @@ import { RegistrationStatus } from '../registrations/registration.enums';
 import { TournamentMatch } from './tournament-match.entity';
 import { TournamentStatus } from './tournament.enums';
 import { Court } from '../courts/court.entity';
-import { matchView, programRelations } from './program-view';
+import { programRelations } from './program-view';
 import { TournamentScheduleSlot } from './tournament-schedule-slot.entity';
-import { publicProgramView } from './public-program-view';
+import { publicCourt, publicPair, publicProgramView, publicVenue } from './public-program-view';
 import { standings } from './zone-standings';
 
 @Injectable()
@@ -25,12 +25,15 @@ export class TournamentQueryService {
     const tournament = await this.tournaments.findOne({ where: { status: TournamentStatus.ACTIVE }, order: { startsAt: 'ASC', id: 'ASC' } });
     if (!tournament) return { tournament: null, courts: [] };
 
-    const [zones, matches, courts] = await Promise.all([
+    const [zones, matches, courts, slots, detail] = await Promise.all([
       this.zones.find({ where: { tournamentCategory: { tournamentId: tournament.id } }, relations: { venue: true, tournamentCategory: { category: true } }, order: { name: 'ASC' } }),
       this.matches.find({ where: { zone: { tournamentCategory: { tournamentId: tournament.id } } }, relations: { zone: { tournamentCategory: { category: true } }, homeRegistration: { locality: true }, awayRegistration: { locality: true }, scheduleSlot: { court: { venue: true } } }, order: { zoneId: 'ASC', matchOrder: 'ASC' } }),
-      this.courts.find({ where: { active: true }, order: { name: 'ASC' } }),
+      this.courts.find({ where: { active: true }, relations: { venue: true }, order: { name: 'ASC' } }),
+      this.matches.manager.getRepository(TournamentScheduleSlot).find({ where: { tournamentId: tournament.id }, relations: programRelations, order: { sequence: 'ASC' } }),
+      this.detail(tournament.id),
     ]);
     const entries = zones.length ? await this.entries.find({ where: zones.map((zone) => ({ zoneId: zone.id })), relations: { registration: { locality: true } }, order: { seed: 'ASC', id: 'ASC' } }) : [];
+    const publicSlots = publicProgramView(detail, slots).slots;
 
     return {
       tournament: {
@@ -39,13 +42,13 @@ export class TournamentQueryService {
           id: zone.id,
           name: zone.name,
           category: zone.tournamentCategory.category.name,
-          venue: zone.venue,
-          court: zone.venue,
-          standings: standings(entries.filter((entry) => entry.zoneId === zone.id), matches.filter((match) => match.zoneId === zone.id)),
-          matches: matches.filter((match) => match.zoneId === zone.id).map((match) => matchView(match)),
+          venue: publicVenue(zone.venue),
+          standings: standings(entries.filter((entry) => entry.zoneId === zone.id), matches.filter((match) => match.zoneId === zone.id)).map((row) => ({ ...row, registration: publicPair(row.registration) })),
+          matches: publicSlots.filter((slot) => slot.match?.zoneId === zone.id).map((slot) => slot.match),
         })),
+        knockout: publicSlots.filter((slot) => slot.stage !== 'ZONE'),
       },
-      courts,
+      courts: courts.map((court) => publicCourt(court)),
     };
   }
   async currentPublicMap() {

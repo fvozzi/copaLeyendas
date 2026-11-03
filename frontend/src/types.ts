@@ -15,7 +15,7 @@ export type HeardAboutSource = 'INSTAGRAM' | 'FRIEND' | 'CLUB' | 'OTHER';
 export type ShirtSize = 'S' | 'M' | 'L' | 'XL' | 'XXL' | 'XXXL' | 'XXXXL' | 'XXXXXL';
 export type ShirtModel = 'Guastavino Color 1' | 'Guastavino Color 2' | 'Dabber Color 3' | 'Dabber Color 4';
 
-export type UserRole = 'DIRECTOR' | 'ASSISTANT' | 'EDITOR';
+export type UserRole = 'DIRECTOR' | 'COURT_LEADER' | 'ASSISTANT' | 'EDITOR';
 
 export interface AuthUser {
   id: number;
@@ -61,7 +61,7 @@ export interface AdminUserPayload {
   name: string;
   email: string;
   password?: string;
-  role: 'DIRECTOR' | 'ASSISTANT';
+  role: 'DIRECTOR' | 'COURT_LEADER';
 }
 
 export interface LoginResponse {
@@ -313,7 +313,7 @@ export interface TournamentPayload { name: string; feePerPlayer?: number; starts
 export interface TournamentCategory { id: number; categoryId: number; pointsPerSet: number; setsToWin: number; zoneSize: number; zoneCount: number | null; category: Category; }
 export interface TournamentZone { id: number; name: string; capacity: number; tournamentCategoryId: number; venueId: number; venue: Venue; tournamentCategory: TournamentCategory; }
 export interface TournamentDetail extends Tournament { categories: TournamentCategory[]; zones: TournamentZone[]; }
-export interface TournamentMatch { id: number; zoneId?: number | null; sequence?: number | null; homeQualifierZoneId?: number | null; awayQualifierZoneId?: number | null; homeQualifierRank?: number | null; awayQualifierRank?: number | null; matchOrder: number; status: string; court?: Court | null; homeRegistration: PairRegistration | null; awayRegistration: PairRegistration | null; homeSource?: 'DIRECT' | 'WINNER' | 'LOSER'; awaySource?: 'DIRECT' | 'WINNER' | 'LOSER'; homeSourceMatchId?: number | null; awaySourceMatchId?: number | null; homeScore: number | null; awayScore: number | null; scheduledAt: string | null; }
+export interface TournamentMatch { id: number; zoneId?: number | null; sequence?: number | null; homeQualifierZoneId?: number | null; awayQualifierZoneId?: number | null; homeQualifierRank?: number | null; awayQualifierRank?: number | null; matchOrder: number; status: string; court?: Court | null; homeRegistration: PairRegistration | null; awayRegistration: PairRegistration | null; homeSource?: 'DIRECT' | 'WINNER' | 'LOSER'; awaySource?: 'DIRECT' | 'WINNER' | 'LOSER'; homeSourceMatchId?: number | null; awaySourceMatchId?: number | null; homeScore: number | null; awayScore: number | null; scheduledAt: string | null; resultPhotoAvailable?: boolean; resultPhotoOriginalName?: string | null; resultSubmittedAt?: string | null; }
 export interface ZoneEntry { id: number; seed: number; registration: PairRegistration; }
 export interface ZoneDetail extends TournamentZone { entries: ZoneEntry[]; }
 
@@ -323,8 +323,9 @@ export interface ProgramScenario { mainDay: string; finalsDay: string; interleav
 export interface ProgramScenarioPreview { baseVersion: string; slots: TournamentScheduleSlot[]; warnings: { sequence: number; message: string }[]; capacityWarnings?: { sequence: number; message: string }[]; }
 export interface PublicStanding { registration: PairRegistration; played: number; wins: number; losses: number; pointsFor: number; pointsAgainst: number; tablePoints: number; }
 export interface PublicTournamentZone { id: number; name: string; category: string; venue: Venue; court?: Court; standings: PublicStanding[]; matches: TournamentMatch[]; }
-export interface PublicTournament extends Tournament { zones: PublicTournamentZone[]; }
+export interface PublicTournament extends Tournament { zones: PublicTournamentZone[]; knockout: TournamentScheduleSlot[]; }
 export interface PublicCurrentTournament { tournament: PublicTournament | null; courts: Court[]; }
+export interface TournamentOperations { tournament: Pick<Tournament, 'id' | 'name' | 'startsAt' | 'endsAt'> | null; courts: Court[]; slots: TournamentScheduleSlot[]; }
 export interface PublicProgramMapData { detail: TournamentDetail | null; slots: TournamentScheduleSlot[]; }
 export interface TournamentScheduleSlot { capacityWarning?: string | null; id: number; matchId?: number | null; match?: TournamentMatch | null; tournamentId: number; tournamentCategoryId: number; zoneName: string; matchOrder: number; stage: 'ZONE' | 'QUARTERFINAL' | 'SEMIFINAL' | 'FINAL'; sequence: number; courtId: number | null; court: Court | null; scheduledAt: string | null; tournamentCategory: TournamentCategory; }
 

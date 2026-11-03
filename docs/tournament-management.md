@@ -124,7 +124,7 @@ Cada pareja juega dos partidos.
 
 ### CU-10 Cargar resultado
 
-El organizador carga los tantos de cada participante por set. Para Copa Leyendas Femme se carga un unico resultado a 25 tantos. El sistema valida el formato, determina ganador/perdedor y habilita los partidos condicionales dependientes.
+El Lider de cancha elige una de sus canchas asignadas, selecciona el partido y carga los tantos junto con una foto obligatoria de la planilla o tablero. En celulares el selector permite abrir la camara directamente. Para Copa Leyendas Femme se carga un unico resultado a 25 tantos: exactamente uno de los equipos debe llegar a 25 y el rival debe quedar por debajo. El sistema valida el formato, determina ganador/perdedor y habilita los partidos condicionales dependientes. La foto queda privada para Direccion y los lideres asignados a esa cancha.
 
 ### CU-11 Corregir resultado
 
@@ -132,15 +132,15 @@ Un Director puede corregir un resultado. Si ya existen partidos dependientes jug
 
 ### CU-12 Consultar posiciones
 
-El sistema calcula por zona: jugados, ganados, perdidos, tantos a favor, tantos en contra y diferencia. La regla de desempate configurable por defecto es: ganados, diferencia de tantos, tantos a favor.
+El sistema calcula por zona: jugados, ganados, perdidos, tantos a favor, tantos en contra y diferencia. La regla de desempate configurable por defecto es: ganados, diferencia de tantos, tantos a favor. La tabla y los cruces clasificados se publican tambien en el perfil publico del torneo.
 
-### CU-13 Asignar asistentes a una cancha
+### CU-13 Asignar lideres a una cancha
 
-El Director asigna uno o mas usuarios con rol Encargado / Asistente a cada cancha. La asignacion es independiente por cancha, por lo que una persona puede operar varias canchas y una cancha puede tener varios asistentes.
+El Director asigna uno o mas usuarios con perfil Lider de cancha a cada cancha. La asignacion es independiente por cancha, por lo que una persona puede operar varias canchas y una cancha puede tener varios lideres.
 
 ### CU-14 Operar una cancha asignada
 
-El Encargado / Asistente puede consultar las zonas de sus canchas asignadas, definir o mover el horario de sus partidos y cargar resultados. No puede crear torneos, categorias, zonas, asignar parejas ni generar fixtures. El backend rechaza esas operaciones y tambien rechaza cualquier intento de modificar una cancha no asignada.
+El Lider de cancha puede consultar los partidos de sus canchas asignadas y cargar resultados con foto. No puede crear torneos, categorias, zonas, asignar parejas ni generar fixtures. El backend rechaza esas operaciones y tambien rechaza cualquier intento de cargar un resultado de una cancha no asignada.
 
 ## Reglas Copa Leyendas Femme
 
@@ -161,5 +161,5 @@ El Encargado / Asistente puede consultar las zonas de sus canchas asignadas, def
 | Metodo de zona de 3 | Categoria del torneo | Triangular |
 | Desempate | Categoria del torneo | Ganados, diferencia, tantos a favor |
 | Cupo | Zona | Definido por el Director |
-| Asistentes asignados | Cancha | Definido por el Director |
-| Horario | Partido | Definido por Director o asistente de su cancha |
+| Lideres asignados | Cancha | Definido por el Director |
+| Horario | Partido | Definido por el Director |

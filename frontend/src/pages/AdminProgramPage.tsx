@@ -54,16 +54,19 @@ export function AdminProgramPage() {
   const [date, setDate] = useState('');
   const [editingCourt, setEditingCourt] = useState(0);
   const [scores, setScores] = useState({ home: 25, away: 0 });
+  const [resultPhoto, setResultPhoto] = useState<File | null>(null);
   const editMatch = (slot: TournamentScheduleSlot, kind: 'schedule' | 'result') => {
-    setError(null); setEditing({ slot, kind }); setScores({ home: slot.match?.homeScore ?? 25, away: slot.match?.awayScore ?? 0 }); setEditingCourt(slot.courtId ?? 0);
+    setError(null); setEditing({ slot, kind }); setScores({ home: slot.match?.homeScore ?? 25, away: slot.match?.awayScore ?? 0 }); setResultPhoto(null); setEditingCourt(slot.courtId ?? 0);
     setDate(slot.scheduledAt ? new Date(new Date(slot.scheduledAt).getTime() - new Date(slot.scheduledAt).getTimezoneOffset() * 60_000).toISOString().slice(0, 16) : '');
   };
   const saveMatch = async (event: React.FormEvent) => {
     event.preventDefault(); if (!editing) return;
     setSaving(true); setError(null);
     try {
-      if (editing.kind === 'result' && editing.slot.matchId) await saveMatchResult(editing.slot.matchId, scores.home, scores.away);
-      else await updateTournamentScheduleSlot(editing.slot.id, { scheduledAt: date ? new Date(date).toISOString() : null, courtId: editingCourt || null });
+      if (editing.kind === 'result') {
+        if (!editing.slot.matchId || !resultPhoto) return;
+        await saveMatchResult(editing.slot.matchId, scores.home, scores.away, resultPhoto);
+      } else await updateTournamentScheduleSlot(editing.slot.id, { scheduledAt: date ? new Date(date).toISOString() : null, courtId: editingCourt || null });
       setSlots(await getTournamentScheduleGrid(tournamentId)); setEditing(null);
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo guardar el partido.'); }
     finally { setSaving(false); }
@@ -164,8 +167,8 @@ export function AdminProgramPage() {
     {editing && <AdminDialog title={`${editing.kind === 'result' ? 'Resultado' : 'Horario'} P${editing.slot.sequence}`} onClose={() => { if (!saving) setEditing(null); }}><form className="editor-form" onSubmit={saveMatch}>
       {error && <div className="inline-state span-2" role="alert">{error}</div>}
       <p className="field-hint span-2">{editing.slot.tournamentCategory.category.name} · {editing.slot.zoneName}<br />{matchLabel(editing.slot, slots)}</p>
-      {editing.kind === 'schedule' ? <><label>Fecha y hora<input type="datetime-local" value={date} onChange={(event) => setDate(event.target.value)} /></label><label>Cancha<select value={editingCourt} onChange={(event) => setEditingCourt(Number(event.target.value))}><option value="0">Sin asignar</option>{knownVenues.map((venue) => <optgroup key={venue.id} label={venue.name}>{knownCourts.filter((court) => court.venueId === venue.id && ((court.active && venue.active) || court.id === editingCourt)).map((court) => <option key={court.id} value={court.id} disabled={!court.active || !venue.active}>{court.name}{court.active && venue.active ? '' : ' (inactiva)'}</option>)}</optgroup>)}</select></label></> : <><label>Local<input type="number" min="0" value={scores.home} disabled={editing.slot.match?.status === 'PLAYED'} onChange={(event) => setScores({ ...scores, home: Number(event.target.value) })} required /></label><label>Visitante<input type="number" min="0" value={scores.away} disabled={editing.slot.match?.status === 'PLAYED'} onChange={(event) => setScores({ ...scores, away: Number(event.target.value) })} required /></label></>}
-      {editing.slot.match?.status !== 'PLAYED' && <div className="span-2 form-actions"><button className="primary-button" disabled={saving}>Guardar</button>{editing.kind === 'schedule' && editing.slot.match?.status === 'READY' && <button type="button" className="secondary-button" disabled={saving} onClick={() => editMatch(editing.slot, 'result')}>Cargar resultado</button>}</div>}
+      {editing.kind === 'schedule' ? <><label>Fecha y hora<input type="datetime-local" value={date} onChange={(event) => setDate(event.target.value)} /></label><label>Cancha<select value={editingCourt} onChange={(event) => setEditingCourt(Number(event.target.value))}><option value="0">Sin asignar</option>{knownVenues.map((venue) => <optgroup key={venue.id} label={venue.name}>{knownCourts.filter((court) => court.venueId === venue.id && ((court.active && venue.active) || court.id === editingCourt)).map((court) => <option key={court.id} value={court.id} disabled={!court.active || !venue.active}>{court.name}{court.active && venue.active ? '' : ' (inactiva)'}</option>)}</optgroup>)}</select></label></> : <><label>Local<input type="number" min="0" max={editing.slot.tournamentCategory.pointsPerSet} value={scores.home} disabled={editing.slot.match?.status === 'PLAYED'} onChange={(event) => setScores({ ...scores, home: Number(event.target.value) })} required /></label><label>Visitante<input type="number" min="0" max={editing.slot.tournamentCategory.pointsPerSet} value={scores.away} disabled={editing.slot.match?.status === 'PLAYED'} onChange={(event) => setScores({ ...scores, away: Number(event.target.value) })} required /></label><label className="span-2">Foto del resultado<input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="environment" onChange={(event) => setResultPhoto(event.target.files?.[0] ?? null)} required /></label></>}
+      {editing.slot.match?.status !== 'PLAYED' && <div className="span-2 form-actions"><button className="primary-button" disabled={saving || (editing.kind === 'result' && !resultPhoto)}>Guardar</button>{editing.kind === 'schedule' && editing.slot.match?.status === 'READY' && <button type="button" className="secondary-button" disabled={saving} onClick={() => editMatch(editing.slot, 'result')}>Cargar resultado</button>}</div>}
     </form></AdminDialog>}
   </div>;
 }

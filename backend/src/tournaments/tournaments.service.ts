@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { type AuthenticatedUser } from '../auth/current-user.decorator';
 import { UserRole } from '../auth/user.entity';
 import { CourtAssistantAssignment } from '../courts/court-assistant-assignment.entity';
@@ -8,7 +8,7 @@ import { Court } from '../courts/court.entity';
 import { Venue } from '../courts/venue.entity';
 import { PairRegistration } from '../registrations/pair-registration.entity';
 import { RegistrationStatus } from '../registrations/registration.enums';
-import { MatchStatus, ParticipantSource } from './tournament.enums';
+import { MatchStatus, ParticipantSource, TournamentStatus } from './tournament.enums';
 import { TournamentCategory } from './tournament-category.entity';
 import { TournamentMatch } from './tournament-match.entity';
 import { TournamentScheduleSlot } from './tournament-schedule-slot.entity';
@@ -21,6 +21,7 @@ import { standings } from './zone-standings';
 import { createHash } from 'node:crypto';
 import type { ProgramScenarioDto } from './program-scenario.dto';
 import { simulateProgram } from './program-scenario';
+import { readMatchResultPhoto, removeMatchResultPhoto, storeMatchResultPhoto } from './match-result-photo-storage';
 
 @Injectable()
 export class TournamentsService {
@@ -38,6 +39,28 @@ export class TournamentsService {
   ) {}
 
   list() { return this.t.find({ order: { startsAt: 'DESC', id: 'DESC' } }); }
+  async operations(user: AuthenticatedUser) {
+    const tournament = await this.t.findOne({ where: { status: TournamentStatus.ACTIVE }, order: { startsAt: 'ASC', id: 'ASC' } });
+    if (!tournament) return { tournament: null, courts: [], slots: [] };
+    const allSlots = await this.slots.find({ where: { tournamentId: tournament.id }, relations: programRelations, order: { sequence: 'ASC' } });
+    const assignedIds = user.role === UserRole.DIRECTOR
+      ? [...new Set(allSlots.flatMap((slot) => slot.courtId ? [slot.courtId] : []))]
+      : (await this.assignments.find({ where: { userId: user.sub } })).map((assignment) => assignment.courtId);
+    if (user.role !== UserRole.DIRECTOR && !this.isCourtLeader(user)) throw new ForbiddenException('Este perfil no puede operar canchas.');
+    const allowed = new Set(assignedIds);
+    const visibleSlots = allSlots.filter((slot) => slot.matchId && slot.courtId && allowed.has(slot.courtId));
+    const courtIds = [...new Set(visibleSlots.flatMap((slot) => slot.courtId ? [slot.courtId] : []))];
+    const courts = courtIds.length ? await this.c.find({ where: { id: In(courtIds) }, relations: { venue: true }, order: { name: 'ASC' } }) : [];
+    return {
+      tournament: { id: tournament.id, name: tournament.name, startsAt: tournament.startsAt, endsAt: tournament.endsAt },
+      courts,
+      slots: programView(visibleSlots).map((slot) => {
+        if (!slot.match) return slot;
+        const { resultPhotoStoredName, resultPhotoOriginalName, resultPhotoMimeType, resultPhotoSize, ...match } = slot.match;
+        return { ...slot, match: { ...match, resultPhotoAvailable: Boolean(resultPhotoStoredName), resultPhotoOriginalName } };
+      }),
+    };
+  }
   create(dto: Partial<Tournament>) { return this.t.save(this.t.create(dto)); }
   async update(id: number, dto: Partial<Tournament>) {
     const tournament = await this.t.findOneBy({ id });
@@ -488,34 +511,73 @@ export class TournamentsService {
     return matchView(match, { ...slot, scheduledAt: new Date(scheduledAt) });
   }
 
-  async result(id: number, homeScore: number, awayScore: number, user: AuthenticatedUser) {
-    this.assertDirectorAccess(user);
-    if (homeScore === awayScore) throw new BadRequestException('El partido debe tener ganador');
+  async result(id: number, homeScore: number, awayScore: number, user: AuthenticatedUser, photo?: Express.Multer.File) {
+    const slot = await this.slots.findOneBy({ matchId: id });
+    if (!slot) throw new NotFoundException('Partido fuera del programa');
+    await this.assertMatchAccess(user, id, slot);
+    const category = slot.tournamentCategory ?? await this.tc.findOneBy({ id: slot.tournamentCategoryId });
+    const target = category?.pointsPerSet ?? 25;
+    if (!Number.isInteger(homeScore) || !Number.isInteger(awayScore) || homeScore < 0 || awayScore < 0 || !((homeScore === target && awayScore < target) || (awayScore === target && homeScore < target))) {
+      throw new BadRequestException(`El resultado debe tener exactamente un equipo con ${target} tantos y el rival con menos de ${target}.`);
+    }
     const initial = await this.matchWithZone(id);
-    return this.withLockedMatch(initial, async (manager) => {
-      const repository = manager.getRepository(TournamentMatch);
-      const match = await repository.findOneBy({ id });
-      if (!match) throw new NotFoundException('Partido no encontrado');
-      if (match.status === MatchStatus.PLAYED) {
-        if (match.homeScore === homeScore && match.awayScore === awayScore) return match;
-        throw new BadRequestException('El partido ya tiene un resultado cargado.');
-      }
-      if (!match.homeRegistrationId || !match.awayRegistrationId) throw new BadRequestException('El partido no esta listo');
-      match.homeScore = homeScore;
-      match.awayScore = awayScore;
-      match.winnerRegistrationId = homeScore > awayScore ? match.homeRegistrationId : match.awayRegistrationId;
-      match.status = MatchStatus.PLAYED;
-      await repository.save(match);
-      await this.resolveDependents(match, repository);
-      if (match.zoneId) await this.resolveQualifiers(manager, match.zoneId);
-      return match;
-    });
+    if (initial.status === MatchStatus.PLAYED) {
+      if (initial.homeScore === homeScore && initial.awayScore === awayScore) return initial;
+      throw new BadRequestException('El partido ya tiene un resultado cargado.');
+    }
+    const storedName = photo ? await storeMatchResultPhoto(photo) : null;
+    try {
+      return await this.withLockedMatch(initial, async (manager) => {
+        const repository = manager.getRepository(TournamentMatch);
+        const match = await repository.findOneBy({ id });
+        if (!match) throw new NotFoundException('Partido no encontrado');
+        if (match.status === MatchStatus.PLAYED) throw new BadRequestException('El partido ya tiene un resultado cargado.');
+        if (!match.homeRegistrationId || !match.awayRegistrationId) throw new BadRequestException('El partido no esta listo');
+        match.homeScore = homeScore;
+        match.awayScore = awayScore;
+        match.winnerRegistrationId = homeScore > awayScore ? match.homeRegistrationId : match.awayRegistrationId;
+        match.status = MatchStatus.PLAYED;
+        if (photo && storedName) {
+          match.resultPhotoStoredName = storedName;
+          match.resultPhotoOriginalName = photo.originalname;
+          match.resultPhotoMimeType = photo.mimetype;
+          match.resultPhotoSize = photo.size;
+        }
+        match.resultSubmittedById = user.sub;
+        match.resultSubmittedAt = new Date();
+        await repository.save(match);
+        await this.resolveDependents(match, repository);
+        if (match.zoneId) await this.resolveQualifiers(manager, match.zoneId);
+        return { ...match, resultPhotoStoredName: undefined, resultPhotoAvailable: Boolean(storedName) };
+      });
+    } catch (error) {
+      if (storedName) await removeMatchResultPhoto(storedName);
+      throw error;
+    }
+  }
+
+  async resultPhoto(id: number, user: AuthenticatedUser) {
+    await this.assertMatchAccess(user, id);
+    const match = await this.m.findOneBy({ id });
+    if (!match?.resultPhotoStoredName || !match.resultPhotoMimeType) throw new NotFoundException('El partido no tiene foto de resultado.');
+    try {
+      return { content: await readMatchResultPhoto(match.resultPhotoStoredName), contentType: match.resultPhotoMimeType, filename: match.resultPhotoOriginalName ?? `resultado-${id}` };
+    } catch {
+      throw new NotFoundException('No se encontro la foto del resultado.');
+    }
   }
 
   async assertZoneAccess(user: AuthenticatedUser, zoneId: number) {
     const zone = await this.z.findOneBy({ id: zoneId });
     if (!zone) throw new NotFoundException('Zona no encontrada');
-    this.assertDirectorAccess(user);
+    if (user.role === UserRole.DIRECTOR) return;
+    if (!this.isCourtLeader(user)) throw new ForbiddenException('Este perfil no puede operar canchas.');
+    const assigned = await this.slots.createQueryBuilder('slot')
+      .innerJoin('slot.match', 'match')
+      .innerJoin(CourtAssistantAssignment, 'assignment', 'assignment.courtId = slot.courtId AND assignment.userId = :userId', { userId: user.sub })
+      .where('match.zoneId = :zoneId', { zoneId })
+      .getExists();
+    if (!assigned) throw new ForbiddenException('No estas asignado a una cancha de esta zona.');
   }
 
   matches(zoneId: number) { return this.fixture(zoneId); }
@@ -539,6 +601,19 @@ export class TournamentsService {
   private assertDirectorAccess(user: AuthenticatedUser) {
     if (user.role === UserRole.DIRECTOR) return;
     throw new ForbiddenException('La asignacion de canchas se define al programar los partidos.');
+  }
+
+  private isCourtLeader(user: AuthenticatedUser) {
+    return user.role === UserRole.COURT_LEADER || user.role === UserRole.ASSISTANT;
+  }
+
+  private async assertMatchAccess(user: AuthenticatedUser, matchId: number, knownSlot?: TournamentScheduleSlot) {
+    if (user.role === UserRole.DIRECTOR) return;
+    if (!this.isCourtLeader(user)) throw new ForbiddenException('Este perfil no puede cargar resultados.');
+    const slot = knownSlot ?? await this.slots.findOneBy({ matchId });
+    if (!slot?.courtId || !(await this.assignments.existsBy({ courtId: slot.courtId, userId: user.sub }))) {
+      throw new ForbiddenException('No estas asignado a la cancha de este partido.');
+    }
   }
 
   private async resolveDependents(source: TournamentMatch, repository = this.m) {

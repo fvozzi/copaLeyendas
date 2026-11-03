@@ -13,6 +13,6 @@ export class CreateUserDto {
   @MinLength(8)
   password: string;
 
-  @IsEnum([UserRole.DIRECTOR, UserRole.ASSISTANT])
-  role: UserRole.DIRECTOR | UserRole.ASSISTANT;
+  @IsEnum([UserRole.DIRECTOR, UserRole.COURT_LEADER])
+  role: UserRole.DIRECTOR | UserRole.COURT_LEADER;
 }

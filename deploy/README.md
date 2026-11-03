@@ -66,6 +66,7 @@ SEED_ADMIN_EMAIL=admin@copaleyendas.local
 SEED_ADMIN_PASSWORD=cambia-esto
 SEED_ADMIN_NAME=Direccion Copa Leyendas
 PAYMENT_PROOF_STORAGE_DIR=/var/www/copa-leyendas/shared/payment-proofs
+MATCH_RESULT_PHOTO_STORAGE_DIR=/var/www/copa-leyendas/shared/match-results
 # Carpeta raiz "Copa Leyendas" en Drive. La aplicacion crea carpetas por edicion.
 GOOGLE_DRIVE_ROOT_FOLDER_ID=ID_DE_CARPETA
 # JSON de cuenta de servicio en una linea, preferentemente codificado base64.

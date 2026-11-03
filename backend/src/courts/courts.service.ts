@@ -50,8 +50,8 @@ export class CourtsService {
     await this.getById(courtId);
     const ids = [...new Set(userIds)];
     const users = ids.length ? await this.users.findBy({ id: In(ids) }) : [];
-    if (users.length !== ids.length || users.some((user) => user.role !== UserRole.ASSISTANT)) {
-      throw new BadRequestException('Solo se pueden asignar usuarios Encargado / Asistente.');
+    if (users.length !== ids.length || users.some((user) => ![UserRole.COURT_LEADER, UserRole.ASSISTANT].includes(user.role))) {
+      throw new BadRequestException('Solo se pueden asignar usuarios con perfil Lider de cancha.');
     }
     await this.assignments.manager.transaction(async (manager) => {
       await manager.delete(CourtAssistantAssignment, { courtId });

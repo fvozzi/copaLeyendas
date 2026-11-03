@@ -21,7 +21,7 @@ import type {
   PlayerPayload,
   Category, CategoryPayload, Court, CourtPayload, Venue, VenuePayload,
   Tournament, TournamentPayload, TournamentDetail, TournamentMatch, ZoneDetail, AdminUser, AdminUserPayload, CashExpense, CashExpensePayload, CashIncomePayload, CashSummary, TournamentScheduleSlot,
-  ActivityLogPage,
+  ActivityLogPage, TournamentOperations,
 } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
@@ -344,7 +344,20 @@ export function applyProgramScenario(id: number, payload: ProgramScenario) { ret
 export function updateTournamentScheduleSlot(id: number, payload: { scheduledAt?: string | null; courtId?: number | null }) { return request<TournamentScheduleSlot>(`/tournaments/schedule-slots/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true); }
 export function getZoneMatches(id: number) { return request<TournamentMatch[]>(`/tournaments/zones/${id}/matches`, {}, true); }
 export function generateZoneFixture(id: number) { return request<TournamentMatch[]>(`/tournaments/zones/${id}/fixture`, { method: 'POST' }, true); }
-export function saveMatchResult(id: number, homeScore: number, awayScore: number) { return request<TournamentMatch>(`/tournaments/matches/${id}/result`, { method: 'POST', body: JSON.stringify({ homeScore, awayScore }) }, true); }
+export function getTournamentOperations() { return request<TournamentOperations>('/tournaments/operations', {}, true); }
+export function saveMatchResult(id: number, homeScore: number, awayScore: number, photo: File) {
+  const form = new FormData();
+  form.set('homeScore', String(homeScore)); form.set('awayScore', String(awayScore)); form.set('photo', photo);
+  return request<TournamentMatch>(`/tournaments/matches/${id}/result`, { method: 'POST', body: form }, true);
+}
+export async function openMatchResultPhoto(id: number) {
+  const token = getToken();
+  const response = await fetch(`${API_URL}/tournaments/matches/${id}/result-photo`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!response.ok) throw new Error(await readError(response));
+  const url = URL.createObjectURL(await response.blob());
+  window.open(url, '_blank', 'noopener,noreferrer');
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
 export function updateMatchSchedule(id: number, scheduledAt: string) { return request<TournamentMatch>(`/tournaments/matches/${id}/schedule`, { method: 'PATCH', body: JSON.stringify({ scheduledAt }) }, true); }
 export function getZone(id: number) { return request<ZoneDetail>(`/tournaments/zones/${id}`, {}, true); }
 export function getAvailableZoneRegistrations(categoryId: number) { return request<PairRegistration[]>(`/tournaments/categories/${categoryId}/registrations`, {}, true); }

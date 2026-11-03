@@ -1,5 +1,8 @@
-import { Body, Controller, Delete, ForbiddenException, Get, Param, ParseIntPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, Param, ParseIntPipe, Patch, Post, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { IsDateString, IsInt, Min } from 'class-validator';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import type { Response } from 'express';
 import { CurrentUser, type AuthenticatedUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UserRole } from '../auth/user.entity';
@@ -17,6 +20,7 @@ class AssignPlaceDto { @IsInt() @Min(1) registrationId: number; }
 export class TournamentsController {
   constructor(private s: TournamentsService, private q: TournamentQueryService) {}
   @Get() list() { return this.s.list(); }
+  @Get('operations') operations(@CurrentUser() user: AuthenticatedUser) { return this.s.operations(user); }
   @Get('zones/:id') async zone(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { await this.s.assertZoneAccess(user, id); return this.q.zone(id); }
   @Get('categories/:id/registrations') registrations(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { this.assertDirector(user); return this.q.availableRegistrations(id); }
   @Get('zones/:id/matches') async matches(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { await this.s.assertZoneAccess(user, id); return this.s.matches(id); }
@@ -38,6 +42,20 @@ export class TournamentsController {
   @Post('zones/:id/fixture') fixture(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { this.assertDirector(user); return this.s.fixture(id); }
   @Patch('zones/:id/places/:seed') place(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Param('seed', ParseIntPipe) seed: number, @Body() dto: AssignPlaceDto) { this.assertDirector(user); return this.s.assignPlace(id, dto.registrationId, seed); }
   @Patch('matches/:id/schedule') schedule(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: ScheduleMatchDto) { return this.s.schedule(id, dto.scheduledAt, user); }
-  @Post('matches/:id/result') result(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: ResultDto) { return this.s.result(id, dto.homeScore, dto.awayScore, user); }
+  @Post('matches/:id/result')
+  @UseInterceptors(FileInterceptor('photo', { storage: memoryStorage(), limits: { fileSize: 8 * 1024 * 1024, files: 1 } }))
+  result(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: ResultDto, @UploadedFile() photo?: Express.Multer.File) {
+    if (!photo) throw new BadRequestException('La foto del resultado es obligatoria.');
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'].includes(photo.mimetype)) throw new BadRequestException('La foto debe ser JPG, PNG, WebP, HEIC o HEIF.');
+    return this.s.result(id, dto.homeScore, dto.awayScore, user, photo);
+  }
+  @Get('matches/:id/result-photo')
+  async resultPhoto(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Res({ passthrough: true }) response: Response) {
+    const file = await this.s.resultPhoto(id, user);
+    response.setHeader('Content-Type', file.contentType);
+    response.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file.filename)}"`);
+    response.setHeader('Cache-Control', 'private, max-age=300');
+    return file.content;
+  }
   private assertDirector(user: AuthenticatedUser) { if (user.role !== UserRole.DIRECTOR) throw new ForbiddenException('Solo Direccion puede configurar el torneo.'); }
 }

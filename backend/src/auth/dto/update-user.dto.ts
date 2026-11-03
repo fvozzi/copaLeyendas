@@ -17,6 +17,6 @@ export class UpdateUserDto {
   password?: string;
 
   @IsOptional()
-  @IsEnum([UserRole.DIRECTOR, UserRole.ASSISTANT])
-  role?: UserRole.DIRECTOR | UserRole.ASSISTANT;
+  @IsEnum([UserRole.DIRECTOR, UserRole.COURT_LEADER])
+  role?: UserRole.DIRECTOR | UserRole.COURT_LEADER;
 }

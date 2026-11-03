@@ -67,8 +67,12 @@ it('shows actual pairs and submits results to the real fixture match, not the pl
   vi.mocked(getTournamentScheduleGrid).mockResolvedValue([{ ...actual, match: { ...actual.match!, status: 'PLAYED', homeScore: 25, awayScore: 0 } }]);
   await click('Resultado');
   const form = document.querySelector('form')!;
+  const photo = new File(['resultado'], 'resultado.jpg', { type: 'image/jpeg' });
+  const input = form.querySelector<HTMLInputElement>('input[type="file"]')!;
+  Object.defineProperty(input, 'files', { value: [photo] });
+  await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
   await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
-  expect(saveMatchResult).toHaveBeenCalledWith(500, 25, 0);
+  expect(saveMatchResult).toHaveBeenCalledWith(500, 25, 0, photo);
   expect(container.textContent).toContain('25 - 0');
 });
 

@@ -1,4 +1,5 @@
 import { Column, Entity, JoinColumn, ManyToOne, OneToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { User } from '../auth/user.entity';
 import { TournamentScheduleSlot } from './tournament-schedule-slot.entity';
 import { PairRegistration } from '../registrations/pair-registration.entity';
 import { MatchStatus, ParticipantSource } from './tournament.enums';
@@ -28,4 +29,11 @@ export class TournamentMatch {
   @Column({ type: 'integer', nullable: true }) awayScore: number | null;
   @Column({ type: 'integer', nullable: true }) winnerRegistrationId: number | null;
   @Column({ type: 'timestamp with time zone', nullable: true }) scheduledAt: Date | null;
+  @Column({ type: 'varchar', nullable: true }) resultPhotoStoredName: string | null;
+  @Column({ type: 'varchar', nullable: true }) resultPhotoOriginalName: string | null;
+  @Column({ type: 'varchar', nullable: true }) resultPhotoMimeType: string | null;
+  @Column({ type: 'integer', nullable: true }) resultPhotoSize: number | null;
+  @Column({ type: 'integer', nullable: true }) resultSubmittedById: number | null;
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' }) @JoinColumn({ name: 'resultSubmittedById' }) resultSubmittedBy: User | null;
+  @Column({ type: 'timestamp with time zone', nullable: true }) resultSubmittedAt: Date | null;
 }

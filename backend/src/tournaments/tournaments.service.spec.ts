@@ -22,7 +22,7 @@ vi.mock('../registrations/pair-registration.entity', () => ({ PairRegistration: 
 vi.mock('../courts/court.entity', () => ({ Court: class Court {} }));
 vi.mock('../courts/venue.entity', () => ({ Venue: class Venue {} }));
 vi.mock('../courts/court-assistant-assignment.entity', () => ({ CourtAssistantAssignment: class CourtAssistantAssignment {} }));
-vi.mock('../auth/user.entity', () => ({ UserRole: { DIRECTOR: 'DIRECTOR', ASSISTANT: 'ASSISTANT' } }));
+vi.mock('../auth/user.entity', () => ({ UserRole: { DIRECTOR: 'DIRECTOR', COURT_LEADER: 'COURT_LEADER', ASSISTANT: 'ASSISTANT' } }));
 
 function removableZone() {
   const zone = { id: 2, name: 'C', tournamentCategoryId: 8 };
@@ -274,7 +274,7 @@ function setup(capacity = 4) {
   ]);
   const manager = { getRepository: (entity: any) => repositories.get(entity) };
   const zoneRepository = { manager: { transaction: vi.fn(async (fn) => fn(manager)) } };
-  const service = new TournamentsService(tournamentRepository as never, {} as never, zoneRepository as never, {} as never, matchRepository as never, { ...slotRepository, manager: zoneRepository.manager } as never, repositories.get(Court) as never, {} as never, {} as never, {} as never);
+  const service = new TournamentsService(tournamentRepository as never, repositories.get(TournamentCategory) as never, zoneRepository as never, {} as never, matchRepository as never, { ...slotRepository, manager: zoneRepository.manager } as never, repositories.get(Court) as never, {} as never, {} as never, {} as never);
   return { service, entries, matches, matchRepository, registration, schedule, entryRepository, planned, slotRepository, venue, repositories };
 }
 
@@ -323,6 +323,17 @@ describe('fixtures with unassigned places', () => {
     await service.result(matches[1].id, 25, 10, director);
     expect(matches[2]).toMatchObject({ homeRegistrationId: 10, awayRegistrationId: 40, status: MatchStatus.READY });
     expect(matches[3]).toMatchObject({ homeRegistrationId: 30, awayRegistrationId: 20, status: MatchStatus.READY });
+  });
+
+  it('requires exactly one team to reach the configured 25 points', async () => {
+    const { service, matches } = setup();
+    await service.fixture(1);
+    await service.assignPlace(1, 10, 1); await service.assignPlace(1, 20, 2);
+    const director = { role: 'DIRECTOR' } as never;
+    await expect(service.result(matches[0].id, 24, 10, director)).rejects.toThrow('exactamente un equipo con 25');
+    await expect(service.result(matches[0].id, 25, 25, director)).rejects.toThrow('exactamente un equipo con 25');
+    await expect(service.result(matches[0].id, 25, -1, director)).rejects.toThrow('exactamente un equipo con 25');
+    expect(matches[0].status).toBe(MatchStatus.READY);
   });
 
   it('preserves existing results on repeated generation and blocks replacing played fixtures', async () => {

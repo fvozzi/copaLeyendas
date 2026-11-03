@@ -882,10 +882,11 @@ img {
 }
 
 .knockout-section h3 { margin: 0; font-family: 'Newsreader', serif; font-size: 2rem; }
-.knockout-bracket { display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, 0.7fr); gap: 3rem; align-items: center; }
+.knockout-bracket { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 2rem; align-items: center; }
 .bracket-round { display: grid; gap: 0.8rem; align-content: center; }
 .bracket-round > p { margin: 0; color: var(--clay); font-size: 0.78rem; font-weight: 800; text-transform: uppercase; }
 .bracket-match { display: grid; gap: 0.35rem; padding: 0.75rem 0.9rem; border: 1px solid var(--line); border-radius: 8px; background: var(--white); }
+.bracket-match span { display: flex; justify-content: space-between; gap: 0.75rem; }
 .bracket-match span + span { padding-top: 0.35rem; border-top: 1px solid var(--line); }
 .bracket-final { position: relative; }
 .bracket-final::before { content: ''; position: absolute; left: -2.1rem; top: 50%; width: 1.5rem; height: 48%; border: solid var(--forest); border-width: 2px 0 2px 2px; transform: translateY(-50%); opacity: 0.55; }
@@ -1164,9 +1165,19 @@ img {
 
 .public-table th:first-child,
 .public-table td:first-child {
-  min-width: 190px;
   text-align: left;
 }
+
+.public-table th:nth-child(2),
+.public-table td:nth-child(2) { min-width: 190px; text-align: left; }
+.public-table tr.is-qualified td { background: rgba(41, 91, 72, 0.08); font-weight: 700; }
+.standings-rule { margin: 0 0 1rem; color: var(--ink-soft); }
+
+.result-court-selector { display: flex; align-items: end; justify-content: space-between; gap: 1rem; }
+.result-court-selector label { display: grid; gap: 0.4rem; min-width: min(100%, 320px); font-weight: 700; }
+.result-photo-field small { color: var(--ink-soft); font-weight: 400; }
+.court-leader-field { display: grid; gap: 0.65rem; margin: 0; padding: 1rem; border: 1px solid var(--line); border-radius: 8px; }
+.court-leader-field legend { padding: 0 0.35rem; font-weight: 800; }
 
 .court-public-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));

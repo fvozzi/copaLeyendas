@@ -104,5 +104,6 @@ npm run dev
 - La ruta publica de inscripcion es `http://localhost:5174/inscripcion` y primero pide token.
 - Direccion del Torneo puede marcar tokens con inscripcion bonificada; en ese caso no se pide comprobante.
 - El backend guarda comprobantes en `storage/payment-proofs` relativo al directorio de ejecucion del backend solo cuando corresponde.
+- El backend guarda las fotos de resultados en `storage/match-results`; en producción conviene configurar `MATCH_RESULT_PHOTO_STORAGE_DIR` dentro del directorio compartido persistente.
 - El frontend corre en `http://localhost:5174`.
 - El setup de producción para DigitalOcean quedó documentado en [deploy/README.md](/F:/FV/dev/copaLeyendas/deploy/README.md).
