@@ -15,6 +15,8 @@ export function AdminPlayersPage() {
   const [editing, setEditing] = useState<Player | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [photo, setPhoto] = useState<{ url: string; name: string } | null>(null);
   const [loadingPhoto, setLoadingPhoto] = useState<number | null>(null);
   useEffect(() => () => { if (photo) URL.revokeObjectURL(photo.url); }, [photo]);
@@ -36,12 +38,12 @@ export function AdminPlayersPage() {
   };
   const load = () => getPlayers(search || undefined).then(setPlayers).catch((reason: Error) => setError(reason.message));
   useEffect(() => { load(); getLocalities().then(setLocalities).catch((reason: Error) => setError(reason.message)); }, []);
-  const openCreate = () => { setEditing(null); setForm(initialForm); setError(null); setDialogOpen(true); };
-  const openEdit = (player: Player) => { setEditing(player); setForm({ fullName: player.fullName, dni: player.dni, birthDate: player.birthDate ?? '', phone: player.phone ?? '', instagram: player.instagram ?? '', shirtSize: player.shirtSize ?? '', shirtModel: player.shirtModel ?? '', localityId: player.localityId }); setError(null); setDialogOpen(true); };
-  const closeDialog = () => { setDialogOpen(false); setEditing(null); setForm(initialForm); };
+  const openCreate = () => { setEditing(null); setForm(initialForm); setError(null); setModalError(null); setDialogOpen(true); };
+  const openEdit = (player: Player) => { setEditing(player); setForm({ fullName: player.fullName, dni: player.dni, birthDate: player.birthDate ?? '', phone: player.phone ?? '', instagram: player.instagram ?? '', shirtSize: player.shirtSize ?? '', shirtModel: player.shirtModel ?? '', localityId: player.localityId }); setError(null); setModalError(null); setDialogOpen(true); };
+  const closeDialog = (force = false) => { if (saving && !force) return; setDialogOpen(false); setEditing(null); setForm(initialForm); setModalError(null); };
   const toPayload = (): PlayerPayload => ({ ...form, birthDate: form.birthDate || undefined, phone: form.phone || undefined, instagram: form.instagram || undefined, shirtSize: form.shirtSize || undefined, shirtModel: form.shirtModel || null });
-  const save = async (event: React.FormEvent<HTMLFormElement>) => { event.preventDefault(); setError(null); try { if (editing) await updatePlayer(editing.id, toPayload()); else await createPlayer(toPayload()); closeDialog(); load(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo guardar la jugadora.'); } };
-  const remove = async (player: Player) => { if (!window.confirm(`Se eliminara la ficha de ${player.fullName}.`)) return; try { await deletePlayer(player.id); load(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo eliminar la jugadora.'); } };
+  const save = async (event: React.FormEvent<HTMLFormElement>) => { event.preventDefault(); setSaving(true); setModalError(null); try { if (editing) await updatePlayer(editing.id, toPayload()); else await createPlayer(toPayload()); closeDialog(true); await load(); } catch (reason) { setModalError(reason instanceof Error ? reason.message : 'No se pudo guardar la jugadora.'); } finally { setSaving(false); } };
+  const remove = async (player: Player) => { if (!window.confirm(`Se eliminará la ficha de ${player.fullName}.`)) return; setError(null); try { await deletePlayer(player.id); await load(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo eliminar la jugadora.'); } };
   const exportPlayers = async (kind: 'full' | 'insurance') => { try { await downloadPlayersExport(kind); } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo descargar el archivo.'); } };
 
   return <div className="admin-panel">
@@ -61,7 +63,8 @@ export function AdminPlayersPage() {
       { label: 'Talle', render: (item) => item.shirtSize ?? '-' },
       { label: 'Foto', render: (item) => item.hasPhoto ? <div className="list-actions"><button className="inline-link" disabled={loadingPhoto !== null} onClick={() => void openPhoto(item)}>Ver foto</button><button className="inline-link" disabled={loadingPhoto !== null} onClick={() => void openPhoto(item, true)}>Descargar</button></div> : 'Sin foto' },
     ]} rows={players} onEdit={openEdit} onDelete={remove} emptyMessage="No hay jugadoras cargadas." preserveTableOnMobile /></section>
-    {dialogOpen ? <AdminDialog title={editing ? 'Editar jugadora' : 'Nueva jugadora'} onClose={closeDialog}><form className="editor-form" onSubmit={save}>
+    {dialogOpen ? <AdminDialog title={editing ? 'Editar jugadora' : 'Nueva jugadora'} onClose={() => closeDialog()}><form className="editor-form" onSubmit={save}>
+      {modalError ? <div className="inline-state span-2" role="alert">{modalError}</div> : null}
       <label>Nombre y apellido<input value={form.fullName} onChange={(event) => setForm({ ...form, fullName: event.target.value })} required /></label>
       <label>DNI<input value={form.dni} onChange={(event) => setForm({ ...form, dni: event.target.value })} required /></label>
       <label>Fecha de nacimiento<input type="date" value={form.birthDate ?? ''} onChange={(event) => setForm({ ...form, birthDate: event.target.value })} /></label>
@@ -70,7 +73,7 @@ export function AdminPlayersPage() {
       <label>Localidad / equipo<select value={form.localityId ?? ''} onChange={(event) => setForm({ ...form, localityId: event.target.value ? Number(event.target.value) : null })}><option value="">Sin asignar</option>{localities.map((locality) => <option key={locality.id} value={locality.id}>{locality.name}, {locality.provinceName}</option>)}</select></label>
       <label>Talle de camiseta<select value={form.shirtSize ?? ''} onChange={(event) => setForm({ ...form, shirtSize: event.target.value as PlayerPayload['shirtSize'] })}><option value="">Sin definir</option>{shirtSizeLabels.map((size) => <option key={size} value={size}>{size}</option>)}</select></label>
       <label>Modelo asignado<select value={form.shirtModel ?? ''} onChange={(event) => setForm({ ...form, shirtModel: event.target.value as PlayerPayload['shirtModel'] })}><option value="">Asignar automáticamente</option>{shirtModelLabels.map((model) => <option key={model} value={model}>{model}</option>)}</select></label>
-      <div className="form-actions span-2"><button type="submit" className="primary-button">Guardar</button></div>
+      <div className="form-actions span-2"><button type="submit" className="primary-button" disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</button></div>
     </form></AdminDialog> : null}
     {photo ? <AdminDialog title={photo.name} onClose={() => setPhoto(null)}><img src={photo.url} alt={`Foto de ${photo.name}`} style={{ display: 'block', maxWidth: '100%', maxHeight: '70vh', margin: 'auto', objectFit: 'contain' }} /></AdminDialog> : null}
   </div>;

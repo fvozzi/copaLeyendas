@@ -32,7 +32,13 @@ export class PlayersService {
   ) {}
 
   async list(query: QueryPlayersDto) {
-    const registrations = await this.importRegisteredPlayers();
+    // Registrations synchronize their players when they are created or rectified.
+    // Repeating that roster synchronization while listing silently undid manual
+    // unassignments and recreated players that a director had explicitly deleted.
+    const registrations = await this.registrationsRepository.find({
+      relations: { category: true, locality: true },
+      order: { updatedAt: 'ASC', id: 'ASC' },
+    });
     const qb = this.playersRepository.createQueryBuilder('player')
       .leftJoinAndSelect('player.locality', 'locality')
       .leftJoinAndSelect('locality.category', 'category');
@@ -147,28 +153,6 @@ export class PlayersService {
     const locality = await this.localitiesRepository.findOne({ where: { id: localityId } });
     if (!locality) throw new NotFoundException('Localidad no encontrada');
     return locality;
-  }
-
-  private async importRegisteredPlayers() {
-    const registrations = await this.registrationsRepository.find({
-      relations: { category: true, locality: true },
-      order: { updatedAt: 'ASC', id: 'ASC' },
-    });
-
-    const latestRegistrationByDni = new Map<string, number>();
-    for (const registration of registrations) {
-      for (const prefix of ['playerOne', 'playerTwo', 'playerThree'] as const) {
-        const dni = registration[`${prefix}Dni`]?.trim();
-        if (dni) latestRegistrationByDni.set(dni, registration.id);
-      }
-    }
-    for (const registration of registrations) {
-      const authoritativeDnis = new Set([...latestRegistrationByDni]
-        .filter(([, registrationId]) => registrationId === registration.id)
-        .map(([dni]) => dni));
-      await this.syncRegistrationPlayers(registration, undefined, authoritativeDnis);
-    }
-    return registrations;
   }
 
   private async getShirtZoneEntries(): Promise<ShirtZoneEntry[]> {

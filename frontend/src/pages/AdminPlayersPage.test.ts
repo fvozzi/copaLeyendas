@@ -99,3 +99,32 @@ it('allows changing the persisted shirt model from the player editor', async () 
   await act(async () => save.click());
   expect(updatePlayer).toHaveBeenCalledWith(1, expect.objectContaining({ shirtModel: 'Dabber Color 4' }));
 });
+
+it('sends an explicit null when removing the locality assignment', async () => {
+  vi.mocked(getPlayers).mockResolvedValue([{
+    id: 1, fullName: 'Player One', dni: '12345678', localityId: 7, locality: { id: 7, name: 'Equipo', provinceName: 'Buenos Aires' },
+  }] as never);
+  vi.mocked(getLocalities).mockResolvedValue([{ id: 7, name: 'Equipo', provinceName: 'Buenos Aires' }] as never);
+  vi.mocked(updatePlayer).mockResolvedValue({} as never);
+  await act(async () => root.render(createElement(AdminPlayersPage)));
+  const edit = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Editar')!;
+  await act(async () => edit.click());
+  const locality = Array.from(document.querySelectorAll('label')).find((label) => label.textContent?.includes('Localidad / equipo'))!.querySelector('select')!;
+  await act(async () => { locality.value = ''; locality.dispatchEvent(new Event('change', { bubbles: true })); });
+  const form = document.querySelector('form')!;
+  await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+  expect(updatePlayer).toHaveBeenCalledWith(1, expect.objectContaining({ localityId: null }));
+});
+
+it('keeps the player dialog open and shows update errors inside it', async () => {
+  vi.mocked(getPlayers).mockResolvedValue([{ id: 1, fullName: 'Player One', dni: '12345678', localityId: 7 }] as never);
+  vi.mocked(updatePlayer).mockRejectedValue(new Error('No se pudo desasignar la jugadora.'));
+  await act(async () => root.render(createElement(AdminPlayersPage)));
+  const edit = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Editar')!;
+  await act(async () => edit.click());
+  const form = document.querySelector('form')!;
+  await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+  const dialog = document.querySelector('[role="dialog"]')!;
+  expect(dialog).toBeTruthy();
+  expect(dialog.querySelector('[role="alert"]')?.textContent).toContain('No se pudo desasignar la jugadora.');
+});

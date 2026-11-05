@@ -133,6 +133,28 @@ describe('registered player photos', () => {
 });
 
 describe('registration player synchronization', () => {
+  it('does not recreate a manually deleted player while listing registrations', async () => {
+    const { service, registrations, query } = setup();
+    query.getMany.mockResolvedValue([]);
+    registrations.find.mockResolvedValue([{
+      id: 9, playerOneName: 'Eliminada', playerOneDni: '12345678',
+      localityId: 4, category: { name: 'Damas A' }, locality: { name: 'Equipo' },
+    }] as never);
+    const synchronize = vi.spyOn(service, 'syncRegistrationPlayers');
+    await expect(service.list({})).resolves.toEqual([]);
+    expect(synchronize).not.toHaveBeenCalled();
+  });
+
+  it('persists an explicit unassignment and an explicit deletion', async () => {
+    const player = { id: 4, dni: '12345678', fullName: 'Jugadora', localityId: 7 };
+    const players = { findOne: vi.fn(async () => player), save: vi.fn(async (value) => value), remove: vi.fn(async () => player) };
+    const service = new PlayersService(players as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never);
+    await service.update(4, { localityId: null });
+    expect(players.save).toHaveBeenCalledWith(expect.objectContaining({ id: 4, localityId: null }));
+    await expect(service.remove(4)).resolves.toEqual({ success: true });
+    expect(players.remove).toHaveBeenCalledWith(expect.objectContaining({ id: 4 }));
+  });
+
   it('keeps existing players linked to the locality referenced by their registration', async () => {
     const players = { findOne: vi.fn().mockResolvedValue({ id: 1, dni: '123', localityId: 2 }), save: vi.fn() };
     const localities = { findOne: vi.fn(), save: vi.fn() };
