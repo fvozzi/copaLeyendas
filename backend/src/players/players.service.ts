@@ -98,7 +98,13 @@ export class PlayersService {
 
   async update(id: number, dto: UpdatePlayerDto) {
     const player = await this.getById(id);
-    if (dto.localityId !== undefined) player.localityId = (await this.resolveLocality(dto.localityId))?.id ?? null;
+    if (dto.localityId !== undefined) {
+      const locality = await this.resolveLocality(dto.localityId);
+      // getById loads the relation. Keep both the FK and the relation in sync so
+      // TypeORM cannot restore the previous locality object when localityId is null.
+      player.localityId = locality?.id ?? null;
+      player.locality = locality;
+    }
     if (dto.fullName !== undefined) player.fullName = dto.fullName.trim();
     if (dto.dni !== undefined) player.dni = dto.dni.trim();
     if (dto.birthDate !== undefined) player.birthDate = normalizeOptional(dto.birthDate);

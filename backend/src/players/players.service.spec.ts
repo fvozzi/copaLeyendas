@@ -146,11 +146,11 @@ describe('registration player synchronization', () => {
   });
 
   it('persists an explicit unassignment and an explicit deletion', async () => {
-    const player = { id: 4, dni: '12345678', fullName: 'Jugadora', localityId: 7 };
+    const player = { id: 4, dni: '12345678', fullName: 'Jugadora', localityId: 7, locality: { id: 7, name: 'Equipo anterior' } };
     const players = { findOne: vi.fn(async () => player), save: vi.fn(async (value) => value), remove: vi.fn(async () => player) };
     const service = new PlayersService(players as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never);
     await service.update(4, { localityId: null });
-    expect(players.save).toHaveBeenCalledWith(expect.objectContaining({ id: 4, localityId: null }));
+    expect(players.save).toHaveBeenCalledWith(expect.objectContaining({ id: 4, localityId: null, locality: null }));
     await expect(service.remove(4)).resolves.toEqual({ success: true });
     expect(players.remove).toHaveBeenCalledWith(expect.objectContaining({ id: 4 }));
   });
