@@ -12,6 +12,7 @@ import type {
   PublicRegistrationResponse,
   PublicCurrentTournament,
   PublicProgramMapData,
+  TournamentDistribution,
   RegistrationAccessGrant,
   RegistrationStatusPayload,
   ContentPost,
@@ -337,6 +338,8 @@ export function createTournamentZone(payload: { tournamentCategoryId: number; ve
 export function updateTournamentZone(id: number, payload: { name: string; venueId: number; capacity: number }) { return request(`/tournaments/zones/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true); }
 export function deleteTournamentZone(id: number) { return request<{ success: boolean }>(`/tournaments/zones/${id}`, { method: 'DELETE' }, true); }
 export function divideTournamentZones(id: number) { return request(`/tournaments/categories/${id}/divide-zones`, { method: 'POST' }, true); }
+export function getTournamentDistribution(id: number) { return request<TournamentDistribution>(`/tournaments/${id}/distribution`, {}, true); }
+export function applyTournamentDistribution(id: number, baseVersion: string) { return request<TournamentDistribution>(`/tournaments/${id}/distribution/apply`, { method: 'POST', body: JSON.stringify({ baseVersion }) }, true); }
 export function getTournamentScheduleGrid(id: number) { return request<TournamentScheduleSlot[]>(`/tournaments/${id}/schedule-grid`, {}, true); }
 export function redistributeTournamentCourts(id: number) { return request<TournamentScheduleSlot[]>(`/tournaments/${id}/redistribute-courts`, { method: 'POST' }, true); }
 export function previewProgramScenario(id: number, payload: ProgramScenario) { return request<ProgramScenarioPreview>(`/tournaments/${id}/program-scenario/preview`, { method: 'POST', body: JSON.stringify(payload) }, true); }

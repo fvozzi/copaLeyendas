@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, Param, ParseIntPipe, Patch, Post, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
-import { IsDateString, IsInt, Min } from 'class-validator';
+import { IsDateString, IsInt, IsString, Min } from 'class-validator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import type { Response } from 'express';
@@ -14,6 +14,7 @@ import { ProgramScenarioDto } from './program-scenario.dto';
 class ScheduleMatchDto { @IsDateString() scheduledAt: string; }
 class ResultDto { @IsInt() homeScore: number; @IsInt() awayScore: number; }
 class AssignPlaceDto { @IsInt() @Min(1) registrationId: number; }
+class ApplyDistributionDto { @IsString() baseVersion: string; }
 
 @Controller('tournaments')
 @UseGuards(JwtAuthGuard)
@@ -25,6 +26,8 @@ export class TournamentsController {
   @Get('categories/:id/registrations') registrations(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { this.assertDirector(user); return this.q.availableRegistrations(id); }
   @Get('zones/:id/matches') async matches(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { await this.s.assertZoneAccess(user, id); return this.s.matches(id); }
   @Get(':id') detail(@Param('id', ParseIntPipe) id: number) { return this.q.detail(id); }
+  @Get(':id/distribution') distribution(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { this.assertDirector(user); return this.s.distributionPreview(id); }
+  @Post(':id/distribution/apply') applyDistribution(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: ApplyDistributionDto) { this.assertDirector(user); return this.s.applyDistribution(id, dto.baseVersion); }
   @Get(':id/schedule-grid') scheduleGrid(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { this.assertDirector(user); return this.s.scheduleGrid(id); }
   @Post(':id/redistribute-courts') redistributeCourts(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { this.assertDirector(user); return this.s.redistributeCourts(id); }
   @Post(':id/program-scenario/preview') previewScenario(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: ProgramScenarioDto) { this.assertDirector(user); return this.s.scenario(id, dto); }

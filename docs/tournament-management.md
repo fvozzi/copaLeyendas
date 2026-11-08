@@ -80,7 +80,17 @@ El Director registra una localidad/equipo y le asigna categoria. Al emitir un to
 
 Una vez validado el pago o bonificacion, el Director marca la inscripcion como confirmada. Solo esas parejas se consideran para el conteo de la categoria y para armar zonas.
 
-Al agregar o editar una categoría del torneo, el Director puede fijar la cantidad de zonas además de las parejas por zona. Por ejemplo, 2 zonas de 4 reservan 8 lugares aunque todavía no estén confirmadas todas las parejas. Si deja la cantidad vacía, se calcula al dividir según las parejas confirmadas. El sistema no divide si las parejas confirmadas superan el cupo configurado. Con 2 zonas se programan dos semifinales (1.ª A contra 2.ª B y 1.ª B contra 2.ª A) y la final, sin cuartos.
+La cantidad y el tamaño de las zonas no requieren configuración manual. Se calculan a partir de las parejas confirmadas: si el total es divisible por 3 se usan zonas de 3; si no y es divisible por 4 se usan zonas de 4; en los demás casos se busca una combinación exacta de ambos tamaños. Por ejemplo: 8 = 4+4, 9 = 3+3+3, 10 = 3+3+4, 12 = 3+3+3+3 y 16 = 4+4+4+4. Los totales que no pueden expresarse con zonas completas de 3 o 4 quedan señalados y no se pueden aplicar.
+
+### CU-05b Distribuir zonas y generar partidos
+
+El menú **Distribución** permite elegir el torneo y calcular una vista previa sin modificar datos. La vista muestra la sede, el tamaño de cada zona y todas las parejas antes de confirmar. La asignación cumple estas prioridades:
+
+- parejas de la misma localidad, dentro de una categoría, comparten sede y quedan en zonas distintas;
+- entre categorías se intenta mantener la misma sede para una localidad;
+- en igualdad de condiciones se balancea la carga entre sedes activas.
+
+Al aplicar la vista previa se reemplazan únicamente zonas que todavía no tienen fixture, se crean las asignaciones y se genera el fixture en una transacción. Si cambiaron inscripciones, sedes o zonas desde el cálculo, se exige recalcular. Cuando ya existen partidos, la distribución pasa a modo de consulta y los cambios se realizan desde **Programa → Mapa**.
 
 ### CU-06 Crear zona
 
@@ -148,6 +158,9 @@ El Lider de cancha puede consultar los partidos de sus canchas asignadas y carga
 - Partido: un set, 25 tantos.
 - Con 16 parejas en una categoria: cuatro zonas de cuatro. Cada zona contiene cuatro partidos con esquema inicial-condicional.
 - Con 12 parejas: cuatro zonas de tres. Cada zona juega triangular.
+- Con 8 parejas: dos zonas de cuatro.
+- Con 9 parejas: tres zonas de tres.
+- Con 10 parejas: dos zonas de tres y una zona de cuatro.
 - La cantidad de parejas confirmadas se obtiene de la categoria del torneo, no de la zona.
 - Una zona siempre debe estar vinculada a una categoria y una cancha.
 

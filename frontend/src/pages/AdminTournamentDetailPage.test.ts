@@ -6,7 +6,7 @@ import { AdminTournamentDetailPage } from './AdminTournamentDetailPage';
 import { deleteTournamentZone, getCategories, getTournament, getVenues, updateTournamentCategory, updateTournamentZone } from '../lib/api';
 
 vi.mock('../lib/auth', () => ({ useAuth: () => ({ user: { role: 'DIRECTOR' } }) }));
-vi.mock('../lib/api', () => ({ getCategories: vi.fn(), getTournament: vi.fn(), getVenues: vi.fn(), updateTournamentZone: vi.fn(), deleteTournamentZone: vi.fn(), addTournamentCategory: vi.fn(), createTournamentZone: vi.fn(), divideTournamentZones: vi.fn(), updateTournamentCategory: vi.fn() }));
+vi.mock('../lib/api', () => ({ getCategories: vi.fn(), getTournament: vi.fn(), getVenues: vi.fn(), updateTournamentZone: vi.fn(), deleteTournamentZone: vi.fn(), addTournamentCategory: vi.fn(), createTournamentZone: vi.fn(), updateTournamentCategory: vi.fn() }));
 let container: HTMLDivElement;
 let root: Root;
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.restoreAllMocks(); vi.resetAllMocks(); });
@@ -32,26 +32,21 @@ it('shows when a venue has no active courts and allows correction without closin
   expect(form.querySelector('button')?.disabled).toBe(false);
 });
 
-it('saves two zones of four pairs for Cimadamore and shows the total capacity', async () => {
+it('shows automatic zoning and saves only the match format for Cimadamore', async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   const category = { id: 8, categoryId: 3, category: { id: 3, name: 'Silvina Cimadamore' }, pointsPerSet: 25, setsToWin: 1, zoneSize: 4, zoneCount: null };
   vi.mocked(getTournament).mockResolvedValue({ id: 1, name: 'Copa', categories: [category], zones: [] } as never);
   vi.mocked(getCategories).mockResolvedValue([{ id: 3, name: 'Silvina Cimadamore' }] as never);
   vi.mocked(getVenues).mockResolvedValue([]);
-  vi.mocked(updateTournamentCategory).mockResolvedValue({ ...category, zoneCount: 2 } as never);
+  vi.mocked(updateTournamentCategory).mockResolvedValue(category as never);
   container = document.createElement('div'); document.body.append(container); root = createRoot(container);
   await act(async () => root.render(createElement(MemoryRouter, { initialEntries: ['/app/torneos/1'], future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(Routes, null, createElement(Route, { path: '/app/torneos/:id', element: createElement(AdminTournamentDetailPage) })))));
-  expect(container.textContent).toContain('Según confirmadas');
+  expect(container.textContent).toContain('Automática · zonas de 3 o 4');
   await act(async () => (container.querySelector('tbody button') as HTMLButtonElement).click());
   const form = document.querySelector('form')!;
-  const zoneCount = form.querySelector('input[placeholder="Automático"]') as HTMLInputElement;
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(zoneCount, '2');
-    zoneCount.dispatchEvent(new Event('input', { bubbles: true }));
-  });
-  expect(form.textContent).toContain('Cupo total: 8 parejas');
+  expect(form.textContent).toContain('se calculan automáticamente');
   await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
-  expect(updateTournamentCategory).toHaveBeenCalledWith(8, expect.objectContaining({ zoneSize: 4, zoneCount: 2 }));
+  expect(updateTournamentCategory).toHaveBeenCalledWith(8, expect.objectContaining({ pointsPerSet: 25, setsToWin: 1 }));
 });
 
 it('deletes an unused zone from the list after warning about its pending games', async () => {
@@ -70,7 +65,7 @@ it('deletes an unused zone from the list after warning about its pending games',
   await act(async () => remove.click());
   expect(confirm).toHaveBeenCalledWith(expect.stringContaining('zona C de Silvina Cimadamore'));
   expect(deleteTournamentZone).toHaveBeenCalledWith(12);
-  expect(container.textContent).toContain('Usa Dividir zonas');
+  expect(container.textContent).toContain('Usá Distribución automática');
 });
 
 it('shows the server reason and keeps the zone when it has assigned pairs', async () => {

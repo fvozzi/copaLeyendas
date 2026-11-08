@@ -27,6 +27,7 @@ import { RegistrationPage } from './pages/RegistrationPage';
 import { SectionPage } from './pages/SectionPage';
 import { TournamentEditionPage } from './pages/TournamentEditionPage';
 import { AdminResultsPage } from './pages/AdminResultsPage';
+import { AdminDistributionPage } from './pages/AdminDistributionPage';
 
 export default function App() {
   return (
@@ -56,6 +57,7 @@ export default function App() {
               <Route path="canchas/internas" element={<AdminPlayingCourtsPage />} />
               <Route path="torneos" element={<AdminTournamentsPage />} />
               <Route path="torneos/:id" element={<AdminTournamentDetailPage />} />
+              <Route path="distribucion" element={<AdminDistributionPage />} />
               <Route path="programa" element={<AdminProgramPage />} />
               <Route path="resultados" element={<AdminResultsPage />} />
               <Route path="zonas/:id" element={<AdminZonePage />} />

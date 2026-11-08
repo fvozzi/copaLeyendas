@@ -1140,6 +1140,38 @@ img {
   color: var(--ink-soft);
 }
 
+.distribution-page { min-width: 0; }
+.distribution-rules { display: grid; grid-template-columns: minmax(14rem, 0.8fr) minmax(18rem, 1.2fr); gap: 1.5rem; }
+.distribution-rules h2, .distribution-rules p { margin: 0; }
+.distribution-rules p { margin-top: 0.45rem; color: var(--ink-soft); line-height: 1.5; }
+.distribution-rules ol { margin: 0; padding-left: 1.3rem; display: grid; gap: 0.55rem; line-height: 1.45; }
+.distribution-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 0.75rem; }
+.distribution-toolbar label { flex: 1; min-width: 14rem; max-width: 32rem; font-size: 0.78rem; color: var(--ink-soft); }
+.distribution-toolbar select { display: block; width: 100%; min-height: 44px; margin-top: 0.25rem; padding: 0.55rem 0.7rem; }
+.distribution-category-grid { display: grid; gap: 1rem; }
+.distribution-category { display: grid; gap: 1rem; }
+.distribution-category > header { display: flex; justify-content: space-between; align-items: start; gap: 1rem; }
+.distribution-category h2, .distribution-category h3 { margin: 0; }
+.distribution-summary { display: grid; justify-items: end; gap: 0.2rem; text-align: right; }
+.distribution-summary strong { font-size: 1.1rem; }
+.distribution-summary span, .distribution-zone span { color: var(--ink-soft); font-size: 0.83rem; }
+.distribution-warning { margin: 0; padding: 0.65rem 0.8rem; border-radius: 8px; background: #fff4d8; color: #624800; }
+.distribution-zone-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.75rem; }
+.distribution-zone { min-width: 0; padding: 0.9rem; border: 1px solid var(--line); border-radius: 10px; background: var(--white); }
+.distribution-zone > div { display: grid; gap: 0.2rem; }
+.distribution-zone .inline-link { justify-self: start; margin-top: 0.25rem; }
+.distribution-zone ol { margin: 0.75rem 0 0; padding-left: 1.35rem; display: grid; gap: 0.55rem; }
+.distribution-zone li { padding-left: 0.15rem; }
+.distribution-zone li strong, .distribution-zone li small { display: block; overflow-wrap: anywhere; }
+.distribution-zone li small { margin-top: 0.1rem; color: var(--ink-soft); }
+
+@media (max-width: 760px) {
+  .distribution-rules { grid-template-columns: 1fr; }
+  .distribution-toolbar > * { width: 100%; max-width: none; }
+  .distribution-category > header { display: grid; }
+  .distribution-summary { justify-items: start; text-align: left; }
+}
+
 .match-score {
   text-align: right;
   font-weight: 700;

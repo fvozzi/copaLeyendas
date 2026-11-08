@@ -1,0 +1,30 @@
+import { act, createElement } from 'react';
+import { createRoot } from 'react-dom/client';
+import { MemoryRouter } from 'react-router-dom';
+import { afterEach, expect, it, vi } from 'vitest';
+import { applyTournamentDistribution, getTournamentDistribution, getTournaments } from '../lib/api';
+import { AdminDistributionPage } from './AdminDistributionPage';
+
+vi.mock('../lib/api', () => ({ getTournaments: vi.fn(), getTournamentDistribution: vi.fn(), applyTournamentDistribution: vi.fn() }));
+
+afterEach(() => { vi.restoreAllMocks(); vi.resetAllMocks(); document.body.innerHTML = ''; });
+
+it('shows the assignment rules and applies the preview to the real tournament', async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  vi.mocked(getTournaments).mockResolvedValue([{ id: 1, name: 'Copa', status: 'ACTIVE' }] as never);
+  const preview = { tournament: { id: 1, name: 'Copa' }, mode: 'PREVIEW', canApply: true, baseVersion: 'version-1', matchCount: 0, rules: ['Misma localidad: misma sede y distinta zona.', 'Los partidos son los mismos de Programa - Mapa.'], plans: [{ tournamentCategoryId: 5, categoryName: 'Damas A', registrationCount: 8, capacities: [4, 4], venue: { id: 2, name: 'Sede Norte' }, warnings: [], zones: [{ name: 'Zona A', capacity: 4, venue: { id: 2, name: 'Sede Norte' }, registrations: [{ id: 10, localityId: 3, localityName: 'Rocha', label: 'Las Leyendas' }] }] }] } as const;
+  vi.mocked(getTournamentDistribution).mockResolvedValue(preview as never);
+  vi.mocked(applyTournamentDistribution).mockResolvedValue({ ...preview, mode: 'CURRENT', canApply: false, matchCount: 11 } as never);
+  vi.spyOn(window, 'confirm').mockReturnValue(true);
+  const container = document.createElement('div'); document.body.append(container);
+  const root = createRoot(container);
+  await act(async () => root.render(createElement(MemoryRouter, { future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(AdminDistributionPage))));
+  expect(container.textContent).toContain('Misma localidad: misma sede y distinta zona.');
+  expect(container.textContent).toContain('4 + 4');
+  expect(container.textContent).toContain('Las Leyendas');
+  const apply = [...container.querySelectorAll('button')].find((button) => button.textContent === 'Aplicar y generar partidos')!;
+  await act(async () => apply.click());
+  expect(applyTournamentDistribution).toHaveBeenCalledWith(1, 'version-1');
+  expect(container.textContent).toContain('hay 11 partidos reales');
+  await act(async () => root.unmount());
+});
