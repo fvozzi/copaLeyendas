@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { applyTournamentDistribution, getTournamentDistribution, getTournaments, setTournamentAttendance } from '../lib/api';
-import type { Tournament, TournamentDistribution } from '../types';
+import { Link, useNavigate } from 'react-router-dom';
+import { ProgramZoneEditor } from '../components/ProgramZoneEditor';
+import { applyTournamentDistribution, getTournament, getTournamentDistribution, getTournamentScheduleGrid, getTournaments, getVenues, setTournamentAttendance } from '../lib/api';
+import type { Tournament, TournamentDistribution, TournamentScheduleSlot, TournamentZone, Venue } from '../types';
 
 export function AdminDistributionPage() {
+  const navigate = useNavigate();
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [tournamentId, setTournamentId] = useState(0);
   const [distribution, setDistribution] = useState<TournamentDistribution | null>(null);
@@ -11,6 +13,7 @@ export function AdminDistributionPage() {
   const [applying, setApplying] = useState(false);
   const [updatingAttendance, setUpdatingAttendance] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [zoneEditor, setZoneEditor] = useState<{ zone: TournamentZone; venues: Venue[]; slots: TournamentScheduleSlot[] } | null>(null);
 
   useEffect(() => {
     getTournaments().then((items) => {
@@ -49,6 +52,26 @@ export function AdminDistributionPage() {
     finally { setUpdatingAttendance(null); }
   };
 
+  const openZoneEditor = async (zoneId: number) => {
+    setLoading(true); setError(null);
+    try {
+      const [detail, venues, slots] = await Promise.all([getTournament(tournamentId), getVenues(), getTournamentScheduleGrid(tournamentId)]);
+      const zone = detail.zones.find((item) => item.id === zoneId);
+      if (!zone) throw new Error('La zona ya no existe. Recalculá la distribución.');
+      setZoneEditor({ zone, venues, slots: slots.filter((slot) => slot.match?.zoneId === zoneId) });
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo abrir la zona.'); }
+    finally { setLoading(false); }
+  };
+
+  const refreshZoneEditor = async () => {
+    if (!zoneEditor) return;
+    const [nextDistribution, detail, slots] = await Promise.all([getTournamentDistribution(tournamentId), getTournament(tournamentId), getTournamentScheduleGrid(tournamentId)]);
+    setDistribution(nextDistribution);
+    const zone = detail.zones.find((item) => item.id === zoneEditor.zone.id);
+    if (!zone) { setZoneEditor(null); return; }
+    setZoneEditor({ ...zoneEditor, zone, slots: slots.filter((slot) => slot.match?.zoneId === zone.id) });
+  };
+
   return <div className="admin-panel distribution-page">
     <div className="panel-header">
       <div><p className="eyebrow">Competencia</p><h1>Distribución</h1></div>
@@ -83,11 +106,12 @@ export function AdminDistributionPage() {
         </div>
         {plan.warnings.map((warning) => <p className="distribution-warning" key={warning}>{warning}</p>)}
         <div className="distribution-zone-grid">{plan.zones.map((zone) => <section className="distribution-zone" key={`${plan.tournamentCategoryId}-${zone.name}`}>
-          <div><h3>{zone.name}</h3><span>{zone.registrations.length}/{zone.capacity} · {zone.venue?.name ?? plan.venue?.name}</span>{zone.id && <Link className="inline-link" to={`/app/zonas/${zone.id}`}>Abrir partidos</Link>}</div>
+          <div><h3>{zone.name}</h3><span>{zone.registrations.length}/{zone.capacity} · {zone.venue?.name ?? plan.venue?.name}</span>{zone.id && <button type="button" className="inline-link" onClick={() => void openZoneEditor(zone.id!)}>Editar zona y parejas</button>}</div>
           <ol>{zone.registrations.map((registration) => <li key={registration.id}><strong>{registration.label}</strong><small>{registration.localityName}</small></li>)}</ol>
         </section>)}</div>
       </article>)}
     </div>
     {!loading && distribution && !distribution.plans.length && <p className="empty-copy">El torneo todavía no tiene categorías configuradas.</p>}
+    {zoneEditor && <ProgramZoneEditor zone={zoneEditor.zone} venues={zoneEditor.venues} slots={zoneEditor.slots} onClose={() => setZoneEditor(null)} onChanged={refreshZoneEditor} onMatch={() => navigate('/app/programa')} />}
   </div>;
 }
