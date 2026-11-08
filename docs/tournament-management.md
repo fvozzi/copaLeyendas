@@ -80,7 +80,7 @@ El Director registra una localidad/equipo y le asigna categoria. Al emitir un to
 
 Una vez validado el pago o bonificacion, el Director marca la inscripcion como confirmada. Solo esas parejas se consideran para el conteo de la categoria y para armar zonas.
 
-La cantidad y el tamaño de las zonas no requieren configuración manual. Se calculan a partir de las parejas confirmadas: si el total es divisible por 3 se usan zonas de 3; si no y es divisible por 4 se usan zonas de 4; en los demás casos se busca una combinación exacta de ambos tamaños. Por ejemplo: 8 = 4+4, 9 = 3+3+3, 10 = 3+3+4, 12 = 3+3+3+3 y 16 = 4+4+4+4. Los totales que no pueden expresarse con zonas completas de 3 o 4 quedan señalados y no se pueden aplicar.
+La cantidad y el tamaño de las zonas no requieren configuración manual. Se calculan a partir de las parejas confirmadas y presentes, con un máximo de cuatro zonas completas de 3 o 4 parejas. Por ejemplo: 8 = 4+4, 9 = 3+3+3, 10 = 4+3+3, 12 = 3+3+3+3, 15 = 4+4+4+3 y 16 = 4+4+4+4. Así, una baja sobre un cuadro de 16 conserva las cuatro zonas y reduce solamente una de ellas. Los totales que no pueden formar zonas completas quedan señalados y no se pueden aplicar.
 
 ### CU-05b Distribuir zonas y generar partidos
 
@@ -101,6 +101,10 @@ Desde la lista de zonas, el Director puede eliminar una zona sobrante tras confi
 ### CU-07 Asignar parejas a zona
 
 El Director asigna parejas confirmadas a una zona. Una pareja no puede pertenecer a dos zonas de la misma categoria del torneo.
+
+### CU-07b Registrar asistencia y rearmar
+
+Antes del primer resultado, el Director puede marcar una pareja como ausente para ese torneo sin eliminar su inscripción, pago ni historial. La vista previa excluye a las ausentes y propone la nueva composición. Al aplicarla se reemplazan únicamente el fixture y el programa pendientes. Si una pareja vuelve a participar se puede incluir nuevamente y recalcular. Con resultados cargados la asistencia y la distribución quedan bloqueadas para preservar el historial deportivo. Eliminar la inscripción queda reservado para registros cargados por error.
 
 ### CU-08 Armar fixture de zona de cuatro
 
@@ -161,6 +165,7 @@ El Lider de cancha puede consultar los partidos de sus canchas asignadas y carga
 - Con 8 parejas: dos zonas de cuatro.
 - Con 9 parejas: tres zonas de tres.
 - Con 10 parejas: dos zonas de tres y una zona de cuatro.
+- Con 15 parejas: tres zonas de cuatro y una zona de tres.
 - La cantidad de parejas confirmadas se obtiene de la categoria del torneo, no de la zona.
 - Una zona siempre debe estar vinculada a una categoria y una cancha.
 

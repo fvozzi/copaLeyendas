@@ -1156,6 +1156,12 @@ img {
 .distribution-summary strong { font-size: 1.1rem; }
 .distribution-summary span, .distribution-zone span { color: var(--ink-soft); font-size: 0.83rem; }
 .distribution-warning { margin: 0; padding: 0.65rem 0.8rem; border-radius: 8px; background: #fff4d8; color: #624800; }
+.distribution-attendance { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: 0.55rem; }
+.distribution-attendance > div { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; min-width: 0; padding: 0.65rem 0.75rem; border: 1px solid var(--line); border-radius: 8px; }
+.distribution-attendance > div.is-absent { background: #f5f1ee; opacity: 0.75; }
+.distribution-attendance span, .distribution-attendance strong, .distribution-attendance small { display: block; min-width: 0; overflow-wrap: anywhere; }
+.distribution-attendance small { margin-top: 0.1rem; color: var(--ink-soft); }
+.distribution-attendance button { flex: 0 0 auto; }
 .distribution-zone-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.75rem; }
 .distribution-zone { min-width: 0; padding: 0.9rem; border: 1px solid var(--line); border-radius: 10px; background: var(--white); }
 .distribution-zone > div { display: grid; gap: 0.2rem; }

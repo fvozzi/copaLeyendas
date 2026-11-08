@@ -23,6 +23,7 @@ import type { ProgramScenarioDto } from './program-scenario.dto';
 import { simulateProgram } from './program-scenario';
 import { readMatchResultPhoto, removeMatchResultPhoto, storeMatchResultPhoto } from './match-result-photo-storage';
 import { planTournamentDistribution, type DistributionRegistration } from './tournament-distribution';
+import { TournamentRegistrationAttendance } from './tournament-registration-attendance.entity';
 
 @Injectable()
 export class TournamentsService {
@@ -264,6 +265,13 @@ export class TournamentsService {
     const registrations = categoryIds.length ? await manager.getRepository(PairRegistration).find({
       where: { categoryId: In(categoryIds), status: RegistrationStatus.CONFIRMED }, relations: { locality: true }, order: { id: 'ASC' },
     }) : [];
+    const attendanceRows = await manager.getRepository(TournamentRegistrationAttendance).find({ where: { tournamentId }, order: { id: 'ASC' } });
+    const attendanceByRegistration = new Map(attendanceRows.map((row) => [row.registrationId, row.present]));
+    const eligibleRegistrations = registrations.filter((registration) => attendanceByRegistration.get(registration.id) !== false);
+    const attendance = registrations.map((registration) => {
+      const category = categories.find((item) => item.categoryId === registration.categoryId)!;
+      return { ...this.distributionRegistration(registration), tournamentCategoryId: category.id, categoryName: category.category.name, present: attendanceByRegistration.get(registration.id) !== false };
+    });
     const venues = await manager.getRepository(Venue).find({ where: { active: true }, order: { name: 'ASC' } });
     const zones = await manager.getRepository(Zone).find({
       where: { tournamentCategory: { tournamentId } }, relations: { venue: true, tournamentCategory: { category: true } }, order: { tournamentCategoryId: 'ASC', name: 'ASC' },
@@ -272,12 +280,17 @@ export class TournamentsService {
     const entries = zoneIds.length ? await manager.getRepository(ZoneEntry).find({
       where: { zoneId: In(zoneIds) }, relations: { registration: { locality: true } }, order: { seed: 'ASC', id: 'ASC' },
     }) : [];
-    const zoneMatchCount = zoneIds.length ? await manager.getRepository(TournamentMatch).count({ where: { zoneId: In(zoneIds) } }) : 0;
+    const zoneMatches = zoneIds.length ? await manager.getRepository(TournamentMatch).find({ where: { zoneId: In(zoneIds) } }) : [];
+    const zoneMatchCount = zoneMatches.length;
     const slots = await manager.getRepository(TournamentScheduleSlot).find({ where: { tournamentId }, order: { sequence: 'ASC' } });
     const matchCount = Math.max(zoneMatchCount, slots.filter((slot) => slot.matchId).length);
+    const slotMatchIds = slots.flatMap((slot) => slot.matchId ? [slot.matchId] : []);
+    const slotMatches = slotMatchIds.length ? await manager.getRepository(TournamentMatch).find({ where: { id: In(slotMatchIds) } }) : [];
+    const hasResults = [...zoneMatches, ...slotMatches].some((match) => match.status === MatchStatus.PLAYED);
     const rules = [
-      'Si la cantidad es divisible por 3, se crean zonas de 3; si no y es divisible por 4, se crean zonas de 4.',
-      'Si no es divisible por 3 ni por 4, se usa una combinacion exacta de zonas de 3 y 4.',
+      'El cuadro usa hasta cuatro zonas, siempre completas, de 3 o 4 parejas.',
+      'De 12 a 16 parejas se mantienen cuatro zonas: 12 es 3+3+3+3 y 16 es 4+4+4+4.',
+      'Si falta una de 16, el formato pasa automaticamente a 4+4+4+3.',
       'Las parejas de una misma localidad comparten sede, pero se ubican en zonas diferentes.',
       'Entre categorias distintas se intenta conservar la misma sede para una localidad.',
       'Los partidos generados son los mismos que se consultan y editan desde Programa - Mapa.',
@@ -286,6 +299,7 @@ export class TournamentsService {
       tournament: { id: tournament.id, updatedAt: (tournament as Tournament & { updatedAt?: Date }).updatedAt },
       categories: categories.map((category) => ({ id: category.id, categoryId: category.categoryId, name: category.category.name })),
       registrations: registrations.map((registration) => ({ id: registration.id, categoryId: registration.categoryId, localityId: registration.localityId, updatedAt: registration.updatedAt })),
+      attendance: attendanceRows.map((row) => ({ registrationId: row.registrationId, present: row.present, updatedAt: row.updatedAt })),
       venues: venues.map((venue) => ({ id: venue.id, name: venue.name, active: venue.active })),
       zones: zones.map((zone) => ({ id: zone.id, categoryId: zone.tournamentCategoryId, venueId: zone.venueId, name: zone.name, capacity: zone.capacity })),
       entries: entries.map((entry) => ({ id: entry.id, zoneId: entry.zoneId, registrationId: entry.registrationId, seed: entry.seed })),
@@ -293,7 +307,21 @@ export class TournamentsService {
     };
     const baseVersion = createHash('sha256').update(JSON.stringify(snapshot)).digest('hex');
 
-    if (matchCount) {
+    const planned = planTournamentDistribution(categories.map((category) => ({
+      id: category.id,
+      name: category.category.name,
+      registrations: eligibleRegistrations.filter((registration) => registration.categoryId === category.categoryId).map((registration) => this.distributionRegistration(registration)),
+    })), venues.map((venue) => ({ id: venue.id, name: venue.name })));
+    const currentSignature = JSON.stringify(categories.map((category) => zones.filter((zone) => zone.tournamentCategoryId === category.id).map((zone) => ({
+      name: zone.name, capacity: zone.capacity, venueId: zone.venueId,
+      registrations: entries.filter((entry) => entry.zoneId === zone.id).map((entry) => entry.registrationId).sort((left, right) => left - right),
+    }))));
+    const plannedSignature = JSON.stringify(planned.map((plan) => plan.zones.map((zone) => ({
+      name: zone.name, capacity: zone.capacity, venueId: zone.venue?.id ?? null,
+      registrations: zone.registrations.map((registration) => registration.id).sort((left, right) => left - right),
+    }))));
+
+    if (matchCount && (hasResults || currentSignature === plannedSignature)) {
       const plans = categories.map((category) => {
         const categoryZones = zones.filter((zone) => zone.tournamentCategoryId === category.id);
         const venueIds = new Set(categoryZones.map((zone) => zone.venueId));
@@ -310,19 +338,15 @@ export class TournamentsService {
           warnings: [],
         };
       });
-      return { tournament: { id: tournament.id, name: tournament.name }, mode: 'CURRENT' as const, canApply: false, baseVersion, matchCount, rules, plans };
+      return { tournament: { id: tournament.id, name: tournament.name }, mode: 'CURRENT' as const, canApply: false, baseVersion, matchCount, hasResults, replacesPendingFixture: false, rules, plans, attendance };
     }
 
-    const plans = planTournamentDistribution(categories.map((category) => ({
-      id: category.id,
-      name: category.category.name,
-      registrations: registrations.filter((registration) => registration.categoryId === category.categoryId).map((registration) => this.distributionRegistration(registration)),
-    })), venues.map((venue) => ({ id: venue.id, name: venue.name })));
+    const plans = planned;
     const populated = plans.filter((plan) => plan.registrationCount > 0);
     const complete = populated.every((plan) => plan.capacities.length > 0 && plan.zones.reduce((sum, zone) => sum + zone.registrations.length, 0) === plan.registrationCount);
     return {
       tournament: { id: tournament.id, name: tournament.name }, mode: 'PREVIEW' as const,
-      canApply: Boolean(venues.length && populated.length && complete), baseVersion, matchCount: 0, rules, plans,
+      canApply: Boolean(!hasResults && venues.length && populated.length && complete), baseVersion, matchCount, hasResults, replacesPendingFixture: matchCount > 0, rules, plans, attendance,
     };
   }
 
@@ -337,7 +361,18 @@ export class TournamentsService {
 
       const zoneRepository = manager.getRepository(Zone);
       const existingZones = await zoneRepository.find({ where: { tournamentCategory: { tournamentId } } });
+      const existingZoneIds = existingZones.map((zone) => zone.id);
+      const slotsRepository = manager.getRepository(TournamentScheduleSlot);
+      const existingSlots = await slotsRepository.find({ where: { tournamentId } });
+      const matchIds = new Set(existingSlots.flatMap((slot) => slot.matchId ? [slot.matchId] : []));
+      if (existingZoneIds.length) {
+        const related = await manager.getRepository(TournamentMatch).find({ where: [
+          { zoneId: In(existingZoneIds) }, { homeQualifierZoneId: In(existingZoneIds) }, { awayQualifierZoneId: In(existingZoneIds) },
+        ] });
+        related.forEach((match) => matchIds.add(match.id));
+      }
       await manager.getRepository(TournamentScheduleSlot).delete({ tournamentId });
+      if (matchIds.size) await manager.getRepository(TournamentMatch).delete({ id: In([...matchIds]) });
       if (existingZones.length) await zoneRepository.remove(existingZones);
       for (const plan of preview.plans.filter((item) => item.registrationCount > 0)) {
         for (const plannedZone of plan.zones) {
@@ -352,6 +387,23 @@ export class TournamentsService {
         }
       }
       await this.buildScheduleGrid(manager, tournamentId);
+      return this.distributionPreviewInManager(manager, tournamentId);
+    });
+  }
+
+  async setAttendance(tournamentId: number, registrationId: number, present: boolean) {
+    return this.t.manager.transaction(async (manager) => {
+      const tournament = await manager.getRepository(Tournament).findOne({ where: { id: tournamentId }, lock: { mode: 'pessimistic_write' } });
+      if (!tournament) throw new NotFoundException('Torneo no encontrado');
+      const categories = await manager.getRepository(TournamentCategory).find({ where: { tournamentId } });
+      const registration = await manager.getRepository(PairRegistration).findOneBy({ id: registrationId });
+      if (!registration || registration.status !== RegistrationStatus.CONFIRMED || !categories.some((category) => category.categoryId === registration.categoryId)) throw new NotFoundException('La pareja confirmada no pertenece a este torneo.');
+      if ((await this.distributionPreviewInManager(manager, tournamentId)).hasResults) throw new BadRequestException('No se puede cambiar la asistencia porque el torneo ya tiene resultados cargados.');
+      const repository = manager.getRepository(TournamentRegistrationAttendance);
+      let attendance = await repository.findOneBy({ tournamentId, registrationId });
+      if (!attendance) attendance = repository.create({ tournamentId, registrationId, present });
+      else attendance.present = present;
+      await repository.save(attendance);
       return this.distributionPreviewInManager(manager, tournamentId);
     });
   }

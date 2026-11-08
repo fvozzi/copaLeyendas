@@ -7,9 +7,11 @@ describe('calculateZoneCapacities', () => {
     [12, [3, 3, 3, 3]],
     [8, [4, 4]],
     [9, [3, 3, 3]],
-    [10, [3, 3, 4]],
-    [11, [3, 4, 4]],
-    [14, [3, 3, 4, 4]],
+    [10, [4, 3, 3]],
+    [11, [4, 4, 3]],
+    [13, [4, 3, 3, 3]],
+    [14, [4, 4, 3, 3]],
+    [15, [4, 4, 4, 3]],
   ])('distributes %i registrations as %j', (total, expected) => {
     expect(calculateZoneCapacities(total as number)).toEqual(expected);
   });

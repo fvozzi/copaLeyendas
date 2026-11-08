@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { applyTournamentDistribution, getTournamentDistribution, getTournaments } from '../lib/api';
+import { applyTournamentDistribution, getTournamentDistribution, getTournaments, setTournamentAttendance } from '../lib/api';
 import type { Tournament, TournamentDistribution } from '../types';
 
 export function AdminDistributionPage() {
@@ -9,6 +9,7 @@ export function AdminDistributionPage() {
   const [distribution, setDistribution] = useState<TournamentDistribution | null>(null);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
+  const [updatingAttendance, setUpdatingAttendance] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -30,11 +31,22 @@ export function AdminDistributionPage() {
 
   const apply = async () => {
     if (!distribution?.canApply || applying) return;
-    if (!window.confirm('Se crearán las zonas, las asignaciones y el fixture real del torneo. ¿Continuar?')) return;
+    const message = distribution.replacesPendingFixture
+      ? 'Se reemplazará el fixture pendiente para rearmar las zonas. Los horarios del programa se calcularán nuevamente. ¿Continuar?'
+      : 'Se crearán las zonas, las asignaciones y el fixture real del torneo. ¿Continuar?';
+    if (!window.confirm(message)) return;
     setApplying(true); setError(null);
     try { setDistribution(await applyTournamentDistribution(tournamentId, distribution.baseVersion)); }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo aplicar la distribución.'); }
     finally { setApplying(false); }
+  };
+
+  const changeAttendance = async (registrationId: number, present: boolean) => {
+    if (updatingAttendance) return;
+    setUpdatingAttendance(registrationId); setError(null);
+    try { setDistribution(await setTournamentAttendance(tournamentId, registrationId, present)); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo actualizar la asistencia.'); }
+    finally { setUpdatingAttendance(null); }
   };
 
   return <div className="admin-panel distribution-page">
@@ -45,9 +57,9 @@ export function AdminDistributionPage() {
     <section className="data-card distribution-rules">
       <div><h2>Reglas automáticas</h2><p>La vista previa no modifica el torneo. Al aplicarla se crean las zonas y los partidos reales.</p></div>
       <ol>{(distribution?.rules ?? [
-        'Si la cantidad es divisible por 3, se crean zonas de 3.',
-        'Si no es divisible por 3 pero sí por 4, se crean zonas de 4.',
-        'En los demás casos se combinan zonas de 3 y 4 sin dejar lugares vacíos.',
+        'El cuadro usa hasta cuatro zonas completas de 3 o 4 parejas.',
+        'De 12 a 16 parejas se mantienen cuatro zonas.',
+        'Con una baja sobre 16, el formato pasa a 4+4+4+3.',
         'Las parejas de la misma localidad comparten sede, pero no zona.',
       ]).map((rule) => <li key={rule}>{rule}</li>)}</ol>
     </section>
@@ -57,11 +69,18 @@ export function AdminDistributionPage() {
       {distribution?.mode === 'PREVIEW' && <button type="button" className="primary-button" disabled={!distribution.canApply || applying} onClick={() => void apply()}>{applying ? 'Generando...' : 'Aplicar y generar partidos'}</button>}
     </div>
     {error && <div className="inline-state" role="alert">{error}</div>}
+    {distribution?.mode === 'PREVIEW' && distribution.replacesPendingFixture && <div className="inline-state">La asistencia cambió o el fixture usa una distribución anterior. Aplicá la vista previa para reemplazar únicamente los partidos pendientes.</div>}
     {distribution?.mode === 'CURRENT' && <div className="inline-state inline-state-success">La distribución ya está aplicada: hay {distribution.matchCount} partidos reales. Cualquier cambio hecho desde Programa / Mapa modifica estos mismos partidos.</div>}
     {distribution?.mode === 'PREVIEW' && !distribution.canApply && !loading && <div className="inline-state">La vista previa no se puede aplicar todavía. Revisá las observaciones y que exista al menos una sede activa.</div>}
     <div className="distribution-category-grid">
       {distribution?.plans.map((plan) => <article className="data-card distribution-category" key={plan.tournamentCategoryId}>
-        <header><div><p className="eyebrow">{plan.registrationCount} parejas</p><h2>{plan.categoryName}</h2></div><div className="distribution-summary"><strong>{plan.capacities.length ? plan.capacities.join(' + ') : 'Sin zonas'}</strong><span>{plan.venue?.name ?? (plan.zones.some((zone) => zone.venue) ? 'Varias sedes' : 'Sin sede asignada')}</span></div></header>
+        <header><div><p className="eyebrow">{plan.registrationCount} parejas presentes</p><h2>{plan.categoryName}</h2></div><div className="distribution-summary"><strong>{plan.capacities.length ? plan.capacities.join(' + ') : 'Sin zonas'}</strong><span>{plan.venue?.name ?? (plan.zones.some((zone) => zone.venue) ? 'Varias sedes' : 'Sin sede asignada')}</span></div></header>
+        <div className="distribution-attendance">
+          {distribution.attendance.filter((registration) => registration.tournamentCategoryId === plan.tournamentCategoryId).map((registration) => <div key={registration.id} className={registration.present ? '' : 'is-absent'}>
+            <span><strong>{registration.label}</strong><small>{registration.localityName}</small></span>
+            <button type="button" className={registration.present ? 'danger-link' : 'inline-link'} disabled={updatingAttendance === registration.id || distribution.hasResults} onClick={() => void changeAttendance(registration.id, !registration.present)}>{updatingAttendance === registration.id ? 'Guardando...' : registration.present ? 'Marcar ausente' : 'Volver a incluir'}</button>
+          </div>)}
+        </div>
         {plan.warnings.map((warning) => <p className="distribution-warning" key={warning}>{warning}</p>)}
         <div className="distribution-zone-grid">{plan.zones.map((zone) => <section className="distribution-zone" key={`${plan.tournamentCategoryId}-${zone.name}`}>
           <div><h3>{zone.name}</h3><span>{zone.registrations.length}/{zone.capacity} · {zone.venue?.name ?? plan.venue?.name}</span>{zone.id && <Link className="inline-link" to={`/app/zonas/${zone.id}`}>Abrir partidos</Link>}</div>

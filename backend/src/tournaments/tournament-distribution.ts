@@ -41,13 +41,12 @@ export interface DistributionCategoryPlan {
 export function calculateZoneCapacities(total: number) {
   if (!Number.isInteger(total) || total < 0) throw new Error('La cantidad de parejas debe ser un entero positivo.');
   if (total === 0) return [];
-  if (total % 3 === 0) return Array(total / 3).fill(3) as number[];
-  if (total % 4 === 0) return Array(total / 4).fill(4) as number[];
-  for (let zonesOfFour = 1; zonesOfFour <= Math.floor(total / 4); zonesOfFour += 1) {
-    const remainder = total - zonesOfFour * 4;
-    if (remainder >= 0 && remainder % 3 === 0) {
-      return [...Array(remainder / 3).fill(3), ...Array(zonesOfFour).fill(4)] as number[];
-    }
+  // The competition bracket supports up to four zones. Between 12 and 16
+  // pairs we keep those four zones and only change their individual size.
+  const zoneCount = Math.min(4, Math.floor(total / 3));
+  if (zoneCount > 0 && total >= zoneCount * 3 && total <= zoneCount * 4) {
+    const extras = total - zoneCount * 3;
+    return Array.from({ length: zoneCount }, (_, index) => index < extras ? 4 : 3);
   }
   throw new Error(`No se pueden distribuir exactamente ${total} parejas en zonas de 3 o 4.`);
 }
