@@ -85,11 +85,16 @@ export function planTournamentDistribution(categories: DistributionCategoryInput
     const zones: DistributionZonePlan[] = capacities.map((capacity, index) => {
       const plannedVenueId = venuePlans.get(`${category.id}:${index}`);
       const plannedVenue = venues.find((venue) => venue.id === plannedVenueId) ?? null;
-      return { name: zoneName(index), capacity, venue: plannedVenue, venueAssignment: plannedVenue ? 'MANUAL' : 'AUTOMATIC', registrations: [] };
+      return { name: zoneName(index), capacity, venue: plannedVenue, venueAssignment: plannedVenue ? 'MANUAL' : undefined, registrations: [] };
     });
+    if (zones.some((zone) => !zone.venue)) {
+      warnings.push('Dirección debe asignar una sede a cada zona antes de distribuir las parejas y generar los partidos.');
+      plans.push({ tournamentCategoryId: category.id, categoryName: category.name, registrationCount: category.registrations.length, capacities, venue: null, zones, warnings });
+      continue;
+    }
     const orderedGroups = [...localityGroups.values()].sort((left, right) => right.length - left.length || left[0].localityName.localeCompare(right[0].localityName, 'es'));
     for (const group of orderedGroups) {
-      const venue = [...venues].filter((candidate) => zones.filter((zone) => (!zone.venue || zone.venue.id === candidate.id) && zone.registrations.length < zone.capacity).length >= group.length)
+      const venue = [...venues].filter((candidate) => zones.filter((zone) => zone.venue?.id === candidate.id && zone.registrations.length < zone.capacity).length >= group.length)
         .sort((left, right) => {
           const history = (candidate: DistributionVenueInput) => group.reduce((sum, registration) => sum + (localityVenueHistory.get(registration.localityId)?.get(candidate.id) ?? 0), 0);
           const fixed = (candidate: DistributionVenueInput) => zones.filter((zone) => zone.venueAssignment === 'MANUAL' && zone.venue?.id === candidate.id && zone.registrations.length < zone.capacity).length;
@@ -102,7 +107,7 @@ export function planTournamentDistribution(categories: DistributionCategoryInput
       for (const registration of group) {
         const target = zones
           .map((zone, index) => ({ zone, index }))
-          .filter(({ zone }) => (!zone.venue || zone.venue.id === venue.id) && zone.registrations.length < zone.capacity && !zone.registrations.some((item) => item.localityId === registration.localityId))
+          .filter(({ zone }) => zone.venue?.id === venue.id && zone.registrations.length < zone.capacity && !zone.registrations.some((item) => item.localityId === registration.localityId))
           .sort((left, right) => (left.zone.registrations.length / left.zone.capacity) - (right.zone.registrations.length / right.zone.capacity)
             || (right.zone.capacity - right.zone.registrations.length) - (left.zone.capacity - left.zone.registrations.length)
             || left.index - right.index)[0];
@@ -110,7 +115,6 @@ export function planTournamentDistribution(categories: DistributionCategoryInput
           if (!warnings.some((warning) => warning.includes('no es posible separarlas'))) warnings.push('No fue posible completar las zonas respetando la separacion por localidad.');
           break;
         }
-        target.zone.venue ??= venue;
         target.zone.registrations.push(registration);
       }
       venueLoad.set(venue.id, (venueLoad.get(venue.id) ?? 0) + group.length);
@@ -119,10 +123,6 @@ export function planTournamentDistribution(categories: DistributionCategoryInput
         history.set(venue.id, (history.get(venue.id) ?? 0) + 1);
         localityVenueHistory.set(registration.localityId, history);
       }
-    }
-    for (const zone of zones.filter((item) => !item.venue)) {
-      zone.venue = [...venues].sort((left, right) => (venueLoad.get(left.id) ?? 0) - (venueLoad.get(right.id) ?? 0) || left.name.localeCompare(right.name, 'es'))[0] ?? null;
-      if (zone.venue) venueLoad.set(zone.venue.id, (venueLoad.get(zone.venue.id) ?? 0) + zone.capacity);
     }
     const assignedVenueIds = new Set(zones.flatMap((zone) => zone.venue ? [zone.venue.id] : []));
     const venue = assignedVenueIds.size === 1 ? zones[0]?.venue ?? null : null;

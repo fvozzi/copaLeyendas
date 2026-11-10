@@ -66,5 +66,9 @@ describe('category capacity summary', () => {
     expect(summary.accessGrants.byCategory).toEqual({ 'Damas A': 3, 'Damas B': 0 });
     expect(summary.registrations.byCategory).toEqual({ 'Damas A': 5, 'Damas B': 0 });
     expect(summary.registrations.confirmedByCategory).toEqual({ 'Damas A': 1, 'Damas B': 0 });
+    expect(summary.registrations.byCategoryAndStatus).toEqual({
+      'Damas A': { RECEIVED: 1, UNDER_REVIEW: 1, CONFIRMED: 1, WAITLIST: 1, REJECTED: 1 },
+      'Damas B': { RECEIVED: 0, UNDER_REVIEW: 0, CONFIRMED: 0, WAITLIST: 0, REJECTED: 0 },
+    });
   });
 });

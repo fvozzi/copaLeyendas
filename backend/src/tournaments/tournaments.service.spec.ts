@@ -86,15 +86,13 @@ it('creates the configured number of zones even before all pairs are confirmed',
   };
   const entries = { create: vi.fn((value) => value), save: vi.fn(async (value) => value) };
   const registrations = { find: vi.fn(async () => [1, 2, 3, 4, 5, 6].map((id) => ({ id, localityId: id, locality: { name: `Localidad ${id}` } }))) };
-  const venuePlans = { upsert: vi.fn().mockResolvedValue(undefined) };
-  const service = new TournamentsService({ manager: { getRepository: vi.fn(() => venuePlans) } } as never,
+  const service = new TournamentsService({} as never,
     { findOne: vi.fn(async () => ({ id: 8, categoryId: 3, zoneSize: 4, zoneCount: 2 })) } as never,
     zoneRepository as never, entries as never, {} as never, {} as never, {} as never,
     { find: vi.fn(async () => [{ id: 7, active: true }]) } as never, {} as never, registrations as never);
   expect(await service.divideZones(8)).toMatchObject([{ name: 'Zona A', capacity: 4 }, { name: 'Zona B', capacity: 4 }]);
   expect(entries.save).toHaveBeenCalledTimes(6);
   expect(entries.create.mock.calls.map(([entry]) => entry.zoneId)).toEqual([1, 2, 1, 2, 1, 2]);
-  expect(venuePlans.upsert).toHaveBeenCalled();
 });
 
 it('keeps existing zones if confirmed pairs exceed the configured capacity', async () => {
@@ -227,11 +225,18 @@ it('persists a venue choice for a projected zone before generating matches', asy
   const venuePlans = { upsert: vi.fn().mockResolvedValue(undefined) };
   const tournamentRepository = { manager: { getRepository: vi.fn((entity) => entity === TournamentZoneVenuePlan ? venuePlans : undefined) } };
   const service = new TournamentsService(tournamentRepository as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never);
-  const preview = { hasResults: false, venues: [{ id: 4, name: 'GEBA' }], plans: [{ tournamentCategoryId: 8, zones: [{ name: 'Zona A' }, { name: 'Zona B' }] }] };
+  const preview = { hasResults: false, venues: [{ id: 4, name: 'GEBA' }, { id: 5, name: 'Ciudad' }], plans: [
+    { tournamentCategoryId: 8, zones: [{ name: 'Zona A', venue: { id: 4 } }, { name: 'Zona B', venue: { id: 4 } }] },
+    { tournamentCategoryId: 9, zones: [{ name: 'Zona A', venue: { id: 5 } }] },
+  ] };
   vi.spyOn(service, 'distributionPreview').mockResolvedValueOnce(preview as never).mockResolvedValueOnce({ ...preview, baseVersion: 'updated' } as never);
 
-  await expect(service.setDistributionVenue(1, { tournamentCategoryId: 8, zoneIndex: 1, venueId: 4 })).resolves.toMatchObject({ baseVersion: 'updated' });
-  expect(venuePlans.upsert).toHaveBeenCalledWith({ tournamentCategoryId: 8, zoneIndex: 1, venueId: 4 }, { conflictPaths: ['tournamentCategoryId', 'zoneIndex'] });
+  await expect(service.setDistributionVenue(1, { tournamentCategoryId: 8, zoneIndex: 1, venueId: 5 })).resolves.toMatchObject({ baseVersion: 'updated' });
+  expect(venuePlans.upsert).toHaveBeenCalledWith([
+    { tournamentCategoryId: 8, zoneIndex: 0, venueId: 4, directorAssigned: true },
+    { tournamentCategoryId: 8, zoneIndex: 1, venueId: 5, directorAssigned: true },
+    { tournamentCategoryId: 9, zoneIndex: 0, venueId: 5, directorAssigned: true },
+  ], { conflictPaths: ['tournamentCategoryId', 'zoneIndex'] });
 });
 
 function setup(capacity = 4) {

@@ -84,7 +84,7 @@ La cantidad y el tamaño de las zonas se calculan a partir de las parejas confir
 
 ### CU-05b Distribuir zonas y generar partidos
 
-El menú **Distribución** permite elegir el torneo y calcular una vista previa sin crear zonas ni partidos reales. La vista muestra el tamaño de cada zona, todas las parejas y un selector para que Dirección asigne cada zona a una sede antes de confirmar. La selección se guarda por categoría y posición de zona (Zona A, B, C o D). Si cambia la cantidad de equipos, las zonas que continúan existiendo conservan su sede; las nuevas reciben una sugerencia automática que puede ajustarse antes de aplicar. La asignación cumple estas prioridades:
+El menú **Distribución** permite elegir el torneo y calcular una vista previa sin crear zonas ni partidos reales. La vista muestra el tamaño de cada zona y un selector para que Dirección asigne cada zona a una sede antes de confirmar. No existe autoasignación de sedes: mientras una zona permanezca en **Seleccionar sede**, no se distribuyen sus parejas ni se permite generar los partidos. La selección se guarda por categoría y posición de zona (Zona A, B, C o D), y editar un selector sólo modifica la zona elegida. Si la combinación contradice una regla, se muestra la observación y se bloquea la aplicación sin mover otras zonas. Si cambia la cantidad de equipos, las zonas que continúan existiendo conservan su sede y cada zona nueva queda pendiente de asignación por Dirección. La asignación cumple estas prioridades:
 
 - parejas de la misma localidad, dentro de una categoría, comparten sede y quedan en zonas distintas;
 - entre categorías se intenta mantener la misma sede para una localidad;

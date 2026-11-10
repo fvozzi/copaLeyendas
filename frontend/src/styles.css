@@ -1668,11 +1668,12 @@ textarea {
 .category-summary-wrap {
   min-width: 0;
   margin: 0.75rem 0;
+  overflow-x: auto;
 }
 
 .category-summary-table {
   width: 100%;
-  table-layout: fixed;
+  min-width: 44rem;
   border-collapse: collapse;
 }
 
@@ -1686,7 +1687,7 @@ textarea {
 }
 
 .category-summary-table th:first-child {
-  width: 60%;
+  width: 15rem;
   text-align: left;
 }
 

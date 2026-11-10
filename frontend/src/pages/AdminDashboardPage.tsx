@@ -9,7 +9,15 @@ import {
   registrationStatusLabels,
   sectionMeta,
 } from '../lib/content';
-import type { DashboardSummary } from '../types';
+import type { DashboardSummary, RegistrationStatus } from '../types';
+
+const categoryStatusColumns: { status: RegistrationStatus; short: string }[] = [
+  { status: 'RECEIVED', short: 'REC' },
+  { status: 'UNDER_REVIEW', short: 'REV' },
+  { status: 'CONFIRMED', short: 'CONF' },
+  { status: 'WAITLIST', short: 'ESP' },
+  { status: 'REJECTED', short: 'RECH' },
+];
 
 export function AdminDashboardPage() {
   const { user } = useAuth();
@@ -18,9 +26,16 @@ export function AdminDashboardPage() {
 
   useEffect(() => {
     if (user?.role !== 'DIRECTOR') return;
-    getDashboardSummary()
-      .then(setSummary)
-      .catch((reason: Error) => setError(reason.message));
+    let active = true;
+    const load = () => getDashboardSummary()
+      .then((value) => { if (active) { setSummary(value); setError(null); } })
+      .catch((reason: Error) => { if (active) setError(reason.message); });
+    const refresh = () => { if (document.visibilityState === 'visible') void load(); };
+    void load();
+    const timer = window.setInterval(refresh, 30000);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => { active = false; window.clearInterval(timer); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); };
   }, [user?.role]);
 
   if (user?.role !== 'DIRECTOR') {
@@ -80,15 +95,18 @@ export function AdminDashboardPage() {
           <p className="field-hint">Cupo de referencia: 16 parejas por categoría.</p>
           <div className="category-summary-wrap">
             <table className="category-summary-table" aria-label="Inscripciones por categoría">
-              <thead><tr><th scope="col">Categoría</th><th scope="col" title="Total de habilitaciones generadas" aria-label="Total de habilitaciones generadas">TOT</th><th scope="col" title="Inscripciones confirmadas" aria-label="Inscripciones confirmadas">CONF</th></tr></thead>
-              <tbody>{categoryNames.map((name) => <tr key={name}>
-                <th scope="row">{name}</th>
-                <td><CategoryCount count={summary.accessGrants.byCategory[name] ?? 0} /></td>
-                <td><CategoryCount count={summary.registrations.confirmedByCategory?.[name] ?? 0} /></td>
-              </tr>)}</tbody>
+              <thead><tr><th scope="col">Categoría</th><th scope="col" title="Total de inscripciones" aria-label="Total de inscripciones">TOT</th>{categoryStatusColumns.map(({ status, short }) => <th key={status} scope="col" title={registrationStatusLabels[status]} aria-label={registrationStatusLabels[status]}>{short}</th>)}</tr></thead>
+              <tbody>{categoryNames.map((name) => {
+                const statuses = summary.registrations.byCategoryAndStatus?.[name] ?? {} as Record<RegistrationStatus, number>;
+                return <tr key={name}>
+                  <th scope="row">{name}</th>
+                  <td><strong>{summary.registrations.byCategory[name] ?? 0}</strong></td>
+                  {categoryStatusColumns.map(({ status }) => <td key={status}>{status === 'CONFIRMED' ? <CategoryCount count={statuses[status] ?? 0} /> : <strong>{statuses[status] ?? 0}</strong>}</td>)}
+                </tr>;
+              })}</tbody>
             </table>
           </div>
-          <p className="field-hint">TOT: todas las habilitaciones emitidas, incluidas las revocadas. CONF: aprobadas por Dirección.</p>
+          <p className="field-hint">TOT: todas las inscripciones actuales. REC: recibidas. REV: en revisión. CONF: confirmadas. ESP: lista de espera. RECH: rechazadas.</p>
           <Link to="/app/inscripciones" className="inline-link">Ver inscripciones</Link>
         </section>
         <ShirtDistribution distribution={summary.registrations.shirtDistribution} />

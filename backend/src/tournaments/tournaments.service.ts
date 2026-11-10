@@ -236,9 +236,6 @@ export class TournamentsService {
     if (!venues.length) throw new BadRequestException('Debes habilitar al menos una sede antes de dividir las zonas.');
     if (existing.length) await this.z.remove(existing);
     const zones = await this.z.save(Array.from({ length: count }, (_, index) => this.z.create({ tournamentCategoryId, venueId: venues[index % venues.length].id, name: `Zona ${String.fromCharCode(65 + index)}`, capacity: category.zoneSize })));
-    await this.t.manager.getRepository(TournamentZoneVenuePlan).upsert(zones.map((zone, zoneIndex) => ({
-      tournamentCategoryId, zoneIndex, venueId: zone.venueId,
-    })), { conflictPaths: ['tournamentCategoryId', 'zoneIndex'] });
     const assignments = zones.map((zone) => ({ zone, entries: [] as PairRegistration[] }));
     for (const registration of registrations) {
       const eligible = assignments.filter((item) => item.entries.length < category.zoneSize && !item.entries.some((entry) => entry.localityId === registration.localityId));
@@ -259,9 +256,16 @@ export class TournamentsService {
     const plan = preview.plans.find((item) => item.tournamentCategoryId === dto.tournamentCategoryId);
     if (!plan || dto.zoneIndex < 0 || dto.zoneIndex >= plan.zones.length) throw new BadRequestException('La zona proyectada ya no existe. Recalculá la distribución.');
     if (!preview.venues.some((venue) => venue.id === dto.venueId)) throw new BadRequestException('Seleccioná una sede activa.');
-    await this.t.manager.getRepository(TournamentZoneVenuePlan).upsert({
-      tournamentCategoryId: dto.tournamentCategoryId, zoneIndex: dto.zoneIndex, venueId: dto.venueId,
-    }, { conflictPaths: ['tournamentCategoryId', 'zoneIndex'] });
+    // Persist the complete explicit plan currently shown, replacing only the
+    // selected position. Unassigned zones remain unassigned: there is no
+    // automatic venue choice or sibling update behind this edit.
+    const assignments = preview.plans.flatMap((category) => category.zones.flatMap((zone, zoneIndex) => {
+      const venueId = category.tournamentCategoryId === dto.tournamentCategoryId && zoneIndex === dto.zoneIndex
+        ? dto.venueId
+        : zone.venue?.id;
+      return venueId ? [{ tournamentCategoryId: category.tournamentCategoryId, zoneIndex, venueId, directorAssigned: true }] : [];
+    }));
+    await this.t.manager.getRepository(TournamentZoneVenuePlan).upsert(assignments, { conflictPaths: ['tournamentCategoryId', 'zoneIndex'] });
     return this.distributionPreview(tournamentId);
   }
 
@@ -293,7 +297,7 @@ export class TournamentsService {
     });
     const venues = await manager.getRepository(Venue).find({ where: { active: true }, order: { name: 'ASC' } });
     const venuePlans = categories.length ? await manager.getRepository(TournamentZoneVenuePlan).find({
-      where: categories.map((category) => ({ tournamentCategoryId: category.id })), order: { tournamentCategoryId: 'ASC', zoneIndex: 'ASC' },
+      where: categories.map((category) => ({ tournamentCategoryId: category.id, directorAssigned: true })), order: { tournamentCategoryId: 'ASC', zoneIndex: 'ASC' },
     }) : [];
     const zones = await manager.getRepository(Zone).find({
       where: { tournamentCategory: { tournamentId } }, relations: { venue: true, tournamentCategory: { category: true } }, order: { tournamentCategoryId: 'ASC', name: 'ASC' },
@@ -310,7 +314,7 @@ export class TournamentsService {
     const slotMatches = slotMatchIds.length ? await manager.getRepository(TournamentMatch).find({ where: { id: In(slotMatchIds) } }) : [];
     const hasResults = [...zoneMatches, ...slotMatches].some((match) => match.status === MatchStatus.PLAYED);
     const rules = [
-      'Dirección puede asignar cada zona a una sede antes de generar los partidos.',
+      'Dirección debe asignar cada zona a una sede antes de generar los partidos; no hay autoasignación de sedes.',
       'El cuadro usa hasta cuatro zonas, siempre completas, de 3 o 4 parejas.',
       'De 12 a 16 parejas se mantienen cuatro zonas: 12 es 3+3+3+3 y 16 es 4+4+4+4.',
       'Si falta una de 16, el formato pasa automaticamente a 4+4+4+3.',
@@ -403,7 +407,7 @@ export class TournamentsService {
           const venue = plannedZone.venue ?? plan.venue;
           if (!venue) throw new BadRequestException(`No se pudo asignar una sede a ${plan.categoryName} - ${plannedZone.name}.`);
           await manager.getRepository(TournamentZoneVenuePlan).upsert({
-            tournamentCategoryId: plan.tournamentCategoryId, zoneIndex, venueId: venue.id,
+            tournamentCategoryId: plan.tournamentCategoryId, zoneIndex, venueId: venue.id, directorAssigned: true,
           }, { conflictPaths: ['tournamentCategoryId', 'zoneIndex'] });
           const zone = await zoneRepository.save(zoneRepository.create({
             tournamentCategoryId: plan.tournamentCategoryId, venueId: venue.id, name: plannedZone.name, capacity: plannedZone.capacity,
@@ -569,7 +573,7 @@ export class TournamentsService {
     const zoneIndex = zones.findIndex((item) => item.id === zone.id);
     if (zoneIndex < 0) return;
     await manager.getRepository(TournamentZoneVenuePlan).upsert({
-      tournamentCategoryId: zone.tournamentCategoryId, zoneIndex, venueId: zone.venueId,
+      tournamentCategoryId: zone.tournamentCategoryId, zoneIndex, venueId: zone.venueId, directorAssigned: true,
     }, { conflictPaths: ['tournamentCategoryId', 'zoneIndex'] });
   }
 

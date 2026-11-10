@@ -96,6 +96,7 @@ export interface DashboardSummary {
     total: number;
     byCategory: Record<string, number>;
     confirmedByCategory: Record<string, number>;
+    byCategoryAndStatus: Record<string, Record<RegistrationStatus, number>>;
     byStatus: Record<string, number>;
     shirtSizes: Record<string, number>;
     shirtDistribution?: { sizes: string[]; totals: Record<string, number>; models: { name: string; sizes: Record<string, number>; total: number; players?: { registrationId: number; position: string; name: string; size: string; team: string; category: string; zone?: string | null; brand: string | null }[] }[]; total: number };

@@ -13,4 +13,5 @@ export class TournamentZoneVenuePlan {
   @Column({ type: 'integer' }) venueId: number;
   @ManyToOne(() => Venue, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'venueId' }) venue: Venue;
+  @Column({ type: 'boolean', default: false }) directorAssigned: boolean;
 }

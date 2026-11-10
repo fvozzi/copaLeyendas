@@ -60,6 +60,7 @@ export class DashboardService {
         total: registrations.length,
         byCategory: countByCategory(registrations, categories),
         confirmedByCategory: countByCategory(registrations.filter((registration) => registration.status === RegistrationStatus.CONFIRMED), categories),
+        byCategoryAndStatus: countRegistrationStatusesByCategory(registrations, categories),
         byStatus: countBy(registrations, 'status'),
         shirtSizes: shirtDistribution.totals,
         shirtDistribution,
@@ -110,6 +111,19 @@ function countByCategory(items: { categoryId: number; category: Category }[], ca
   for (const item of items) {
     const name = item.category?.name ?? `Categoria ${item.categoryId}`;
     counts[name] = (counts[name] ?? 0) + 1;
+  }
+  return counts;
+}
+
+function countRegistrationStatusesByCategory(items: PairRegistration[], categories: Category[]) {
+  const statuses = Object.values(RegistrationStatus);
+  const counts = Object.fromEntries(categories.map((category) => [
+    category.name, Object.fromEntries(statuses.map((status) => [status, 0])),
+  ])) as Record<string, Record<RegistrationStatus, number>>;
+  for (const item of items) {
+    const name = item.category?.name ?? `Categoria ${item.categoryId}`;
+    counts[name] ??= Object.fromEntries(statuses.map((status) => [status, 0])) as Record<RegistrationStatus, number>;
+    counts[name][item.status] += 1;
   }
   return counts;
 }
