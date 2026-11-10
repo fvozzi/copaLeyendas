@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PlayersService } from './players.service';
 import { existsSync, createReadStream } from 'node:fs';
 import { Readable } from 'node:stream';
+import { ShirtSize } from '../registrations/registration.enums';
 vi.mock('./player.entity', () => ({ Player: class Player {} }));
 vi.mock('../localities/locality.entity', () => ({ Locality: class Locality {} }));
 vi.mock('../registrations/pair-registration.entity', () => ({ PairRegistration: class PairRegistration {} }));
@@ -147,8 +148,9 @@ describe('registration player synchronization', () => {
 
   it('persists an explicit unassignment and an explicit deletion', async () => {
     const player = { id: 4, dni: '12345678', fullName: 'Jugadora', localityId: 7, locality: { id: 7, name: 'Equipo anterior' } };
-    const players = { findOne: vi.fn(async () => player), save: vi.fn(async (value) => value), remove: vi.fn(async () => player) };
-    const service = new PlayersService(players as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never);
+    const players = { findOne: vi.fn(async () => player), find: vi.fn().mockResolvedValue([]), save: vi.fn(async (value) => value), remove: vi.fn(async () => player) };
+    const registrations = { count: vi.fn().mockResolvedValue(0), find: vi.fn().mockResolvedValue([]) };
+    const service = new PlayersService(players as never, {} as never, registrations as never, {} as never, {} as never, {} as never, {} as never);
     await service.update(4, { localityId: null });
     expect(players.save).toHaveBeenCalledWith(expect.objectContaining({ id: 4, localityId: null, locality: null }));
     await expect(service.remove(4)).resolves.toEqual({ success: true });
@@ -156,9 +158,10 @@ describe('registration player synchronization', () => {
   });
 
   it('keeps existing players linked to the locality referenced by their registration', async () => {
-    const players = { findOne: vi.fn().mockResolvedValue({ id: 1, dni: '123', localityId: 2 }), save: vi.fn() };
+    const players = { findOne: vi.fn().mockResolvedValue({ id: 1, dni: '123', localityId: 2 }), find: vi.fn().mockResolvedValue([]), save: vi.fn() };
     const localities = { findOne: vi.fn(), save: vi.fn() };
-    const service = new PlayersService(players as never, localities as never, {} as never, {} as never, {} as never, {} as never, {} as never);
+    const registrations = { find: vi.fn().mockResolvedValue([]) };
+    const service = new PlayersService(players as never, localities as never, registrations as never, {} as never, {} as never, {} as never, {} as never);
     await service.syncRegistrationPlayers({
       localityId: 9,
       playerOneName: 'Ana', playerOneDni: '123',
@@ -169,5 +172,39 @@ describe('registration player synchronization', () => {
     expect(players.save).toHaveBeenCalledWith(expect.objectContaining({ dni: '123', localityId: 9 }));
     expect(localities.findOne).not.toHaveBeenCalled();
     expect(localities.save).not.toHaveBeenCalled();
+  });
+
+  it('uses the current team roster to replace a stale registration player', async () => {
+    const monica = { id: 8, fullName: 'Monica Torres', dni: '23175871', birthDate: '1973-07-26', phone: null, instagram: null, shirtSize: 'S', localityId: 4 };
+    const pia = { id: 9, fullName: 'Pia Volpi', dni: '53954143', birthDate: '2003-02-24', phone: '091046119', instagram: 'pia_volpi', shirtSize: 'M', localityId: 4 };
+    const registration = {
+      id: 12, localityId: 4,
+      playerOneName: 'Camila Ocampo', playerOneDni: '11111111', playerOneBirthDate: '1990-01-01', playerOnePhone: 'old', playerOneInstagram: null, playerOneShirtSize: 'M',
+      playerOneHasCommercialAgreement: true, playerOneCommercialAgreementDetails: 'Marca anterior', playerOnePhotoStoredName: 'camila.webp',
+      playerTwoName: pia.fullName, playerTwoDni: pia.dni, playerTwoBirthDate: pia.birthDate, playerTwoPhone: pia.phone, playerTwoInstagram: pia.instagram, playerTwoShirtSize: pia.shirtSize,
+      playerThreeName: null, playerThreeDni: null,
+    };
+    const players = { create: vi.fn((value) => value), save: vi.fn(async () => monica), find: vi.fn().mockResolvedValue([monica, pia]) };
+    const localities = { findOne: vi.fn().mockResolvedValue({ id: 4 }) };
+    const registrations = { find: vi.fn().mockResolvedValue([registration]), save: vi.fn(async (value) => value) };
+    const service = new PlayersService(players as never, localities as never, registrations as never, {} as never, {} as never, {} as never, {} as never);
+
+    await service.create({ fullName: monica.fullName, dni: monica.dni, birthDate: monica.birthDate, shirtSize: ShirtSize.S, localityId: 4 });
+
+    expect(registrations.save).toHaveBeenCalledWith(expect.objectContaining({
+      playerOneName: 'Monica Torres', playerOneDni: '23175871',
+      playerTwoName: 'Pia Volpi', playerTwoDni: '53954143',
+      playerOneHasCommercialAgreement: false, playerOneCommercialAgreementDetails: null, playerOnePhotoStoredName: null,
+    }));
+  });
+
+  it('prevents deleting a registered player until a replacement makes the roster valid', async () => {
+    const player = { id: 4, dni: '12345678', fullName: 'Titular', localityId: 7, locality: { id: 7 } };
+    const players = { findOne: vi.fn(async () => player), count: vi.fn().mockResolvedValue(1), remove: vi.fn() };
+    const registrations = { count: vi.fn().mockResolvedValueOnce(1).mockResolvedValueOnce(1) };
+    const service = new PlayersService(players as never, {} as never, registrations as never, {} as never, {} as never, {} as never, {} as never);
+
+    await expect(service.remove(4)).rejects.toThrow('Agregá primero su reemplazo');
+    expect(players.remove).not.toHaveBeenCalled();
   });
 });

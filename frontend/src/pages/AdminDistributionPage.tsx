@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ProgramZoneEditor } from '../components/ProgramZoneEditor';
-import { applyTournamentDistribution, getTournament, getTournamentDistribution, getTournamentScheduleGrid, getTournaments, getVenues, setTournamentAttendance } from '../lib/api';
+import { applyTournamentDistribution, getTournament, getTournamentDistribution, getTournamentScheduleGrid, getTournaments, getVenues, setTournamentAttendance, setTournamentDistributionVenue } from '../lib/api';
 import type { Tournament, TournamentDistribution, TournamentScheduleSlot, TournamentZone, Venue } from '../types';
 
 export function AdminDistributionPage() {
@@ -12,6 +12,7 @@ export function AdminDistributionPage() {
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
   const [updatingAttendance, setUpdatingAttendance] = useState<number | null>(null);
+  const [updatingVenue, setUpdatingVenue] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [zoneEditor, setZoneEditor] = useState<{ zone: TournamentZone; venues: Venue[]; slots: TournamentScheduleSlot[] } | null>(null);
 
@@ -32,14 +33,16 @@ export function AdminDistributionPage() {
 
   useEffect(() => { if (tournamentId) void calculate(tournamentId); }, [tournamentId]);
 
-  const apply = async () => {
+  const apply = async (resetProgram = false) => {
     if (!distribution?.canApply || applying) return;
-    const message = distribution.replacesPendingFixture
-      ? 'Se reemplazará el fixture pendiente para rearmar las zonas. Los horarios del programa se calcularán nuevamente. ¿Continuar?'
+    const message = resetProgram
+      ? 'Se reconstruirán desde cero los partidos, sedes, canchas y horarios del Programa. Se perderán los ajustes manuales pendientes. ¿Continuar?'
+      : distribution.replacesPendingFixture
+      ? 'Se rearmarán las zonas conservando, cuando el partido siga existiendo, la sede, cancha y horario definidos en Programa. ¿Continuar?'
       : 'Se crearán las zonas, las asignaciones y el fixture real del torneo. ¿Continuar?';
     if (!window.confirm(message)) return;
     setApplying(true); setError(null);
-    try { setDistribution(await applyTournamentDistribution(tournamentId, distribution.baseVersion)); }
+    try { setDistribution(await applyTournamentDistribution(tournamentId, distribution.baseVersion, resetProgram)); }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo aplicar la distribución.'); }
     finally { setApplying(false); }
   };
@@ -50,6 +53,15 @@ export function AdminDistributionPage() {
     try { setDistribution(await setTournamentAttendance(tournamentId, registrationId, present)); }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo actualizar la asistencia.'); }
     finally { setUpdatingAttendance(null); }
+  };
+
+  const changeVenue = async (tournamentCategoryId: number, zoneIndex: number, venueId: number) => {
+    const key = `${tournamentCategoryId}-${zoneIndex}`;
+    if (updatingVenue) return;
+    setUpdatingVenue(key); setError(null);
+    try { setDistribution(await setTournamentDistributionVenue(tournamentId, tournamentCategoryId, zoneIndex, venueId)); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo guardar la sede de la zona.'); }
+    finally { setUpdatingVenue(null); }
   };
 
   const openZoneEditor = async (zoneId: number) => {
@@ -78,7 +90,7 @@ export function AdminDistributionPage() {
       <Link className="secondary-button" to="/app/programa">Programa / Mapa</Link>
     </div>
     <section className="data-card distribution-rules">
-      <div><h2>Reglas automáticas</h2><p>La vista previa no modifica el torneo. Al aplicarla se crean las zonas y los partidos reales.</p></div>
+      <div><h2>Planificación de zonas y sedes</h2><p>Asigná primero cada zona a una sede. La vista previa recalcula las parejas sin crear partidos hasta que la apliques.</p></div>
       <ol>{(distribution?.rules ?? [
         'El cuadro usa hasta cuatro zonas completas de 3 o 4 parejas.',
         'De 12 a 16 parejas se mantienen cuatro zonas.',
@@ -89,10 +101,11 @@ export function AdminDistributionPage() {
     <div className="distribution-toolbar">
       <label>Torneo<select value={tournamentId} onChange={(event) => setTournamentId(Number(event.target.value))}><option value="0">Seleccionar</option>{tournaments.map((tournament) => <option key={tournament.id} value={tournament.id}>{tournament.name}</option>)}</select></label>
       <button type="button" className="secondary-button" disabled={!tournamentId || loading} onClick={() => void calculate()}>{loading ? 'Calculando...' : 'Recalcular vista previa'}</button>
-      {distribution?.mode === 'PREVIEW' && <button type="button" className="primary-button" disabled={!distribution.canApply || applying} onClick={() => void apply()}>{applying ? 'Generando...' : 'Aplicar y generar partidos'}</button>}
+      {distribution?.mode === 'PREVIEW' && <button type="button" className="primary-button" disabled={!distribution.canApply || applying} onClick={() => void apply(false)}>{applying ? 'Generando...' : distribution.replacesPendingFixture ? 'Aplicar conservando Programa' : 'Aplicar y generar partidos'}</button>}
+      {distribution?.mode === 'PREVIEW' && distribution.replacesPendingFixture && <button type="button" className="danger-link" disabled={!distribution.canApply || applying} onClick={() => void apply(true)}>Rehacer Programa desde cero</button>}
     </div>
     {error && <div className="inline-state" role="alert">{error}</div>}
-    {distribution?.mode === 'PREVIEW' && distribution.replacesPendingFixture && <div className="inline-state">La asistencia cambió o el fixture usa una distribución anterior. Aplicá la vista previa para reemplazar únicamente los partidos pendientes.</div>}
+    {distribution?.mode === 'PREVIEW' && distribution.replacesPendingFixture && <div className="inline-state">La asistencia o las zonas cambiaron. Al aplicar se conservan las sedes, canchas y horarios editados en Programa para los partidos equivalentes. Usá “Rehacer Programa desde cero” sólo si querés descartarlos.</div>}
     {distribution?.mode === 'CURRENT' && <div className="inline-state inline-state-success">La distribución ya está aplicada: hay {distribution.matchCount} partidos reales. Cualquier cambio hecho desde Programa / Mapa modifica estos mismos partidos.</div>}
     {distribution?.mode === 'PREVIEW' && !distribution.canApply && !loading && <div className="inline-state">La vista previa no se puede aplicar todavía. Revisá las observaciones y que exista al menos una sede activa.</div>}
     <div className="distribution-category-grid">
@@ -105,8 +118,8 @@ export function AdminDistributionPage() {
           </div>)}
         </div>
         {plan.warnings.map((warning) => <p className="distribution-warning" key={warning}>{warning}</p>)}
-        <div className="distribution-zone-grid">{plan.zones.map((zone) => <section className="distribution-zone" key={`${plan.tournamentCategoryId}-${zone.name}`}>
-          <div><h3>{zone.name}</h3><span>{zone.registrations.length}/{zone.capacity} · {zone.venue?.name ?? plan.venue?.name}</span>{zone.id && <button type="button" className="inline-link" onClick={() => void openZoneEditor(zone.id!)}>Editar zona y parejas</button>}</div>
+        <div className="distribution-zone-grid">{plan.zones.map((zone, zoneIndex) => <section className="distribution-zone" key={`${plan.tournamentCategoryId}-${zone.name}`}>
+          <div><h3>{zone.name}</h3><span>{zone.registrations.length}/{zone.capacity} parejas</span>{distribution.mode === 'PREVIEW' ? <label>Sede<select aria-label={`Sede de ${plan.categoryName} ${zone.name}`} value={zone.venue?.id ?? 0} disabled={updatingVenue !== null || distribution.hasResults} onChange={(event) => void changeVenue(plan.tournamentCategoryId, zoneIndex, Number(event.target.value))}><option value={0} disabled>Seleccionar sede</option>{(distribution.venues ?? []).map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}</select><small>{updatingVenue === `${plan.tournamentCategoryId}-${zoneIndex}` ? 'Guardando…' : zone.venueAssignment === 'MANUAL' ? 'Asignación de Dirección' : 'Sugerencia automática'}</small></label> : <span>{zone.venue?.name ?? plan.venue?.name}</span>}{zone.id && <button type="button" className="inline-link" onClick={() => void openZoneEditor(zone.id!)}>Editar zona y parejas</button>}</div>
           <ol>{zone.registrations.map((registration) => <li key={registration.id}><strong>{registration.label}</strong><small>{registration.localityName}</small></li>)}</ol>
         </section>)}</div>
       </article>)}

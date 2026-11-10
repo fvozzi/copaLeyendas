@@ -24,6 +24,8 @@ import { simulateProgram } from './program-scenario';
 import { readMatchResultPhoto, removeMatchResultPhoto, storeMatchResultPhoto } from './match-result-photo-storage';
 import { planTournamentDistribution, type DistributionRegistration } from './tournament-distribution';
 import { TournamentRegistrationAttendance } from './tournament-registration-attendance.entity';
+import { TournamentZoneVenuePlan } from './tournament-zone-venue-plan.entity';
+import { preservedProgramAssignments } from './distribution-program';
 
 @Injectable()
 export class TournamentsService {
@@ -123,7 +125,9 @@ export class TournamentsService {
         for (const slot of pending) await repository.update(slot.id, { courtId: slot.courtId, scheduledAt: slot.scheduledAt });
       }
       if (dto.name !== undefined) for (const slot of zoneSlots) await repository.update(slot.id, { zoneName: zone.name });
-      return manager.getRepository(Zone).save(zone);
+      const saved = await manager.getRepository(Zone).save(zone);
+      if (dto.venueId !== undefined) await this.rememberZoneVenue(manager, saved);
+      return saved;
     });
   }
   async removeZone(id: number) {
@@ -232,6 +236,9 @@ export class TournamentsService {
     if (!venues.length) throw new BadRequestException('Debes habilitar al menos una sede antes de dividir las zonas.');
     if (existing.length) await this.z.remove(existing);
     const zones = await this.z.save(Array.from({ length: count }, (_, index) => this.z.create({ tournamentCategoryId, venueId: venues[index % venues.length].id, name: `Zona ${String.fromCharCode(65 + index)}`, capacity: category.zoneSize })));
+    await this.t.manager.getRepository(TournamentZoneVenuePlan).upsert(zones.map((zone, zoneIndex) => ({
+      tournamentCategoryId, zoneIndex, venueId: zone.venueId,
+    })), { conflictPaths: ['tournamentCategoryId', 'zoneIndex'] });
     const assignments = zones.map((zone) => ({ zone, entries: [] as PairRegistration[] }));
     for (const registration of registrations) {
       const eligible = assignments.filter((item) => item.entries.length < category.zoneSize && !item.entries.some((entry) => entry.localityId === registration.localityId));
@@ -244,6 +251,18 @@ export class TournamentsService {
 
   async distributionPreview(tournamentId: number) {
     return this.distributionPreviewInManager(this.t.manager, tournamentId);
+  }
+
+  async setDistributionVenue(tournamentId: number, dto: { tournamentCategoryId: number; zoneIndex: number; venueId: number }) {
+    const preview = await this.distributionPreview(tournamentId);
+    if (preview.hasResults) throw new BadRequestException('No se puede rearmar la distribución porque el torneo ya tiene resultados.');
+    const plan = preview.plans.find((item) => item.tournamentCategoryId === dto.tournamentCategoryId);
+    if (!plan || dto.zoneIndex < 0 || dto.zoneIndex >= plan.zones.length) throw new BadRequestException('La zona proyectada ya no existe. Recalculá la distribución.');
+    if (!preview.venues.some((venue) => venue.id === dto.venueId)) throw new BadRequestException('Seleccioná una sede activa.');
+    await this.t.manager.getRepository(TournamentZoneVenuePlan).upsert({
+      tournamentCategoryId: dto.tournamentCategoryId, zoneIndex: dto.zoneIndex, venueId: dto.venueId,
+    }, { conflictPaths: ['tournamentCategoryId', 'zoneIndex'] });
+    return this.distributionPreview(tournamentId);
   }
 
   private distributionRegistration(registration: PairRegistration): DistributionRegistration {
@@ -273,6 +292,9 @@ export class TournamentsService {
       return { ...this.distributionRegistration(registration), tournamentCategoryId: category.id, categoryName: category.category.name, present: attendanceByRegistration.get(registration.id) !== false };
     });
     const venues = await manager.getRepository(Venue).find({ where: { active: true }, order: { name: 'ASC' } });
+    const venuePlans = categories.length ? await manager.getRepository(TournamentZoneVenuePlan).find({
+      where: categories.map((category) => ({ tournamentCategoryId: category.id })), order: { tournamentCategoryId: 'ASC', zoneIndex: 'ASC' },
+    }) : [];
     const zones = await manager.getRepository(Zone).find({
       where: { tournamentCategory: { tournamentId } }, relations: { venue: true, tournamentCategory: { category: true } }, order: { tournamentCategoryId: 'ASC', name: 'ASC' },
     });
@@ -288,6 +310,7 @@ export class TournamentsService {
     const slotMatches = slotMatchIds.length ? await manager.getRepository(TournamentMatch).find({ where: { id: In(slotMatchIds) } }) : [];
     const hasResults = [...zoneMatches, ...slotMatches].some((match) => match.status === MatchStatus.PLAYED);
     const rules = [
+      'Dirección puede asignar cada zona a una sede antes de generar los partidos.',
       'El cuadro usa hasta cuatro zonas, siempre completas, de 3 o 4 parejas.',
       'De 12 a 16 parejas se mantienen cuatro zonas: 12 es 3+3+3+3 y 16 es 4+4+4+4.',
       'Si falta una de 16, el formato pasa automaticamente a 4+4+4+3.',
@@ -301,6 +324,7 @@ export class TournamentsService {
       registrations: registrations.map((registration) => ({ id: registration.id, categoryId: registration.categoryId, localityId: registration.localityId, updatedAt: registration.updatedAt })),
       attendance: attendanceRows.map((row) => ({ registrationId: row.registrationId, present: row.present, updatedAt: row.updatedAt })),
       venues: venues.map((venue) => ({ id: venue.id, name: venue.name, active: venue.active })),
+      venuePlans: venuePlans.map((plan) => ({ categoryId: plan.tournamentCategoryId, zoneIndex: plan.zoneIndex, venueId: plan.venueId })),
       zones: zones.map((zone) => ({ id: zone.id, categoryId: zone.tournamentCategoryId, venueId: zone.venueId, name: zone.name, capacity: zone.capacity })),
       entries: entries.map((entry) => ({ id: entry.id, zoneId: entry.zoneId, registrationId: entry.registrationId, seed: entry.seed })),
       slots: slots.map((slot) => ({ id: slot.id, matchId: slot.matchId, sequence: slot.sequence })),
@@ -311,7 +335,7 @@ export class TournamentsService {
       id: category.id,
       name: category.category.name,
       registrations: eligibleRegistrations.filter((registration) => registration.categoryId === category.categoryId).map((registration) => this.distributionRegistration(registration)),
-    })), venues.map((venue) => ({ id: venue.id, name: venue.name })));
+    })), venues.map((venue) => ({ id: venue.id, name: venue.name })), new Map(venuePlans.map((plan) => [`${plan.tournamentCategoryId}:${plan.zoneIndex}`, plan.venueId])));
     const currentSignature = JSON.stringify(categories.map((category) => zones.filter((zone) => zone.tournamentCategoryId === category.id).map((zone) => ({
       name: zone.name, capacity: zone.capacity, venueId: zone.venueId,
       registrations: entries.filter((entry) => entry.zoneId === zone.id).map((entry) => entry.registrationId).sort((left, right) => left - right),
@@ -332,13 +356,13 @@ export class TournamentsService {
           capacities: categoryZones.map((zone) => zone.capacity),
           venue: venueIds.size === 1 ? categoryZones[0]?.venue ?? null : null,
           zones: categoryZones.map((zone) => ({
-            id: zone.id, name: zone.name, capacity: zone.capacity, venue: zone.venue,
+            id: zone.id, name: zone.name, capacity: zone.capacity, venue: zone.venue, venueAssignment: 'APPLIED' as const,
             registrations: entries.filter((entry) => entry.zoneId === zone.id).map((entry) => this.distributionRegistration(entry.registration)),
           })),
           warnings: [],
         };
       });
-      return { tournament: { id: tournament.id, name: tournament.name }, mode: 'CURRENT' as const, canApply: false, baseVersion, matchCount, hasResults, replacesPendingFixture: false, rules, plans, attendance };
+      return { tournament: { id: tournament.id, name: tournament.name }, mode: 'CURRENT' as const, canApply: false, baseVersion, matchCount, hasResults, replacesPendingFixture: false, rules, plans, attendance, venues: venues.map(({ id, name }) => ({ id, name })) };
     }
 
     const plans = planned;
@@ -346,11 +370,11 @@ export class TournamentsService {
     const complete = populated.every((plan) => plan.capacities.length > 0 && plan.zones.reduce((sum, zone) => sum + zone.registrations.length, 0) === plan.registrationCount);
     return {
       tournament: { id: tournament.id, name: tournament.name }, mode: 'PREVIEW' as const,
-      canApply: Boolean(!hasResults && venues.length && populated.length && complete), baseVersion, matchCount, hasResults, replacesPendingFixture: matchCount > 0, rules, plans, attendance,
+      canApply: Boolean(!hasResults && venues.length && populated.length && complete), baseVersion, matchCount, hasResults, replacesPendingFixture: matchCount > 0, rules, plans, attendance, venues: venues.map(({ id, name }) => ({ id, name })),
     };
   }
 
-  async applyDistribution(tournamentId: number, baseVersion: string) {
+  async applyDistribution(tournamentId: number, baseVersion: string, resetProgram = false) {
     return this.t.manager.transaction(async (manager) => {
       const tournament = await manager.getRepository(Tournament).findOne({ where: { id: tournamentId }, lock: { mode: 'pessimistic_write' } });
       if (!tournament) throw new NotFoundException('Torneo no encontrado');
@@ -363,7 +387,7 @@ export class TournamentsService {
       const existingZones = await zoneRepository.find({ where: { tournamentCategory: { tournamentId } } });
       const existingZoneIds = existingZones.map((zone) => zone.id);
       const slotsRepository = manager.getRepository(TournamentScheduleSlot);
-      const existingSlots = await slotsRepository.find({ where: { tournamentId } });
+      const existingSlots = await slotsRepository.find({ where: { tournamentId }, relations: programRelations });
       const matchIds = new Set(existingSlots.flatMap((slot) => slot.matchId ? [slot.matchId] : []));
       if (existingZoneIds.length) {
         const related = await manager.getRepository(TournamentMatch).find({ where: [
@@ -375,9 +399,12 @@ export class TournamentsService {
       if (matchIds.size) await manager.getRepository(TournamentMatch).delete({ id: In([...matchIds]) });
       if (existingZones.length) await zoneRepository.remove(existingZones);
       for (const plan of preview.plans.filter((item) => item.registrationCount > 0)) {
-        for (const plannedZone of plan.zones) {
+        for (const [zoneIndex, plannedZone] of plan.zones.entries()) {
           const venue = plannedZone.venue ?? plan.venue;
           if (!venue) throw new BadRequestException(`No se pudo asignar una sede a ${plan.categoryName} - ${plannedZone.name}.`);
+          await manager.getRepository(TournamentZoneVenuePlan).upsert({
+            tournamentCategoryId: plan.tournamentCategoryId, zoneIndex, venueId: venue.id,
+          }, { conflictPaths: ['tournamentCategoryId', 'zoneIndex'] });
           const zone = await zoneRepository.save(zoneRepository.create({
             tournamentCategoryId: plan.tournamentCategoryId, venueId: venue.id, name: plannedZone.name, capacity: plannedZone.capacity,
           }));
@@ -387,6 +414,12 @@ export class TournamentsService {
         }
       }
       await this.buildScheduleGrid(manager, tournamentId);
+      if (!resetProgram && existingSlots.length) {
+        const generatedSlots = await slotsRepository.find({ where: { tournamentId }, relations: programRelations, order: { sequence: 'ASC' } });
+        for (const assignment of preservedProgramAssignments(existingSlots, generatedSlots)) {
+          await slotsRepository.update(assignment.id, { courtId: assignment.courtId, scheduledAt: assignment.scheduledAt });
+        }
+      }
       return this.distributionPreviewInManager(manager, tournamentId);
     });
   }
@@ -517,7 +550,11 @@ export class TournamentsService {
       if (apply) {
         if (result.warnings.length) throw new BadRequestException('Hay partidos sin horario. Ajustá el escenario antes de aplicarlo.');
         for (const slot of result.slots) await slotRepo.update(slot.id, { courtId: slot.courtId, scheduledAt: slot.scheduledAt });
-        for (const rule of config.rules.filter((rule) => rule.stage === 'ZONE')) await zoneRepo.update(rule.zoneId!, { venueId: rule.venueId });
+        for (const rule of config.rules.filter((rule) => rule.stage === 'ZONE')) {
+          await zoneRepo.update(rule.zoneId!, { venueId: rule.venueId });
+          const zone = zones.find((item) => item.id === rule.zoneId);
+          if (zone) { zone.venueId = rule.venueId; await this.rememberZoneVenue(manager, zone); }
+        }
         const assignedDays = result.slots.flatMap((slot) => slot.scheduledAt ? [new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' }).format(slot.scheduledAt)] : []);
         await manager.getRepository(Tournament).update(tournamentId, { playingDays: [...new Set([...this.programDays(tournament), config.mainDay, config.finalsDay, ...assignedDays])].sort() });
         await runner.commitTransaction();
@@ -525,6 +562,15 @@ export class TournamentsService {
       return { baseVersion, slots: programView(result.slots), warnings: result.warnings, capacityWarnings: result.capacityWarnings };
     } catch (error) { if (runner.isTransactionActive) await runner.rollbackTransaction(); throw error; }
     finally { await runner.release(); }
+  }
+
+  private async rememberZoneVenue(manager: EntityManager, zone: Pick<Zone, 'id' | 'tournamentCategoryId' | 'venueId'>) {
+    const zones = await manager.getRepository(Zone).find({ where: { tournamentCategoryId: zone.tournamentCategoryId }, order: { name: 'ASC', id: 'ASC' } });
+    const zoneIndex = zones.findIndex((item) => item.id === zone.id);
+    if (zoneIndex < 0) return;
+    await manager.getRepository(TournamentZoneVenuePlan).upsert({
+      tournamentCategoryId: zone.tournamentCategoryId, zoneIndex, venueId: zone.venueId,
+    }, { conflictPaths: ['tournamentCategoryId', 'zoneIndex'] });
   }
 
   private programDays(tournament: Tournament) {

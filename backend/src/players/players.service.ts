@@ -88,16 +88,22 @@ export class PlayersService {
 
   async create(dto: CreatePlayerDto) {
     const locality = await this.resolveLocality(dto.localityId);
-    return this.playersRepository.save(this.playersRepository.create({
+    const player = await this.playersRepository.save(this.playersRepository.create({
       fullName: dto.fullName.trim(), dni: dto.dni.trim(), birthDate: normalizeOptional(dto.birthDate),
       phone: normalizeOptional(dto.phone), instagram: normalizeOptional(dto.instagram), shirtSize: dto.shirtSize ?? null,
       shirtModel: dto.shirtModel ?? null,
       localityId: locality?.id ?? null,
     }));
+    await this.synchronizeLocalityRoster(player.localityId);
+    return player;
   }
 
   async update(id: number, dto: UpdatePlayerDto) {
     const player = await this.getById(id);
+    const previousDni = player.dni.trim();
+    const previousLocalityId = player.localityId;
+    const nextLocalityId = dto.localityId === undefined ? previousLocalityId : dto.localityId;
+    if (nextLocalityId !== previousLocalityId) await this.assertCanLeaveRegisteredRoster(player, previousLocalityId);
     if (dto.localityId !== undefined) {
       const locality = await this.resolveLocality(dto.localityId);
       // getById loads the relation. Keep both the FK and the relation in sync so
@@ -112,11 +118,18 @@ export class PlayersService {
     if (dto.instagram !== undefined) player.instagram = normalizeOptional(dto.instagram);
     if (dto.shirtSize !== undefined) player.shirtSize = dto.shirtSize;
     if (dto.shirtModel !== undefined) player.shirtModel = dto.shirtModel;
-    return this.playersRepository.save(player);
+    const saved = await this.playersRepository.save(player);
+    await this.synchronizePlayerSnapshots(saved, previousDni);
+    await this.synchronizeLocalityRoster(previousLocalityId);
+    if (saved.localityId !== previousLocalityId) await this.synchronizeLocalityRoster(saved.localityId);
+    return saved;
   }
 
   async remove(id: number) {
-    await this.playersRepository.remove(await this.getById(id));
+    const player = await this.getById(id);
+    await this.assertCanLeaveRegisteredRoster(player, player.localityId);
+    await this.playersRepository.remove(player);
+    await this.synchronizeLocalityRoster(player.localityId);
     return { success: true };
   }
 
@@ -237,6 +250,7 @@ export class PlayersService {
         }),
       );
     }
+    await this.synchronizeLocalityRoster(registration.localityId);
   }
 
   private async correctRegistrationPlayers(registration: PairRegistration, previous: PairRegistration, manager: EntityManager) {
@@ -262,6 +276,148 @@ export class PlayersService {
     }
   }
 
+  /**
+   * Player is the canonical identity record. Registration columns are retained as
+   * an immutable-friendly intake snapshot, but every application edit refreshes
+   * the matching snapshot so tournament views cannot drift from Players.
+   */
+  private async synchronizePlayerSnapshots(player: Player, previousDni = player.dni.trim()) {
+    const registrations = await this.registrationsRepository.find({
+      where: [
+        { playerOneDni: previousDni }, { playerTwoDni: previousDni }, { playerThreeDni: previousDni },
+        ...(previousDni === player.dni.trim() ? [] : [
+          { playerOneDni: player.dni.trim() }, { playerTwoDni: player.dni.trim() }, { playerThreeDni: player.dni.trim() },
+        ]),
+      ],
+    });
+    for (const registration of registrations) {
+      if (registration.localityId !== player.localityId) continue;
+      let changed = false;
+      for (const prefix of ['playerOne', 'playerTwo', 'playerThree'] as const) {
+        if (registration[`${prefix}Dni`]?.trim() !== previousDni) continue;
+        assignPlayerSnapshot(registration, prefix, player);
+        changed = true;
+      }
+      if (changed) await this.registrationsRepository.save(registration);
+    }
+  }
+
+  /**
+   * Today a locality represents one team. When that team has one registration,
+   * its current 2/3-player roster is also the pair roster. Existing positions are
+   * preserved and a replacement fills the vacated position.
+   */
+  private async synchronizeLocalityRoster(localityId: number | null) {
+    if (!localityId) return;
+    const [players, registrations] = await Promise.all([
+      this.playersRepository.find({ where: { localityId }, order: { id: 'ASC' } }),
+      this.registrationsRepository.find({ where: { localityId }, order: { id: 'ASC' } }),
+    ]);
+    if (registrations.length !== 1 || players.length < 2 || players.length > 3) return;
+
+    const registration = registrations[0];
+    const metadata = registrationMetadataByDni(registration);
+    const ordered: Array<Player | undefined> = Array(players.length);
+    const available = new Map(players.map((player) => [player.dni.trim(), player]));
+    for (const [index, prefix] of (['playerOne', 'playerTwo', 'playerThree'] as const).entries()) {
+      if (index >= ordered.length) break;
+      const player = available.get(registration[`${prefix}Dni`]?.trim() ?? '');
+      if (!player) continue;
+      ordered[index] = player;
+      available.delete(player.dni.trim());
+    }
+    for (const player of available.values()) {
+      const empty = ordered.findIndex((item) => !item);
+      if (empty >= 0) ordered[empty] = player;
+    }
+    assignPlayerSnapshot(registration, 'playerOne', ordered[0]!);
+    assignRegistrationMetadata(registration, 'playerOne', metadata.get(ordered[0]!.dni.trim()));
+    assignPlayerSnapshot(registration, 'playerTwo', ordered[1]!);
+    assignRegistrationMetadata(registration, 'playerTwo', metadata.get(ordered[1]!.dni.trim()));
+    if (ordered[2]) {
+      assignPlayerSnapshot(registration, 'playerThree', ordered[2]);
+      assignRegistrationMetadata(registration, 'playerThree', metadata.get(ordered[2].dni.trim()));
+    }
+    else clearThirdPlayerSnapshot(registration);
+    await this.registrationsRepository.save(registration);
+  }
+
+  private async assertCanLeaveRegisteredRoster(player: Player, localityId: number | null) {
+    if (!localityId) return;
+    const referenced = await this.registrationsRepository.count({
+      where: [{ playerOneDni: player.dni }, { playerTwoDni: player.dni }, { playerThreeDni: player.dni }],
+    });
+    if (!referenced) return;
+    const [remainingPlayers, registrations] = await Promise.all([
+      this.playersRepository.count({ where: { localityId, id: Not(player.id) } }),
+      this.registrationsRepository.count({ where: { localityId } }),
+    ]);
+    if (registrations === 1 && (remainingPlayers === 2 || remainingPlayers === 3)) return;
+    throw new BadRequestException('La jugadora integra una pareja inscripta. Agregá primero su reemplazo al mismo equipo; luego podrás quitarla sin dejar el programa inconsistente.');
+  }
+
+}
+
+type PlayerPrefix = 'playerOne' | 'playerTwo' | 'playerThree';
+type RegistrationMetadata = {
+  hasCommercialAgreement: boolean;
+  commercialAgreementDetails: string | null;
+  photoStoredName: string | null;
+  photoOriginalName: string | null;
+  photoMimeType: string | null;
+  photoSizeBytes: number | null;
+};
+
+function assignPlayerSnapshot(registration: PairRegistration, prefix: PlayerPrefix, player: Player) {
+  registration[`${prefix}Name`] = player.fullName.trim();
+  registration[`${prefix}Dni`] = player.dni.trim();
+  // These fields predate Players and are non-null for the first two positions.
+  // Preserve the submitted value when a manually-created player has no value yet.
+  if (player.birthDate) registration[`${prefix}BirthDate`] = player.birthDate;
+  if (player.phone) registration[`${prefix}Phone`] = player.phone;
+  registration[`${prefix}Instagram`] = player.instagram;
+  if (player.shirtSize) registration[`${prefix}ShirtSize`] = player.shirtSize;
+}
+
+function registrationMetadataByDni(registration: PairRegistration) {
+  const result = new Map<string, RegistrationMetadata>();
+  for (const prefix of ['playerOne', 'playerTwo', 'playerThree'] as const) {
+    const dni = registration[`${prefix}Dni`]?.trim();
+    if (!dni) continue;
+    result.set(dni, {
+      hasCommercialAgreement: registration[`${prefix}HasCommercialAgreement`],
+      commercialAgreementDetails: registration[`${prefix}CommercialAgreementDetails`],
+      photoStoredName: registration[`${prefix}PhotoStoredName`],
+      photoOriginalName: registration[`${prefix}PhotoOriginalName`],
+      photoMimeType: registration[`${prefix}PhotoMimeType`],
+      photoSizeBytes: registration[`${prefix}PhotoSizeBytes`],
+    });
+  }
+  return result;
+}
+
+function assignRegistrationMetadata(registration: PairRegistration, prefix: PlayerPrefix, metadata?: RegistrationMetadata) {
+  registration[`${prefix}HasCommercialAgreement`] = metadata?.hasCommercialAgreement ?? false;
+  registration[`${prefix}CommercialAgreementDetails`] = metadata?.commercialAgreementDetails ?? null;
+  registration[`${prefix}PhotoStoredName`] = metadata?.photoStoredName ?? null;
+  registration[`${prefix}PhotoOriginalName`] = metadata?.photoOriginalName ?? null;
+  registration[`${prefix}PhotoMimeType`] = metadata?.photoMimeType ?? null;
+  registration[`${prefix}PhotoSizeBytes`] = metadata?.photoSizeBytes ?? null;
+}
+
+function clearThirdPlayerSnapshot(registration: PairRegistration) {
+  registration.playerThreeName = null;
+  registration.playerThreeDni = null;
+  registration.playerThreeBirthDate = null;
+  registration.playerThreePhone = null;
+  registration.playerThreeInstagram = null;
+  registration.playerThreeShirtSize = null;
+  registration.playerThreeHasCommercialAgreement = false;
+  registration.playerThreeCommercialAgreementDetails = null;
+  registration.playerThreePhotoStoredName = null;
+  registration.playerThreePhotoOriginalName = null;
+  registration.playerThreePhotoMimeType = null;
+  registration.playerThreePhotoSizeBytes = null;
 }
 
 function normalizeOptional(value?: string | null) {

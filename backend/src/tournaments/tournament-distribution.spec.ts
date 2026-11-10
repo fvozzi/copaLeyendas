@@ -42,4 +42,23 @@ describe('planTournamentDistribution', () => {
     const localityVenue = (plan: typeof plans[number]) => plan.zones.find((zone) => zone.registrations.some((registration) => registration.localityId === 7))?.venue?.id;
     expect(localityVenue(plans[1])).toBe(localityVenue(plans[0]));
   });
+
+  it('honors venue choices made before generating zones and keeps them by zone position when counts change', () => {
+    const registrations = Array.from({ length: 9 }, (_, index) => ({ id: index + 1, localityId: index + 1, localityName: `Equipo ${index + 1}`, label: `Pareja ${index + 1}` }));
+    const venues = [{ id: 1, name: 'Norte' }, { id: 2, name: 'Sur' }];
+    const choices = new Map([['3:0', 2], ['3:1', 1]]);
+    const [threeZones] = planTournamentDistribution([{ id: 3, name: 'Damas A', registrations }], venues, choices);
+    expect(threeZones.zones.map((zone) => zone.venue?.id)).toEqual([2, 1, expect.any(Number)]);
+    expect(threeZones.zones.slice(0, 2).map((zone) => zone.venueAssignment)).toEqual(['MANUAL', 'MANUAL']);
+
+    const [twoZones] = planTournamentDistribution([{ id: 3, name: 'Damas A', registrations: registrations.slice(0, 8) }], venues, choices);
+    expect(twoZones.zones.map((zone) => zone.venue?.id)).toEqual([2, 1]);
+  });
+
+  it('does not split pairs from one locality across manually separated venues', () => {
+    const registrations = Array.from({ length: 8 }, (_, index) => ({ id: index + 1, localityId: index < 2 ? 7 : 100 + index, localityName: index < 2 ? 'Rocha' : `Equipo ${index + 1}`, label: `Pareja ${index + 1}` }));
+    const [plan] = planTournamentDistribution([{ id: 3, name: 'Damas A', registrations }], [{ id: 1, name: 'Norte' }, { id: 2, name: 'Sur' }], new Map([['3:0', 1], ['3:1', 2]]));
+    expect(plan.warnings).toContain('Rocha no puede ubicarse en una sola sede con la asignación actual de zonas.');
+    expect(plan.zones.flatMap((zone) => zone.registrations)).toHaveLength(6);
+  });
 });

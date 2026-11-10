@@ -80,17 +80,17 @@ El Director registra una localidad/equipo y le asigna categoria. Al emitir un to
 
 Una vez validado el pago o bonificacion, el Director marca la inscripcion como confirmada. Solo esas parejas se consideran para el conteo de la categoria y para armar zonas.
 
-La cantidad y el tamaño de las zonas no requieren configuración manual. Se calculan a partir de las parejas confirmadas y presentes, con un máximo de cuatro zonas completas de 3 o 4 parejas. Por ejemplo: 8 = 4+4, 9 = 3+3+3, 10 = 4+3+3, 12 = 3+3+3+3, 15 = 4+4+4+3 y 16 = 4+4+4+4. Así, una baja sobre un cuadro de 16 conserva las cuatro zonas y reduce solamente una de ellas. Los totales que no pueden formar zonas completas quedan señalados y no se pueden aplicar.
+La cantidad y el tamaño de las zonas se calculan a partir de las parejas confirmadas y presentes, con un máximo de cuatro zonas completas de 3 o 4 parejas. Por ejemplo: 8 = 4+4, 9 = 3+3+3, 10 = 4+3+3, 12 = 3+3+3+3, 15 = 4+4+4+3 y 16 = 4+4+4+4. Así, una baja sobre un cuadro de 16 conserva las cuatro zonas y reduce solamente una de ellas. Los totales que no pueden formar zonas completas quedan señalados y no se pueden aplicar. La cantidad y capacidad son automáticas; la sede de cada zona puede y debe ser revisada por Dirección antes de generar los partidos.
 
 ### CU-05b Distribuir zonas y generar partidos
 
-El menú **Distribución** permite elegir el torneo y calcular una vista previa sin modificar datos. La vista muestra la sede, el tamaño de cada zona y todas las parejas antes de confirmar. La asignación cumple estas prioridades:
+El menú **Distribución** permite elegir el torneo y calcular una vista previa sin crear zonas ni partidos reales. La vista muestra el tamaño de cada zona, todas las parejas y un selector para que Dirección asigne cada zona a una sede antes de confirmar. La selección se guarda por categoría y posición de zona (Zona A, B, C o D). Si cambia la cantidad de equipos, las zonas que continúan existiendo conservan su sede; las nuevas reciben una sugerencia automática que puede ajustarse antes de aplicar. La asignación cumple estas prioridades:
 
 - parejas de la misma localidad, dentro de una categoría, comparten sede y quedan en zonas distintas;
 - entre categorías se intenta mantener la misma sede para una localidad;
 - en igualdad de condiciones se balancea la carga entre sedes activas.
 
-Al aplicar la vista previa se reemplazan únicamente zonas que todavía no tienen fixture, se crean las asignaciones y se genera el fixture en una transacción. Si cambiaron inscripciones, sedes o zonas desde el cálculo, se exige recalcular. Cuando ya existen partidos, la distribución pasa a modo de consulta y los cambios se realizan desde **Programa → Mapa**.
+Al aplicar la vista previa se crean o rearman las zonas, asignaciones y partidos pendientes en una transacción. Si cambiaron inscripciones, sedes o zonas desde el cálculo, se exige recalcular. Una reaplicación normal conserva para cada partido equivalente la sede/cancha y el horario definidos posteriormente desde **Programa**; Distribución no debe deshacer decisiones manuales del programa. La acción separada **Rehacer Programa desde cero**, acompañada por una confirmación explícita, es la única que descarta esos ajustes y vuelve a calcular canchas y horarios. Una vez cargado el primer resultado no se permite rearmar la distribución.
 
 ### CU-06 Crear zona
 
@@ -104,7 +104,7 @@ El Director asigna parejas confirmadas a una zona. Una pareja no puede pertenece
 
 ### CU-07b Registrar asistencia y rearmar
 
-Antes del primer resultado, el Director puede marcar una pareja como ausente para ese torneo sin eliminar su inscripción, pago ni historial. La vista previa excluye a las ausentes y propone la nueva composición. Al aplicarla se reemplazan únicamente el fixture y el programa pendientes. Si una pareja vuelve a participar se puede incluir nuevamente y recalcular. Con resultados cargados la asistencia y la distribución quedan bloqueadas para preservar el historial deportivo. Eliminar la inscripción queda reservado para registros cargados por error.
+Antes del primer resultado, el Director puede marcar una pareja como ausente para ese torneo sin eliminar su inscripción, pago ni historial. La vista previa excluye a las ausentes y propone la nueva composición. Al aplicarla se reemplaza únicamente la estructura pendiente que cambió y se conservan las asignaciones de Programa para los partidos equivalentes. Si una pareja vuelve a participar se puede incluir nuevamente y recalcular. Con resultados cargados la asistencia y la distribución quedan bloqueadas para preservar el historial deportivo. Eliminar la inscripción queda reservado para registros cargados por error.
 
 ### CU-08 Armar fixture de zona de cuatro
 

@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, Param, ParseIntPipe, Patch, Post, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
-import { IsBoolean, IsDateString, IsInt, IsString, Min } from 'class-validator';
+import { IsBoolean, IsDateString, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import type { Response } from 'express';
@@ -14,7 +14,8 @@ import { ProgramScenarioDto } from './program-scenario.dto';
 class ScheduleMatchDto { @IsDateString() scheduledAt: string; }
 class ResultDto { @IsInt() homeScore: number; @IsInt() awayScore: number; }
 class AssignPlaceDto { @IsInt() @Min(1) registrationId: number; }
-class ApplyDistributionDto { @IsString() baseVersion: string; }
+class ApplyDistributionDto { @IsString() baseVersion: string; @IsOptional() @IsBoolean() resetProgram?: boolean; }
+class DistributionVenueDto { @IsInt() @Min(1) tournamentCategoryId: number; @IsInt() @Min(0) zoneIndex: number; @IsInt() @Min(1) venueId: number; }
 class AttendanceDto { @IsBoolean() present: boolean; }
 
 @Controller('tournaments')
@@ -28,7 +29,8 @@ export class TournamentsController {
   @Get('zones/:id/matches') async matches(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { await this.s.assertZoneAccess(user, id); return this.s.matches(id); }
   @Get(':id') detail(@Param('id', ParseIntPipe) id: number) { return this.q.detail(id); }
   @Get(':id/distribution') distribution(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { this.assertDirector(user); return this.s.distributionPreview(id); }
-  @Post(':id/distribution/apply') applyDistribution(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: ApplyDistributionDto) { this.assertDirector(user); return this.s.applyDistribution(id, dto.baseVersion); }
+  @Patch(':id/distribution/venue') distributionVenue(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: DistributionVenueDto) { this.assertDirector(user); return this.s.setDistributionVenue(id, dto); }
+  @Post(':id/distribution/apply') applyDistribution(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: ApplyDistributionDto) { this.assertDirector(user); return this.s.applyDistribution(id, dto.baseVersion, dto.resetProgram ?? false); }
   @Patch(':id/attendance/:registrationId') attendance(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Param('registrationId', ParseIntPipe) registrationId: number, @Body() dto: AttendanceDto) { this.assertDirector(user); return this.s.setAttendance(id, registrationId, dto.present); }
   @Get(':id/schedule-grid') scheduleGrid(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { this.assertDirector(user); return this.s.scheduleGrid(id); }
   @Post(':id/redistribute-courts') redistributeCourts(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { this.assertDirector(user); return this.s.redistributeCourts(id); }

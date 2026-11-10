@@ -21,6 +21,7 @@ export interface DistributionZonePlan {
   name: string;
   capacity: number;
   venue?: DistributionVenueInput | null;
+  venueAssignment?: 'AUTOMATIC' | 'MANUAL' | 'APPLIED';
   registrations: DistributionRegistration[];
 }
 
@@ -55,7 +56,7 @@ function zoneName(index: number) {
   return `Zona ${String.fromCharCode(65 + index)}`;
 }
 
-export function planTournamentDistribution(categories: DistributionCategoryInput[], venues: DistributionVenueInput[]) {
+export function planTournamentDistribution(categories: DistributionCategoryInput[], venues: DistributionVenueInput[], venuePlans = new Map<string, number>()) {
   const venueLoad = new Map(venues.map((venue) => [venue.id, 0]));
   const localityVenueHistory = new Map<number, Map<number, number>>();
   const plans: DistributionCategoryPlan[] = [];
@@ -81,14 +82,27 @@ export function planTournamentDistribution(categories: DistributionCategoryInput
       }
     }
 
-    const zones: DistributionZonePlan[] = capacities.map((capacity, index) => ({ name: zoneName(index), capacity, venue: null, registrations: [] }));
+    const zones: DistributionZonePlan[] = capacities.map((capacity, index) => {
+      const plannedVenueId = venuePlans.get(`${category.id}:${index}`);
+      const plannedVenue = venues.find((venue) => venue.id === plannedVenueId) ?? null;
+      return { name: zoneName(index), capacity, venue: plannedVenue, venueAssignment: plannedVenue ? 'MANUAL' : 'AUTOMATIC', registrations: [] };
+    });
     const orderedGroups = [...localityGroups.values()].sort((left, right) => right.length - left.length || left[0].localityName.localeCompare(right[0].localityName, 'es'));
     for (const group of orderedGroups) {
-      const used = new Set<number>();
+      const venue = [...venues].filter((candidate) => zones.filter((zone) => (!zone.venue || zone.venue.id === candidate.id) && zone.registrations.length < zone.capacity).length >= group.length)
+        .sort((left, right) => {
+          const history = (candidate: DistributionVenueInput) => group.reduce((sum, registration) => sum + (localityVenueHistory.get(registration.localityId)?.get(candidate.id) ?? 0), 0);
+          const fixed = (candidate: DistributionVenueInput) => zones.filter((zone) => zone.venueAssignment === 'MANUAL' && zone.venue?.id === candidate.id && zone.registrations.length < zone.capacity).length;
+          return history(right) - history(left) || fixed(right) - fixed(left) || (venueLoad.get(left.id) ?? 0) - (venueLoad.get(right.id) ?? 0) || left.name.localeCompare(right.name, 'es');
+        })[0];
+      if (!venue) {
+        warnings.push(`${group[0].localityName} no puede ubicarse en una sola sede con la asignación actual de zonas.`);
+        continue;
+      }
       for (const registration of group) {
         const target = zones
           .map((zone, index) => ({ zone, index }))
-          .filter(({ zone, index }) => !used.has(index) && zone.registrations.length < zone.capacity)
+          .filter(({ zone }) => (!zone.venue || zone.venue.id === venue.id) && zone.registrations.length < zone.capacity && !zone.registrations.some((item) => item.localityId === registration.localityId))
           .sort((left, right) => (left.zone.registrations.length / left.zone.capacity) - (right.zone.registrations.length / right.zone.capacity)
             || (right.zone.capacity - right.zone.registrations.length) - (left.zone.capacity - left.zone.registrations.length)
             || left.index - right.index)[0];
@@ -96,39 +110,19 @@ export function planTournamentDistribution(categories: DistributionCategoryInput
           if (!warnings.some((warning) => warning.includes('no es posible separarlas'))) warnings.push('No fue posible completar las zonas respetando la separacion por localidad.');
           break;
         }
+        target.zone.venue ??= venue;
         target.zone.registrations.push(registration);
-        used.add(target.index);
+      }
+      venueLoad.set(venue.id, (venueLoad.get(venue.id) ?? 0) + group.length);
+      for (const registration of group) {
+        const history = localityVenueHistory.get(registration.localityId) ?? new Map<number, number>();
+        history.set(venue.id, (history.get(venue.id) ?? 0) + 1);
+        localityVenueHistory.set(registration.localityId, history);
       }
     }
-
-    if (venues.length && zones.length) {
-      // Zones connected by a repeated locality form one hard venue component.
-      // Different components may use different venues, which keeps the court load balanced.
-      const parent = zones.map((_, index) => index);
-      const find = (index: number): number => parent[index] === index ? index : (parent[index] = find(parent[index]));
-      const union = (left: number, right: number) => { const leftRoot = find(left), rightRoot = find(right); if (leftRoot !== rightRoot) parent[rightRoot] = leftRoot; };
-      for (const localityId of localityGroups.keys()) {
-        const indexes = zones.flatMap((zone, index) => zone.registrations.some((registration) => registration.localityId === localityId) ? [index] : []);
-        for (let index = 1; index < indexes.length; index += 1) union(indexes[0], indexes[index]);
-      }
-      const components = new Map<number, number[]>();
-      zones.forEach((_, index) => components.set(find(index), [...(components.get(find(index)) ?? []), index]));
-      for (const indexes of [...components.values()].sort((left, right) => left[0] - right[0])) {
-        const componentRegistrations = indexes.flatMap((index) => zones[index].registrations);
-        const venue = [...venues].sort((left, right) => {
-          const score = (candidate: DistributionVenueInput) => componentRegistrations.reduce((sum, registration) => sum + (localityVenueHistory.get(registration.localityId)?.get(candidate.id) ?? 0), 0);
-          return score(right) - score(left)
-            || (venueLoad.get(left.id) ?? 0) - (venueLoad.get(right.id) ?? 0)
-            || left.name.localeCompare(right.name, 'es');
-        })[0];
-        for (const index of indexes) zones[index].venue = venue;
-        venueLoad.set(venue.id, (venueLoad.get(venue.id) ?? 0) + indexes.reduce((sum, index) => sum + zones[index].capacity, 0));
-        for (const registration of componentRegistrations) {
-          const history = localityVenueHistory.get(registration.localityId) ?? new Map<number, number>();
-          history.set(venue.id, (history.get(venue.id) ?? 0) + 1);
-          localityVenueHistory.set(registration.localityId, history);
-        }
-      }
+    for (const zone of zones.filter((item) => !item.venue)) {
+      zone.venue = [...venues].sort((left, right) => (venueLoad.get(left.id) ?? 0) - (venueLoad.get(right.id) ?? 0) || left.name.localeCompare(right.name, 'es'))[0] ?? null;
+      if (zone.venue) venueLoad.set(zone.venue.id, (venueLoad.get(zone.venue.id) ?? 0) + zone.capacity);
     }
     const assignedVenueIds = new Set(zones.flatMap((zone) => zone.venue ? [zone.venue.id] : []));
     const venue = assignedVenueIds.size === 1 ? zones[0]?.venue ?? null : null;
