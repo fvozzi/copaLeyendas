@@ -11,7 +11,7 @@ let root: Root;
 let container: HTMLDivElement;
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.clearAllMocks(); });
 
-it('shows every current registration status by category and applies capacity only to confirmed pairs', async () => {
+it('includes unused tokens in category totals and applies capacity only to confirmed pairs', async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   vi.mocked(getDashboardSummary).mockResolvedValue({
     posts: { total: 0, published: 0, featured: 0, bySection: {} },
@@ -28,9 +28,10 @@ it('shows every current registration status by category and applies capacity onl
   await act(async () => root.render(createElement(MemoryRouter, { future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(AdminDashboardPage))));
   const rows = container.querySelectorAll('.category-summary-table tbody tr');
   expect(rows).toHaveLength(3);
-  expect(Array.from(rows[0].querySelectorAll('strong')).map((cell) => cell.textContent)).toEqual(['4', '1', '1', '1', '0', '1']);
+  expect(Array.from(rows[0].querySelectorAll('strong')).map((cell) => cell.textContent)).toEqual(['16', '1', '1', '1', '0', '1']);
   expect(rows[0].textContent).not.toContain('Cupo completo');
   expect(rows[1].textContent).toContain('Cupo completo');
+  expect(Array.from(rows[1].querySelectorAll('strong')).map((cell) => cell.textContent)).toEqual(['17', '0', '0', '16', '0', '0']);
   expect(Array.from(rows[2].querySelectorAll('strong')).map((cell) => cell.textContent)).toEqual(['0', '0', '0', '0', '0', '0']);
   const shirts = container.querySelector('.shirt-distribution-table')!;
   expect(shirts.querySelectorAll('tbody tr')).toHaveLength(4);

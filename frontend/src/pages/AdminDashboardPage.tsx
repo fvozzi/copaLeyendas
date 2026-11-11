@@ -85,13 +85,13 @@ export function AdminDashboardPage() {
         </article>
       </div>
 
-      <div className="admin-grid">
-        <section className="data-card admin-grid-wide">
+      <div className="dashboard-overview-grid">
+        <section className="data-card">
           <div className="panel-header"><div><h2>Partidos por sede</h2><p className="field-hint">{matchesByVenue.tournamentName ?? 'No hay torneo activo.'}</p></div><strong>Total: {matchesByVenue.totalMatches}</strong></div>
           <AdminDataGrid rows={matchesByVenue.venues.map((venue, index) => ({ ...venue, id: index + 1 }))} emptyMessage="No hay zonas configuradas para el torneo activo." columns={[{ label: 'Sede', render: (venue) => <strong>{venue.venue}</strong> }, { label: 'Categorias', render: (venue) => venue.categories.join(', ') }, { label: 'Partidos', render: (venue) => venue.matches }]} />
         </section>
         <section className="data-card">
-          <h2>Inscripciones por categoria</h2>
+          <h2>Habilitaciones e inscripciones por categoria</h2>
           <p className="field-hint">Cupo de referencia: 16 parejas por categoría.</p>
           <div className="category-summary-wrap">
             <table className="category-summary-table" aria-label="Inscripciones por categoría">
@@ -100,15 +100,18 @@ export function AdminDashboardPage() {
                 const statuses = summary.registrations.byCategoryAndStatus?.[name] ?? {} as Record<RegistrationStatus, number>;
                 return <tr key={name}>
                   <th scope="row">{name}</th>
-                  <td><strong>{summary.registrations.byCategory[name] ?? 0}</strong></td>
+                  <td><strong>{summary.accessGrants.byCategory[name] ?? 0}</strong></td>
                   {categoryStatusColumns.map(({ status }) => <td key={status}>{status === 'CONFIRMED' ? <CategoryCount count={statuses[status] ?? 0} /> : <strong>{statuses[status] ?? 0}</strong>}</td>)}
                 </tr>;
               })}</tbody>
             </table>
           </div>
-          <p className="field-hint">TOT: todas las inscripciones actuales. REC: recibidas. REV: en revisión. CONF: confirmadas. ESP: lista de espera. RECH: rechazadas.</p>
+          <p className="field-hint">TOT: habilitaciones emitidas, incluidos los tokens aún no usados. REC: recibidas. REV: en revisión. CONF: confirmadas. ESP: lista de espera. RECH: rechazadas.</p>
           <Link to="/app/inscripciones" className="inline-link">Ver inscripciones</Link>
         </section>
+      </div>
+
+      <div className="admin-grid">
         <ShirtDistribution distribution={summary.registrations.shirtDistribution} />
         <section className="data-card">
           <h2>Estado de seguimiento</h2>
