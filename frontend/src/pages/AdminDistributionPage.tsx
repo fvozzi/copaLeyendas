@@ -35,10 +35,13 @@ export function AdminDistributionPage() {
 
   const apply = async (resetProgram = false) => {
     if (!distribution?.canApply || applying) return;
+    const newConfirmedCount = distribution.plans.reduce((sum, plan) => sum + plan.newRegistrationCount, 0);
     const message = resetProgram
       ? 'Se reconstruirán desde cero los partidos, sedes, canchas y horarios del Programa. Se perderán los ajustes manuales pendientes. ¿Continuar?'
       : distribution.replacesPendingFixture
-      ? 'Se rearmarán las zonas conservando, cuando el partido siga existiendo, la sede, cancha y horario definidos en Programa. ¿Continuar?'
+      ? newConfirmedCount
+        ? `Se incorporarán ${newConfirmedCount} ${newConfirmedCount === 1 ? 'pareja confirmada nueva' : 'parejas confirmadas nuevas'}, conservando al máximo las zonas actuales y la programación de los partidos equivalentes. ¿Continuar?`
+        : 'Se rearmarán las zonas conservando, cuando el partido siga existiendo, la sede, cancha y horario definidos en Programa. ¿Continuar?'
       : 'Se crearán las zonas, las asignaciones y el fixture real del torneo. ¿Continuar?';
     if (!window.confirm(message)) return;
     setApplying(true); setError(null);
@@ -101,16 +104,16 @@ export function AdminDistributionPage() {
     <div className="distribution-toolbar">
       <label>Torneo<select value={tournamentId} onChange={(event) => setTournamentId(Number(event.target.value))}><option value="0">Seleccionar</option>{tournaments.map((tournament) => <option key={tournament.id} value={tournament.id}>{tournament.name}</option>)}</select></label>
       <button type="button" className="secondary-button" disabled={!tournamentId || loading} onClick={() => void calculate()}>{loading ? 'Calculando...' : 'Recalcular vista previa'}</button>
-      {distribution?.mode === 'PREVIEW' && <button type="button" className="primary-button" disabled={!distribution.canApply || applying} onClick={() => void apply(false)}>{applying ? 'Generando...' : distribution.replacesPendingFixture ? 'Aplicar conservando programación' : 'Aplicar y generar partidos'}</button>}
+      {distribution?.mode === 'PREVIEW' && <button type="button" className="primary-button" disabled={!distribution.canApply || applying} onClick={() => void apply(false)}>{applying ? 'Generando...' : distribution.replacesPendingFixture ? distribution.plans.some((plan) => plan.newRegistrationCount > 0) ? 'Sumar nuevas confirmadas' : 'Aplicar conservando programación' : 'Aplicar y generar partidos'}</button>}
       {distribution?.mode === 'PREVIEW' && distribution.replacesPendingFixture && <button type="button" className="danger-link" disabled={!distribution.canApply || applying} onClick={() => void apply(true)}>Rehacer programación desde cero</button>}
     </div>
     {error && <div className="inline-state" role="alert">{error}</div>}
-    {distribution?.mode === 'PREVIEW' && distribution.replacesPendingFixture && <div className="inline-state">La asistencia o las zonas cambiaron. Al aplicar se conservan las sedes, canchas y horarios editados en Programación para los partidos equivalentes. Usá “Rehacer programación desde cero” sólo si querés descartarlos.</div>}
+    {distribution?.mode === 'PREVIEW' && distribution.replacesPendingFixture && <div className="inline-state">{distribution.plans.some((plan) => plan.newRegistrationCount > 0) ? 'Hay nuevas parejas confirmadas. Al sumarlas se conservan tantas asignaciones de zona como sea posible' : 'La asistencia o las zonas cambiaron'} y se mantienen las sedes, canchas y horarios editados en Programación para los partidos equivalentes. Usá “Rehacer programación desde cero” sólo si querés descartarlos.</div>}
     {distribution?.mode === 'CURRENT' && <div className="inline-state inline-state-success">El armado de zonas ya está aplicado: hay {distribution.matchCount} partidos reales. Cualquier cambio hecho desde Programación modifica estos mismos partidos.</div>}
     {distribution?.mode === 'PREVIEW' && !distribution.canApply && !loading && <div className="inline-state">La vista previa no se puede aplicar todavía. Revisá las observaciones y que exista al menos una sede activa.</div>}
     <div className="distribution-category-grid">
       {distribution?.plans.map((plan) => <article className="data-card distribution-category" key={plan.tournamentCategoryId}>
-        <header><div><p className="eyebrow">{plan.registrationCount} parejas presentes</p><h2>{plan.categoryName}</h2></div><div className="distribution-summary"><strong>{plan.capacities.length ? plan.capacities.join(' + ') : 'Sin zonas'}</strong><span>{plan.venue?.name ?? (plan.zones.some((zone) => zone.venue) ? 'Varias sedes' : 'Sin sede asignada')}</span></div></header>
+        <header><div><p className="eyebrow">{plan.registrationCount} parejas confirmadas{plan.newRegistrationCount > 0 ? ` · ${plan.newRegistrationCount} ${plan.newRegistrationCount === 1 ? 'nueva' : 'nuevas'}` : ''}</p><h2>{plan.categoryName}</h2></div><div className="distribution-summary"><strong>{plan.capacities.length ? plan.capacities.join(' + ') : 'Sin zonas'}</strong><span>{plan.venue?.name ?? (plan.zones.some((zone) => zone.venue) ? 'Varias sedes' : 'Sin sede asignada')}</span></div></header>
         <div className="distribution-attendance">
           {distribution.attendance.filter((registration) => registration.tournamentCategoryId === plan.tournamentCategoryId).map((registration) => <div key={registration.id} className={registration.present ? '' : 'is-absent'}>
             <span><strong>{registration.label}</strong><small>{registration.localityName}</small></span>

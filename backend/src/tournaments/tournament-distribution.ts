@@ -16,6 +16,11 @@ export interface DistributionVenueInput {
   name: string;
 }
 
+export interface DistributionExistingAssignment {
+  zoneIndex: number;
+  venueId: number;
+}
+
 export interface DistributionZonePlan {
   id?: number;
   name: string;
@@ -56,7 +61,12 @@ function zoneName(index: number) {
   return `Zona ${String.fromCharCode(65 + index)}`;
 }
 
-export function planTournamentDistribution(categories: DistributionCategoryInput[], venues: DistributionVenueInput[], venuePlans = new Map<string, number>()) {
+export function planTournamentDistribution(
+  categories: DistributionCategoryInput[],
+  venues: DistributionVenueInput[],
+  venuePlans = new Map<string, number>(),
+  existingAssignments = new Map<string, DistributionExistingAssignment>(),
+) {
   const venueLoad = new Map(venues.map((venue) => [venue.id, 0]));
   const localityVenueHistory = new Map<number, Map<number, number>>();
   const plans: DistributionCategoryPlan[] = [];
@@ -92,23 +102,35 @@ export function planTournamentDistribution(categories: DistributionCategoryInput
       plans.push({ tournamentCategoryId: category.id, categoryName: category.name, registrationCount: category.registrations.length, capacities, venue: null, zones, warnings });
       continue;
     }
-    const orderedGroups = [...localityGroups.values()].sort((left, right) => right.length - left.length || left[0].localityName.localeCompare(right[0].localityName, 'es'));
+    const preference = (registration: DistributionRegistration) => existingAssignments.get(`${category.id}:${registration.id}`);
+    const remainingPreferences = new Map<number, number>();
+    for (const registration of category.registrations) {
+      const preferred = preference(registration);
+      if (preferred && preferred.zoneIndex < zones.length) remainingPreferences.set(preferred.zoneIndex, (remainingPreferences.get(preferred.zoneIndex) ?? 0) + 1);
+    }
+    const preferredCount = (group: DistributionRegistration[]) => group.filter((registration) => preference(registration)).length;
+    const orderedGroups = [...localityGroups.values()].sort((left, right) => right.length - left.length || preferredCount(right) - preferredCount(left) || left[0].localityName.localeCompare(right[0].localityName, 'es'));
     for (const group of orderedGroups) {
       const venue = [...venues].filter((candidate) => zones.filter((zone) => zone.venue?.id === candidate.id && zone.registrations.length < zone.capacity).length >= group.length)
         .sort((left, right) => {
+          const preserved = (candidate: DistributionVenueInput) => group.filter((registration) => preference(registration)?.venueId === candidate.id).length;
           const history = (candidate: DistributionVenueInput) => group.reduce((sum, registration) => sum + (localityVenueHistory.get(registration.localityId)?.get(candidate.id) ?? 0), 0);
           const fixed = (candidate: DistributionVenueInput) => zones.filter((zone) => zone.venueAssignment === 'MANUAL' && zone.venue?.id === candidate.id && zone.registrations.length < zone.capacity).length;
-          return history(right) - history(left) || fixed(right) - fixed(left) || (venueLoad.get(left.id) ?? 0) - (venueLoad.get(right.id) ?? 0) || left.name.localeCompare(right.name, 'es');
+          return preserved(right) - preserved(left) || history(right) - history(left) || fixed(right) - fixed(left) || (venueLoad.get(left.id) ?? 0) - (venueLoad.get(right.id) ?? 0) || left.name.localeCompare(right.name, 'es');
         })[0];
       if (!venue) {
         warnings.push(`${group[0].localityName} no puede ubicarse en una sola sede con la asignación actual de zonas.`);
         continue;
       }
-      for (const registration of group) {
+      for (const registration of [...group].sort((left, right) => Number(Boolean(preference(right))) - Number(Boolean(preference(left))) || left.id - right.id)) {
+        const preferred = preference(registration);
+        if (preferred && preferred.zoneIndex < zones.length) remainingPreferences.set(preferred.zoneIndex, Math.max(0, (remainingPreferences.get(preferred.zoneIndex) ?? 0) - 1));
         const target = zones
           .map((zone, index) => ({ zone, index }))
           .filter(({ zone }) => zone.venue?.id === venue.id && zone.registrations.length < zone.capacity && !zone.registrations.some((item) => item.localityId === registration.localityId))
-          .sort((left, right) => (left.zone.registrations.length / left.zone.capacity) - (right.zone.registrations.length / right.zone.capacity)
+          .sort((left, right) => Number(right.index === preferred?.zoneIndex) - Number(left.index === preferred?.zoneIndex)
+            || Math.max(0, right.zone.capacity - right.zone.registrations.length - (remainingPreferences.get(right.index) ?? 0)) - Math.max(0, left.zone.capacity - left.zone.registrations.length - (remainingPreferences.get(left.index) ?? 0))
+            || (left.zone.registrations.length / left.zone.capacity) - (right.zone.registrations.length / right.zone.capacity)
             || (right.zone.capacity - right.zone.registrations.length) - (left.zone.capacity - left.zone.registrations.length)
             || left.index - right.index)[0];
         if (!target) {

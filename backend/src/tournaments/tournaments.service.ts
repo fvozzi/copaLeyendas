@@ -314,6 +314,7 @@ export class TournamentsService {
     const slotMatches = slotMatchIds.length ? await manager.getRepository(TournamentMatch).find({ where: { id: In(slotMatchIds) } }) : [];
     const hasResults = [...zoneMatches, ...slotMatches].some((match) => match.status === MatchStatus.PLAYED);
     const rules = [
+      'El armado usa únicamente inscripciones confirmadas; los tokens emitidos todavía no confirmados no se incluyen.',
       'Dirección debe asignar cada zona a una sede antes de generar los partidos; no hay autoasignación de sedes.',
       'El cuadro usa hasta cuatro zonas, siempre completas, de 3 o 4 parejas.',
       'De 12 a 16 parejas se mantienen cuatro zonas: 12 es 3+3+3+3 y 16 es 4+4+4+4.',
@@ -335,11 +336,18 @@ export class TournamentsService {
     };
     const baseVersion = createHash('sha256').update(JSON.stringify(snapshot)).digest('hex');
 
+    const existingAssignments = new Map<string, { zoneIndex: number; venueId: number }>();
+    for (const category of categories) {
+      const categoryZones = zones.filter((zone) => zone.tournamentCategoryId === category.id);
+      categoryZones.forEach((zone, zoneIndex) => {
+        entries.filter((entry) => entry.zoneId === zone.id).forEach((entry) => existingAssignments.set(`${category.id}:${entry.registrationId}`, { zoneIndex, venueId: zone.venueId }));
+      });
+    }
     const planned = planTournamentDistribution(categories.map((category) => ({
       id: category.id,
       name: category.category.name,
       registrations: eligibleRegistrations.filter((registration) => registration.categoryId === category.categoryId).map((registration) => this.distributionRegistration(registration)),
-    })), venues.map((venue) => ({ id: venue.id, name: venue.name })), new Map(venuePlans.map((plan) => [`${plan.tournamentCategoryId}:${plan.zoneIndex}`, plan.venueId])));
+    })), venues.map((venue) => ({ id: venue.id, name: venue.name })), new Map(venuePlans.map((plan) => [`${plan.tournamentCategoryId}:${plan.zoneIndex}`, plan.venueId])), existingAssignments);
     const currentSignature = JSON.stringify(categories.map((category) => zones.filter((zone) => zone.tournamentCategoryId === category.id).map((zone) => ({
       name: zone.name, capacity: zone.capacity, venueId: zone.venueId,
       registrations: entries.filter((entry) => entry.zoneId === zone.id).map((entry) => entry.registrationId).sort((left, right) => left - right),
@@ -357,6 +365,7 @@ export class TournamentsService {
           tournamentCategoryId: category.id,
           categoryName: category.category.name,
           registrationCount: categoryZones.reduce((sum, zone) => sum + entries.filter((entry) => entry.zoneId === zone.id).length, 0),
+          newRegistrationCount: 0,
           capacities: categoryZones.map((zone) => zone.capacity),
           venue: venueIds.size === 1 ? categoryZones[0]?.venue ?? null : null,
           zones: categoryZones.map((zone) => ({
@@ -369,7 +378,13 @@ export class TournamentsService {
       return { tournament: { id: tournament.id, name: tournament.name }, mode: 'CURRENT' as const, canApply: false, baseVersion, matchCount, hasResults, replacesPendingFixture: false, rules, plans, attendance, venues: venues.map(({ id, name }) => ({ id, name })) };
     }
 
-    const plans = planned;
+    const plans = planned.map((plan) => ({
+      ...plan,
+      newRegistrationCount: matchCount ? eligibleRegistrations.filter((registration) => {
+        const category = categories.find((item) => item.categoryId === registration.categoryId);
+        return category?.id === plan.tournamentCategoryId && !existingAssignments.has(`${plan.tournamentCategoryId}:${registration.id}`);
+      }).length : 0,
+    }));
     const populated = plans.filter((plan) => plan.registrationCount > 0);
     const complete = populated.every((plan) => plan.capacities.length > 0 && plan.zones.reduce((sum, zone) => sum + zone.registrations.length, 0) === plan.registrationCount);
     return {

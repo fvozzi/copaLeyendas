@@ -55,6 +55,23 @@ describe('planTournamentDistribution', () => {
     expect(twoZones.zones.map((zone) => zone.venue?.id)).toEqual([2, 1]);
   });
 
+  it('adds a newly confirmed pair while preserving as many existing zone assignments as possible', () => {
+    const registrations = Array.from({ length: 9 }, (_, index) => ({ id: index + 1, localityId: index + 1, localityName: `Localidad ${index + 1}`, label: `Pareja ${index + 1}` }));
+    const existing = new Map(Array.from({ length: 8 }, (_, index) => [`7:${index + 1}`, { zoneIndex: index < 4 ? 0 : 1, venueId: 1 }] as const));
+    const [plan] = planTournamentDistribution(
+      [{ id: 7, name: 'Silvina Cimadamore', registrations }],
+      [{ id: 1, name: 'Sede' }],
+      new Map([['7:0', 1], ['7:1', 1], ['7:2', 1]]),
+      existing,
+    );
+
+    expect(plan.capacities).toEqual([3, 3, 3]);
+    expect(plan.zones.flatMap((zone) => zone.registrations)).toHaveLength(9);
+    const resultingZone = new Map(plan.zones.flatMap((zone, zoneIndex) => zone.registrations.map((registration) => [registration.id, zoneIndex] as const)));
+    expect(Array.from({ length: 8 }, (_, index) => index + 1).filter((id) => resultingZone.get(id) === existing.get(`7:${id}`)?.zoneIndex)).toHaveLength(6);
+    expect(resultingZone.get(9)).toBe(2);
+  });
+
   it('leaves every new zone without a venue until Direction assigns it', () => {
     const registrations = Array.from({ length: 8 }, (_, index) => ({ id: index + 1, localityId: index + 1, localityName: `Equipo ${index + 1}`, label: `Pareja ${index + 1}` }));
     const [plan] = planTournamentDistribution([{ id: 3, name: 'Damas A', registrations }], [{ id: 1, name: 'Norte' }, { id: 2, name: 'Sur' }]);

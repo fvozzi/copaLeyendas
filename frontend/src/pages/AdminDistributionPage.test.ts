@@ -12,7 +12,7 @@ afterEach(() => { vi.restoreAllMocks(); vi.resetAllMocks(); document.body.innerH
 it('shows the assignment rules and applies the preview to the real tournament', async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   vi.mocked(getTournaments).mockResolvedValue([{ id: 1, name: 'Copa', status: 'ACTIVE' }] as never);
-  const preview = { tournament: { id: 1, name: 'Copa' }, mode: 'PREVIEW', canApply: true, baseVersion: 'version-1', matchCount: 0, hasResults: false, replacesPendingFixture: false, rules: ['Misma localidad: misma sede y distinta zona.', 'Los partidos son los mismos de Programa - Mapa.'], venues: [{ id: 2, name: 'Sede Norte' }, { id: 3, name: 'Sede Sur' }], attendance: [{ id: 10, localityId: 3, localityName: 'Rocha', label: 'Las Leyendas', tournamentCategoryId: 5, categoryName: 'Damas A', present: true }], plans: [{ tournamentCategoryId: 5, categoryName: 'Damas A', registrationCount: 8, capacities: [4, 4], venue: { id: 2, name: 'Sede Norte' }, warnings: [], zones: [{ name: 'Zona A', capacity: 4, venue: { id: 2, name: 'Sede Norte' }, venueAssignment: 'AUTOMATIC', registrations: [{ id: 10, localityId: 3, localityName: 'Rocha', label: 'Las Leyendas' }] }] }] } as const;
+  const preview = { tournament: { id: 1, name: 'Copa' }, mode: 'PREVIEW', canApply: true, baseVersion: 'version-1', matchCount: 0, hasResults: false, replacesPendingFixture: false, rules: ['Misma localidad: misma sede y distinta zona.', 'Los partidos son los mismos de Programa - Mapa.'], venues: [{ id: 2, name: 'Sede Norte' }, { id: 3, name: 'Sede Sur' }], attendance: [{ id: 10, localityId: 3, localityName: 'Rocha', label: 'Las Leyendas', tournamentCategoryId: 5, categoryName: 'Damas A', present: true }], plans: [{ tournamentCategoryId: 5, categoryName: 'Damas A', registrationCount: 8, newRegistrationCount: 0, capacities: [4, 4], venue: { id: 2, name: 'Sede Norte' }, warnings: [], zones: [{ name: 'Zona A', capacity: 4, venue: { id: 2, name: 'Sede Norte' }, venueAssignment: 'AUTOMATIC', registrations: [{ id: 10, localityId: 3, localityName: 'Rocha', label: 'Las Leyendas' }] }] }] } as const;
   vi.mocked(getTournamentDistribution).mockResolvedValue(preview as never);
   const absentPreview = { ...preview, baseVersion: 'version-2', matchCount: 11, replacesPendingFixture: true, attendance: preview.attendance.map((registration) => ({ ...registration, present: false })), plans: preview.plans.map((plan) => ({ ...plan, registrationCount: 7, capacities: [4, 3] })) } as const;
   vi.mocked(setTournamentAttendance).mockResolvedValue(absentPreview as never);
@@ -43,5 +43,29 @@ it('shows the assignment rules and applies the preview to the real tournament', 
   await act(async () => apply.click());
   expect(applyTournamentDistribution).toHaveBeenCalledWith(1, 'version-2', false);
   expect(container.textContent).toContain('hay 11 partidos reales');
+  await act(async () => root.unmount());
+});
+
+it('offers to add newly confirmed pairs without rebuilding the program from scratch', async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  vi.mocked(getTournaments).mockResolvedValue([{ id: 1, name: 'Copa', status: 'ACTIVE' }] as never);
+  const preview = {
+    tournament: { id: 1, name: 'Copa' }, mode: 'PREVIEW', canApply: true, baseVersion: 'version-9', matchCount: 8, hasResults: false, replacesPendingFixture: true,
+    rules: [], venues: [{ id: 2, name: 'Sede' }], attendance: [],
+    plans: [{ tournamentCategoryId: 5, categoryName: 'Silvina Cimadamore', registrationCount: 9, newRegistrationCount: 1, capacities: [3, 3, 3], venue: { id: 2, name: 'Sede' }, warnings: [], zones: [] }],
+  } as const;
+  vi.mocked(getTournamentDistribution).mockResolvedValue(preview as never);
+  vi.mocked(applyTournamentDistribution).mockResolvedValue({ ...preview, mode: 'CURRENT', canApply: false, replacesPendingFixture: false } as never);
+  vi.spyOn(window, 'confirm').mockReturnValue(true);
+  const container = document.createElement('div'); document.body.append(container);
+  const root = createRoot(container);
+  await act(async () => root.render(createElement(MemoryRouter, { future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(AdminDistributionPage))));
+
+  expect(container.textContent).toContain('9 parejas confirmadas · 1 nueva');
+  expect(container.textContent).toContain('Hay nuevas parejas confirmadas');
+  const add = [...container.querySelectorAll('button')].find((button) => button.textContent === 'Sumar nuevas confirmadas')!;
+  await act(async () => add.click());
+  expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('conservando al máximo las zonas actuales'));
+  expect(applyTournamentDistribution).toHaveBeenCalledWith(1, 'version-9', false);
   await act(async () => root.unmount());
 });
