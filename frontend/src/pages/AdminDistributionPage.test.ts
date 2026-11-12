@@ -36,10 +36,10 @@ it('shows the assignment rules and applies the preview to the real tournament', 
   await act(async () => absent.click());
   expect(setTournamentAttendance).toHaveBeenCalledWith(1, 10, false);
   expect(container.textContent).toContain('4 + 3');
-  const reset = [...container.querySelectorAll('button')].find((button) => button.textContent === 'Rehacer Programa desde cero')!;
+  const reset = [...container.querySelectorAll('button')].find((button) => button.textContent === 'Rehacer programación desde cero')!;
   await act(async () => reset.click());
   expect(applyTournamentDistribution).toHaveBeenCalledWith(1, 'version-2', true);
-  const apply = [...container.querySelectorAll('button')].find((button) => button.textContent === 'Aplicar conservando Programa')!;
+  const apply = [...container.querySelectorAll('button')].find((button) => button.textContent === 'Aplicar conservando programación')!;
   await act(async () => apply.click());
   expect(applyTournamentDistribution).toHaveBeenCalledWith(1, 'version-2', false);
   expect(container.textContent).toContain('hay 11 partidos reales');

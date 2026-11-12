@@ -1,39 +1,138 @@
-import { WhatsAppDeliveryStatus } from '../components/WhatsAppDeliveryStatus';
-import { registrationPaymentLabel } from '../lib/registration-payment';
-import { useEffect, useRef, useState } from 'react';
-import { getRegistrationLocalities } from '../lib/localities';
-import { formatRegistrationDate } from '../lib/registration-dates';
-import { AdminDataGrid } from '../components/AdminDataGrid';
-import { AdminDialog } from '../components/AdminDialog';
-import { createAccessGrant, createLocality, deleteAccessGrant, deleteRegistration, getAccessGrants, getCategories, getLocalities, getRegistrations, openRegistrationPaymentProof, sendAccessGrantTokenByWhatsApp, updateAccessGrantStatus, updateRegistrationStatus } from '../lib/api';
-import { accessGrantStatusLabels, registrationStatusLabels } from '../lib/content';
-import type { AccessGrantPayload, Category, Locality, LocalityPayload, PairRegistration, RegistrationAccessGrant, RegistrationStatus } from '../types';
+import { WhatsAppDeliveryStatus } from "../components/WhatsAppDeliveryStatus";
+import { registrationPaymentLabel } from "../lib/registration-payment";
+import { useEffect, useRef, useState } from "react";
+import { getRegistrationLocalities } from "../lib/localities";
+import { formatRegistrationDate } from "../lib/registration-dates";
+import { AdminDataGrid } from "../components/AdminDataGrid";
+import { AdminDialog } from "../components/AdminDialog";
+import {
+  createAccessGrant,
+  createLocality,
+  deleteAccessGrant,
+  deleteCompleteTeam,
+  deleteRegistration,
+  getAccessGrants,
+  getCategories,
+  getCompleteTeamRemovalImpact,
+  getLocalities,
+  getRegistrations,
+  openRegistrationPaymentProof,
+  sendAccessGrantTokenByWhatsApp,
+  updateAccessGrantStatus,
+  updateRegistrationStatus,
+} from "../lib/api";
+import {
+  accessGrantStatusLabels,
+  registrationStatusLabels,
+} from "../lib/content";
+import type {
+  AccessGrantPayload,
+  Category,
+  CompleteTeamRemovalImpact,
+  Locality,
+  LocalityPayload,
+  PairRegistration,
+  RegistrationAccessGrant,
+  RegistrationStatus,
+} from "../types";
 
-const initialGrant: AccessGrantPayload = { contactName: '', contactEmail: '', contactPhone: '', notes: '', feeWaived: false, paymentDeferredUntilConfirmed: false };
-const initialLocality: LocalityPayload = { name: '', provinceName: '', categoryId: null, active: true };
+const initialGrant: AccessGrantPayload = {
+  contactName: "",
+  contactEmail: "",
+  contactPhone: "",
+  notes: "",
+  feeWaived: false,
+  paymentDeferredUntilConfirmed: false,
+};
+const initialLocality: LocalityPayload = {
+  name: "",
+  provinceName: "",
+  categoryId: null,
+  active: true,
+};
+const money = new Intl.NumberFormat("es-AR", {
+  style: "currency",
+  currency: "ARS",
+  maximumFractionDigits: 0,
+});
 
 export function AdminRegistrationsPage() {
   const creatingGrant = useRef(false);
-  const [grantFilter, setGrantFilter] = useState<'ALL' | 'ACTIVE_UNUSED'>('ALL');
+  const [grantFilter, setGrantFilter] = useState<"ALL" | "ACTIVE_UNUSED">(
+    "ALL",
+  );
   const [savingGrant, setSavingGrant] = useState(false);
-  const [grants, setGrants] = useState<RegistrationAccessGrant[]>([]); const [registrations, setRegistrations] = useState<PairRegistration[]>([]); const [localities, setLocalities] = useState<Locality[]>([]); const [categories, setCategories] = useState<Category[]>([]); const [grant, setGrant] = useState<AccessGrantPayload>(initialGrant); const [localityDraft, setLocalityDraft] = useState<LocalityPayload>(initialLocality); const [creatingLocality, setCreatingLocality] = useState(false); const [editing, setEditing] = useState<PairRegistration | null>(null); const [draft, setDraft] = useState({ status: 'RECEIVED' as RegistrationStatus, adminNotes: '', feeWaived: false }); const [search, setSearch] = useState(''); const [openGrant, setOpenGrant] = useState(false); const [sendingGrantId, setSendingGrantId] = useState<number | null>(null); const [error, setError] = useState<string | null>(null); const [success, setSuccess] = useState<string | null>(null);
-  const activeUnusedGrants = grants.filter((item) => item.status === 'ACTIVE' && !item.consumedAt);
-  const visibleGrants = grantFilter === 'ACTIVE_UNUSED' ? activeUnusedGrants : grants;
-  const load = () => { getAccessGrants({ search: search || undefined }).then(setGrants).catch((reason: Error) => setError(reason.message)); getRegistrations({ search: search || undefined }).then(setRegistrations).catch((reason: Error) => setError(reason.message)); };
-  useEffect(() => { load(); getLocalities().then(setLocalities).catch((reason: Error) => setError(reason.message)); getCategories().then(setCategories).catch((reason: Error) => setError(reason.message)); }, []);
+  const [grants, setGrants] = useState<RegistrationAccessGrant[]>([]);
+  const [registrations, setRegistrations] = useState<PairRegistration[]>([]);
+  const [localities, setLocalities] = useState<Locality[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [grant, setGrant] = useState<AccessGrantPayload>(initialGrant);
+  const [localityDraft, setLocalityDraft] =
+    useState<LocalityPayload>(initialLocality);
+  const [creatingLocality, setCreatingLocality] = useState(false);
+  const [editing, setEditing] = useState<PairRegistration | null>(null);
+  const [draft, setDraft] = useState({
+    status: "RECEIVED" as RegistrationStatus,
+    adminNotes: "",
+    feeWaived: false,
+  });
+  const [search, setSearch] = useState("");
+  const [openGrant, setOpenGrant] = useState(false);
+  const [sendingGrantId, setSendingGrantId] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [completeRemoval, setCompleteRemoval] = useState<{
+    grant: RegistrationAccessGrant;
+    impact: CompleteTeamRemovalImpact | null;
+    confirmation: string;
+  } | null>(null);
+  const [removingComplete, setRemovingComplete] = useState(false);
+  const activeUnusedGrants = grants.filter(
+    (item) => item.status === "ACTIVE" && !item.consumedAt,
+  );
+  const visibleGrants =
+    grantFilter === "ACTIVE_UNUSED" ? activeUnusedGrants : grants;
+  const load = () => {
+    getAccessGrants({ search: search || undefined })
+      .then(setGrants)
+      .catch((reason: Error) => setError(reason.message));
+    getRegistrations({ search: search || undefined })
+      .then(setRegistrations)
+      .catch((reason: Error) => setError(reason.message));
+  };
   useEffect(() => {
-    const refresh = () => { if (document.visibilityState === 'visible') load(); };
+    load();
+    getLocalities()
+      .then(setLocalities)
+      .catch((reason: Error) => setError(reason.message));
+    getCategories()
+      .then(setCategories)
+      .catch((reason: Error) => setError(reason.message));
+  }, []);
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === "visible") load();
+    };
     const timer = window.setInterval(refresh, 30000);
-    window.addEventListener('focus', refresh);
-    document.addEventListener('visibilitychange', refresh);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
     return () => {
       window.clearInterval(timer);
-      window.removeEventListener('focus', refresh);
-      document.removeEventListener('visibilitychange', refresh);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
     };
   }, [search]);
-  const closeGrant = () => { setOpenGrant(false); setCreatingLocality(false); setGrant(initialGrant); setLocalityDraft(initialLocality); };
-  const openNewGrant = () => { closeGrant(); setError(null); setOpenGrant(true); };
+  const closeGrant = () => {
+    setOpenGrant(false);
+    setCreatingLocality(false);
+    setGrant(initialGrant);
+    setLocalityDraft(initialLocality);
+  };
+  const openNewGrant = () => {
+    closeGrant();
+    setError(null);
+    setOpenGrant(true);
+  };
   const create = async (event: React.FormEvent) => {
     event.preventDefault();
     if (creatingGrant.current) return;
@@ -43,9 +142,17 @@ export function AdminRegistrationsPage() {
     try {
       let payload = grant;
       if (creatingLocality) {
-        const category = categories.find((item) => item.id === localityDraft.categoryId && item.active);
-        if (!category) throw new Error('Debe seleccionar una categoria activa para el equipo.');
-        const locality = await createLocality({ ...localityDraft, active: true });
+        const category = categories.find(
+          (item) => item.id === localityDraft.categoryId && item.active,
+        );
+        if (!category)
+          throw new Error(
+            "Debe seleccionar una categoria activa para el equipo.",
+          );
+        const locality = await createLocality({
+          ...localityDraft,
+          active: true,
+        });
         payload = { ...grant, localityId: locality.id };
         setLocalities((current) => [...current, { ...locality, category }]);
         setGrant(payload);
@@ -56,27 +163,876 @@ export function AdminRegistrationsPage() {
       closeGrant();
       load();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'No se pudo emitir el token.');
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "No se pudo emitir el token.",
+      );
     } finally {
       creatingGrant.current = false;
       setSavingGrant(false);
     }
   };
-  const editRegistration = (item: PairRegistration) => { setError(null); setEditing(item); setDraft({ status: item.status, adminNotes: item.adminNotes ?? '', feeWaived: item.feeWaived }); };
-  const saveRegistration = async (event: React.FormEvent) => { event.preventDefault(); if (!editing) return; try { await updateRegistrationStatus(editing.id, draft); setEditing(null); setSuccess('Inscripción actualizada.'); load(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo actualizar la inscripcion.'); } };
+  const editRegistration = (item: PairRegistration) => {
+    setError(null);
+    setEditing(item);
+    setDraft({
+      status: item.status,
+      adminNotes: item.adminNotes ?? "",
+      feeWaived: item.feeWaived,
+    });
+  };
+  const saveRegistration = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!editing) return;
+    try {
+      await updateRegistrationStatus(editing.id, draft);
+      setEditing(null);
+      setSuccess("Inscripción actualizada.");
+      load();
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "No se pudo actualizar la inscripcion.",
+      );
+    }
+  };
   const [reopeningGrantId, setReopeningGrantId] = useState<number | null>(null);
   const reopen = async (item: RegistrationAccessGrant) => {
-    setError(null); setSuccess(null); setReopeningGrantId(item.id);
+    setError(null);
+    setSuccess(null);
+    setReopeningGrantId(item.id);
     try {
-      await updateAccessGrantStatus(item.id, { status: 'ACTIVE' });
-      setSuccess('Token rehabilitado para rectificar. El mismo enlace permite editar los datos ya cargados o agregar una suplente.');
+      await updateAccessGrantStatus(item.id, { status: "ACTIVE" });
+      setSuccess(
+        "Token rehabilitado para rectificar. El mismo enlace permite editar los datos ya cargados o agregar una suplente.",
+      );
       load();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo rehabilitar el token.'); }
-    finally { setReopeningGrantId(null); }
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "No se pudo rehabilitar el token.",
+      );
+    } finally {
+      setReopeningGrantId(null);
+    }
   };
-  const revoke = async (item: RegistrationAccessGrant) => { if (!window.confirm(`Se revocara el token ${item.token}.`)) return; await updateAccessGrantStatus(item.id, { status: 'REVOKED' }); load(); };
-  const removeRegistration = async (item: PairRegistration) => { if (!window.confirm(`Se eliminara el registro de ${item.playerOneName} y ${item.playerTwoName}. El token volvera a estar disponible.`)) return; try { await deleteRegistration(item.id); setSuccess('Registro eliminado. El token vuelve a estar disponible.'); load(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo eliminar el registro.'); } };
-  const removeGrant = async (item: RegistrationAccessGrant) => { if (!window.confirm(`Se eliminara el equipo habilitado ${item.locality.name} y su token ${item.token}.`)) return; try { await deleteAccessGrant(item.id); setSuccess('Equipo habilitado eliminado.'); load(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo eliminar el equipo.'); } };
-  const sendTokenByWhatsApp = async (item: RegistrationAccessGrant) => { setError(null); setSuccess(null); setSendingGrantId(item.id); try { const result = await sendAccessGrantTokenByWhatsApp(item.id); setGrants((current) => current.map((grant) => grant.id === item.id ? { ...grant, whatsappSentAt: result.whatsappSentAt, whatsappMessageId: result.messageId, whatsappDelivery: null } : grant)); setSuccess(`WhatsApp acepto el mensaje para ${result.contactName} (${result.contactPhone}).`); load(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo enviar el token por WhatsApp.'); } finally { setSendingGrantId(null); } };
-  return <div className="admin-panel registrations-page"><div className="panel-header"><div><p className="eyebrow">ABM</p><h1>Inscripciones</h1></div><button className="primary-button" onClick={openNewGrant}>Habilitar equipo</button></div><div className="toolbar"><input placeholder="Buscar por token, localidad o jugadora" value={search} onChange={(event) => setSearch(event.target.value)} /><button className="secondary-button" onClick={load}>Buscar</button></div>{error && !openGrant && !editing ? <div className="inline-state">{error}</div> : null}{success ? <div className="inline-state inline-state-success">{success}</div> : null}<section className="data-card registrations-grants-card"><div className="registrations-section-heading"><h2>Equipos habilitados</h2><div className="program-tabs registration-grant-filters" role="group" aria-label="Filtrar equipos habilitados"><button type="button" aria-pressed={grantFilter === 'ALL'} className={grantFilter === 'ALL' ? 'is-selected' : ''} onClick={() => setGrantFilter('ALL')}>Todos ({grants.length})</button><button type="button" aria-pressed={grantFilter === 'ACTIVE_UNUSED'} className={grantFilter === 'ACTIVE_UNUSED' ? 'is-selected' : ''} onClick={() => setGrantFilter('ACTIVE_UNUSED')}>Activos aún no usados ({activeUnusedGrants.length})</button></div></div><AdminDataGrid rows={visibleGrants} preserveTableOnMobile onEdit={() => undefined} onDelete={() => undefined} emptyMessage={grantFilter === 'ACTIVE_UNUSED' ? 'No hay accesos activos aún no usados.' : 'No hay equipos habilitados.'} columns={[{ label: 'Equipo', render: (item) => <strong>{item.locality.name}</strong> }, { label: 'Categoria', render: (item) => item.category.name }, { label: 'Contacto', render: (item) => <>{item.contactName ?? '-'}{item.contactPhone ? <small className="admin-grid-detail">{item.contactPhone}</small> : null}</> }, { label: 'Token', render: (item) => item.token }, { label: 'Estado del token', sortValue: (item) => accessGrantStatusLabels[item.status === 'ACTIVE' && item.consumedAt ? 'USED' : item.status], render: (item) => <><span className={`status-chip ${item.status === 'ACTIVE' ? 'status-live' : item.status === 'USED' ? 'status-review' : 'status-draft'}`}>{item.status === 'ACTIVE' && item.consumedAt ? 'Habilitado' : accessGrantStatusLabels[item.status]}</span>{item.status === 'ACTIVE' && item.consumedAt ? <small className="admin-grid-detail">Habilitado para rectificar</small> : null}{item.consumedAt ? <small className="admin-grid-detail">{formatRegistrationDate(item.consumedAt)}</small> : null}</> }, { label: 'Entrega WhatsApp', sortValue: (item) => item.whatsappDelivery?.status ?? (item.whatsappSentAt ? 'accepted' : ''), render: (item) => <WhatsAppDeliveryStatus grant={item} /> }, { label: 'Ultimo WhatsApp', sortValue: (item) => item.whatsappSentAt ? new Date(item.whatsappSentAt).getTime() : 0, render: (item) => item.whatsappSentAt ? <time dateTime={item.whatsappSentAt} title="Ultimo envio aceptado por WhatsApp. Hora de Argentina.">{formatRegistrationDate(item.whatsappSentAt)}</time> : 'Sin registro' }, { label: 'Pago', render: (item) => item.registrations?.[0] ? registrationPaymentLabel(item.registrations[0]) : item.feeWaived ? 'Bonificada' : item.paymentDeferredUntilConfirmed ? 'Al confirmar' : 'Pendiente' }]} renderActions={(item) => <><button type="button" className="secondary-button grid-action-button" disabled={!item.contactPhone || item.status !== 'ACTIVE' || sendingGrantId !== null} title={!item.contactPhone ? 'Este token no tiene telefono de contacto' : item.status !== 'ACTIVE' ? 'Solo se pueden enviar tokens activos' : `Enviar token a ${item.contactName ?? item.locality.name}`} onClick={() => sendTokenByWhatsApp(item)}>{sendingGrantId === item.id ? 'Enviando...' : 'Enviar WhatsApp'}</button><button className="inline-link" onClick={() => navigator.clipboard.writeText(item.token).then(() => setSuccess(`Token copiado: ${item.token}`))}>Copiar</button>{item.status === 'USED' || (item.status === 'REVOKED' && item.consumedAt) ? <button className="inline-link" disabled={reopeningGrantId !== null} onClick={() => reopen(item)}>{reopeningGrantId === item.id ? 'Rehabilitando...' : 'Rehabilitar para rectificar'}</button> : null}{item.status === 'ACTIVE' ? <button className="danger-link" onClick={() => revoke(item)}>Revocar</button> : null}<button className="danger-link" onClick={() => removeGrant(item)}>Eliminar</button></>} /></section><section className="data-card registrations-received-card"><h2>Registros recibidos</h2><AdminDataGrid rows={registrations} preserveTableOnMobile onEdit={editRegistration} onDelete={() => undefined} emptyMessage="No hay inscripciones recibidas." columns={[{ label: 'Jugadoras', render: (item) => <strong>{item.playerOneName} / {item.playerTwoName}</strong> }, { label: 'Equipo', render: (item) => `${item.locality.name}, ${item.locality.provinceName}` }, { label: 'Categoria', render: (item) => item.category.name }, { label: 'Estado', render: (item) => <span className="status-chip status-review">{registrationStatusLabels[item.status]}</span> }, { label: 'Pago', render: (item) => registrationPaymentLabel(item) }]} renderActions={(item) => <><button className="inline-link" onClick={() => editRegistration(item)}>Editar</button>{item.payments?.length ? [...item.payments].sort((a, b) => a.id - b.id).map((payment) => <button key={payment.id} className="secondary-button grid-action-button" title={`${payment.originalName} - ${formatRegistrationDate(payment.createdAt)}`} onClick={() => openRegistrationPaymentProof(item.id, payment.id).catch((reason: Error) => setError(reason.message))}>{payment.kind === 'ADDITIONAL' ? 'Comprobante suplente' : payment.kind === 'REPLACEMENT' ? 'Comprobante actualizado' : 'Comprobante inicial'}{payment.amount > 0 ? ` - $${payment.amount.toLocaleString('es-AR')}` : ''}</button>) : !item.feeWaived && item.paymentProofStoredName ? <button className="secondary-button grid-action-button" onClick={() => openRegistrationPaymentProof(item.id).catch((reason: Error) => setError(reason.message))}>Comprobante</button> : null}<button className="danger-link" onClick={() => removeRegistration(item)}>Eliminar</button></>} /></section>{openGrant ? <AdminDialog title="Habilitar equipo" onClose={closeGrant}><form className="editor-form" onSubmit={create}>{error ? <div className="form-error dialog-form-error span-2" role="alert">{error}</div> : null}<label className="span-2">Localidad / equipo *<select value={creatingLocality ? '' : grant.localityId ?? ''} onChange={(event) => { setCreatingLocality(false); setGrant({ ...grant, localityId: event.target.value ? Number(event.target.value) : undefined }); }} required={!creatingLocality} disabled={creatingLocality}><option value="">Seleccionar equipo existente</option>{getRegistrationLocalities(localities).map((item) => <option key={item.id} value={item.id}>{item.name}, {item.provinceName} - {item.category?.name}</option>)}</select></label><div className="span-2 form-actions"><button type="button" className="secondary-button" onClick={() => { setCreatingLocality(!creatingLocality); setGrant({ ...grant, localityId: undefined }); }}>{creatingLocality ? 'Usar equipo existente' : 'Crear nuevo equipo'}</button></div>{creatingLocality ? <><label>Nuevo equipo / localidad *<input value={localityDraft.name} onChange={(event) => setLocalityDraft({ ...localityDraft, name: event.target.value })} required /></label><label>Provincia *<input value={localityDraft.provinceName} onChange={(event) => setLocalityDraft({ ...localityDraft, provinceName: event.target.value })} required /></label><label className="span-2">Categoria *<select value={localityDraft.categoryId ?? ''} onChange={(event) => setLocalityDraft({ ...localityDraft, categoryId: event.target.value ? Number(event.target.value) : null })} required><option value="">Seleccionar categoria</option>{categories.filter((item) => item.active).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label></> : null}<label>Nombre del contacto *<input value={grant.contactName ?? ''} onChange={(event) => setGrant({ ...grant, contactName: event.target.value })} required /></label><label>Email (opcional)<input type="email" value={grant.contactEmail ?? ''} onChange={(event) => setGrant({ ...grant, contactEmail: event.target.value })} /></label><label>Numero de WhatsApp *<input type="tel" value={grant.contactPhone ?? ''} onChange={(event) => setGrant({ ...grant, contactPhone: event.target.value })} placeholder="Ej. +54 9 11 1234-5678" required /></label><label className="checkbox-row"><input type="checkbox" checked={grant.feeWaived ?? false} onChange={(event) => setGrant({ ...grant, feeWaived: event.target.checked, paymentDeferredUntilConfirmed: event.target.checked ? false : grant.paymentDeferredUntilConfirmed })} />Inscripcion bonificada</label><label className="checkbox-row span-2"><input type="checkbox" checked={grant.paymentDeferredUntilConfirmed ?? false} onChange={(event) => setGrant({ ...grant, paymentDeferredUntilConfirmed: event.target.checked, feeWaived: event.target.checked ? false : grant.feeWaived })} />Lista de espera: solicitar pago al confirmar</label><label className="span-2">Notas<textarea rows={3} value={grant.notes ?? ''} onChange={(event) => setGrant({ ...grant, notes: event.target.value })} /></label><div className="span-2 form-actions"><button className="primary-button" disabled={savingGrant}>{savingGrant ? 'Generando...' : 'Generar token'}</button></div></form></AdminDialog> : null}{editing ? <AdminDialog title="Editar inscripción" onClose={() => setEditing(null)}><form className="editor-form" onSubmit={saveRegistration}>{error ? <div className="form-error dialog-form-error span-2" role="alert">{error}</div> : null}<label className="span-2">Estado<select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as RegistrationStatus })}>{Object.entries(registrationStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label className="checkbox-row span-2"><input type="checkbox" checked={draft.feeWaived} onChange={(event) => setDraft({ ...draft, feeWaived: event.target.checked })} />Inscripción bonificada</label><p className="field-hint span-2">Al bonificarla, sus pagos dejan de computarse como ingresos en Caja. Los comprobantes se conservan.</p><label className="span-2">Nota interna<textarea rows={5} value={draft.adminNotes} onChange={(event) => setDraft({ ...draft, adminNotes: event.target.value })} /></label><div className="span-2 form-actions"><button className="primary-button">Guardar</button></div></form></AdminDialog> : null}</div>;
+  const revoke = async (item: RegistrationAccessGrant) => {
+    if (!window.confirm(`Se revocara el token ${item.token}.`)) return;
+    await updateAccessGrantStatus(item.id, { status: "REVOKED" });
+    load();
+  };
+  const removeRegistration = async (item: PairRegistration) => {
+    if (
+      !window.confirm(
+        `Se eliminara el registro de ${item.playerOneName} y ${item.playerTwoName}. El token volvera a estar disponible.`,
+      )
+    )
+      return;
+    try {
+      await deleteRegistration(item.id);
+      setSuccess("Registro eliminado. El token vuelve a estar disponible.");
+      load();
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "No se pudo eliminar el registro.",
+      );
+    }
+  };
+  const removeGrant = async (item: RegistrationAccessGrant) => {
+    if (
+      !window.confirm(
+        `Se eliminara el equipo habilitado ${item.locality.name} y su token ${item.token}.`,
+      )
+    )
+      return;
+    try {
+      await deleteAccessGrant(item.id);
+      setSuccess("Equipo habilitado eliminado.");
+      load();
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "No se pudo eliminar el equipo.",
+      );
+    }
+  };
+  const openCompleteRemoval = async (item: RegistrationAccessGrant) => {
+    setError(null);
+    setSuccess(null);
+    setCompleteRemoval({ grant: item, impact: null, confirmation: "" });
+    try {
+      const impact = await getCompleteTeamRemovalImpact(item.id);
+      setCompleteRemoval((current) =>
+        current?.grant.id === item.id ? { ...current, impact } : current,
+      );
+    } catch (reason) {
+      setCompleteRemoval(null);
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "No se pudo calcular el impacto de la baja.",
+      );
+    }
+  };
+  const confirmCompleteRemoval = async () => {
+    if (
+      !completeRemoval?.impact ||
+      completeRemoval.confirmation.trim() !== completeRemoval.impact.teamName
+    )
+      return;
+    setRemovingComplete(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const result = await deleteCompleteTeam(completeRemoval.grant.id);
+      setCompleteRemoval(null);
+      setSuccess(
+        `El equipo ${result.teamName} y todos sus datos asociados fueron eliminados.`,
+      );
+      load();
+      getLocalities()
+        .then(setLocalities)
+        .catch((reason: Error) => setError(reason.message));
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "No se pudo completar la baja del equipo.",
+      );
+    } finally {
+      setRemovingComplete(false);
+    }
+  };
+  const sendTokenByWhatsApp = async (item: RegistrationAccessGrant) => {
+    setError(null);
+    setSuccess(null);
+    setSendingGrantId(item.id);
+    try {
+      const result = await sendAccessGrantTokenByWhatsApp(item.id);
+      setGrants((current) =>
+        current.map((grant) =>
+          grant.id === item.id
+            ? {
+                ...grant,
+                whatsappSentAt: result.whatsappSentAt,
+                whatsappMessageId: result.messageId,
+                whatsappDelivery: null,
+              }
+            : grant,
+        ),
+      );
+      setSuccess(
+        `WhatsApp acepto el mensaje para ${result.contactName} (${result.contactPhone}).`,
+      );
+      load();
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "No se pudo enviar el token por WhatsApp.",
+      );
+    } finally {
+      setSendingGrantId(null);
+    }
+  };
+  return (
+    <div className="admin-panel registrations-page">
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow">ABM</p>
+          <h1>Inscripciones</h1>
+        </div>
+        <button className="primary-button" onClick={openNewGrant}>
+          Habilitar equipo
+        </button>
+      </div>
+      <div className="toolbar">
+        <input
+          placeholder="Buscar por token, localidad o jugadora"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+        <button className="secondary-button" onClick={load}>
+          Buscar
+        </button>
+      </div>
+      {error && !openGrant && !editing && !completeRemoval ? (
+        <div className="inline-state">{error}</div>
+      ) : null}
+      {success ? (
+        <div className="inline-state inline-state-success">{success}</div>
+      ) : null}
+      <section className="data-card registrations-grants-card">
+        <div className="registrations-section-heading">
+          <h2>Equipos habilitados</h2>
+          <div
+            className="program-tabs registration-grant-filters"
+            role="group"
+            aria-label="Filtrar equipos habilitados"
+          >
+            <button
+              type="button"
+              aria-pressed={grantFilter === "ALL"}
+              className={grantFilter === "ALL" ? "is-selected" : ""}
+              onClick={() => setGrantFilter("ALL")}
+            >
+              Todos ({grants.length})
+            </button>
+            <button
+              type="button"
+              aria-pressed={grantFilter === "ACTIVE_UNUSED"}
+              className={grantFilter === "ACTIVE_UNUSED" ? "is-selected" : ""}
+              onClick={() => setGrantFilter("ACTIVE_UNUSED")}
+            >
+              Activos aún no usados ({activeUnusedGrants.length})
+            </button>
+          </div>
+        </div>
+        <AdminDataGrid
+          rows={visibleGrants}
+          preserveTableOnMobile
+          onEdit={() => undefined}
+          onDelete={() => undefined}
+          emptyMessage={
+            grantFilter === "ACTIVE_UNUSED"
+              ? "No hay accesos activos aún no usados."
+              : "No hay equipos habilitados."
+          }
+          columns={[
+            {
+              label: "Equipo",
+              render: (item) => <strong>{item.locality.name}</strong>,
+            },
+            { label: "Categoria", render: (item) => item.category.name },
+            {
+              label: "Contacto",
+              render: (item) => (
+                <>
+                  {item.contactName ?? "-"}
+                  {item.contactPhone ? (
+                    <small className="admin-grid-detail">
+                      {item.contactPhone}
+                    </small>
+                  ) : null}
+                </>
+              ),
+            },
+            { label: "Token", render: (item) => item.token },
+            {
+              label: "Estado del token",
+              sortValue: (item) =>
+                accessGrantStatusLabels[
+                  item.status === "ACTIVE" && item.consumedAt
+                    ? "USED"
+                    : item.status
+                ],
+              render: (item) => (
+                <>
+                  <span
+                    className={`status-chip ${item.status === "ACTIVE" ? "status-live" : item.status === "USED" ? "status-review" : "status-draft"}`}
+                  >
+                    {item.status === "ACTIVE" && item.consumedAt
+                      ? "Habilitado"
+                      : accessGrantStatusLabels[item.status]}
+                  </span>
+                  {item.status === "ACTIVE" && item.consumedAt ? (
+                    <small className="admin-grid-detail">
+                      Habilitado para rectificar
+                    </small>
+                  ) : null}
+                  {item.consumedAt ? (
+                    <small className="admin-grid-detail">
+                      {formatRegistrationDate(item.consumedAt)}
+                    </small>
+                  ) : null}
+                </>
+              ),
+            },
+            {
+              label: "Entrega WhatsApp",
+              sortValue: (item) =>
+                item.whatsappDelivery?.status ??
+                (item.whatsappSentAt ? "accepted" : ""),
+              render: (item) => <WhatsAppDeliveryStatus grant={item} />,
+            },
+            {
+              label: "Ultimo WhatsApp",
+              sortValue: (item) =>
+                item.whatsappSentAt
+                  ? new Date(item.whatsappSentAt).getTime()
+                  : 0,
+              render: (item) =>
+                item.whatsappSentAt ? (
+                  <time
+                    dateTime={item.whatsappSentAt}
+                    title="Ultimo envio aceptado por WhatsApp. Hora de Argentina."
+                  >
+                    {formatRegistrationDate(item.whatsappSentAt)}
+                  </time>
+                ) : (
+                  "Sin registro"
+                ),
+            },
+            {
+              label: "Pago",
+              render: (item) =>
+                item.registrations?.[0]
+                  ? registrationPaymentLabel(item.registrations[0])
+                  : item.feeWaived
+                    ? "Bonificada"
+                    : item.paymentDeferredUntilConfirmed
+                      ? "Al confirmar"
+                      : "Pendiente",
+            },
+          ]}
+          renderActions={(item) => (
+            <>
+              <button
+                type="button"
+                className="secondary-button grid-action-button"
+                disabled={
+                  !item.contactPhone ||
+                  item.status !== "ACTIVE" ||
+                  sendingGrantId !== null
+                }
+                title={
+                  !item.contactPhone
+                    ? "Este token no tiene telefono de contacto"
+                    : item.status !== "ACTIVE"
+                      ? "Solo se pueden enviar tokens activos"
+                      : `Enviar token a ${item.contactName ?? item.locality.name}`
+                }
+                onClick={() => sendTokenByWhatsApp(item)}
+              >
+                {sendingGrantId === item.id ? "Enviando..." : "Enviar WhatsApp"}
+              </button>
+              <button
+                className="inline-link"
+                onClick={() =>
+                  navigator.clipboard
+                    .writeText(item.token)
+                    .then(() => setSuccess(`Token copiado: ${item.token}`))
+                }
+              >
+                Copiar
+              </button>
+              {item.status === "USED" ||
+              (item.status === "REVOKED" && item.consumedAt) ? (
+                <button
+                  className="inline-link"
+                  disabled={reopeningGrantId !== null}
+                  onClick={() => reopen(item)}
+                >
+                  {reopeningGrantId === item.id
+                    ? "Rehabilitando..."
+                    : "Rehabilitar para rectificar"}
+                </button>
+              ) : null}
+              {item.status === "ACTIVE" ? (
+                <button className="danger-link" onClick={() => revoke(item)}>
+                  Revocar
+                </button>
+              ) : null}
+              <button className="danger-link" onClick={() => removeGrant(item)}>
+                Eliminar token
+              </button>
+              <button
+                className="danger-link"
+                onClick={() => void openCompleteRemoval(item)}
+              >
+                Dar de baja
+              </button>
+            </>
+          )}
+        />
+      </section>
+      <section className="data-card registrations-received-card">
+        <h2>Registros recibidos</h2>
+        <AdminDataGrid
+          rows={registrations}
+          preserveTableOnMobile
+          onEdit={editRegistration}
+          onDelete={() => undefined}
+          emptyMessage="No hay inscripciones recibidas."
+          columns={[
+            {
+              label: "Jugadoras",
+              render: (item) => (
+                <strong>
+                  {item.playerOneName} / {item.playerTwoName}
+                </strong>
+              ),
+            },
+            {
+              label: "Equipo",
+              render: (item) =>
+                `${item.locality.name}, ${item.locality.provinceName}`,
+            },
+            { label: "Categoria", render: (item) => item.category.name },
+            {
+              label: "Estado",
+              render: (item) => (
+                <span className="status-chip status-review">
+                  {registrationStatusLabels[item.status]}
+                </span>
+              ),
+            },
+            { label: "Pago", render: (item) => registrationPaymentLabel(item) },
+          ]}
+          renderActions={(item) => (
+            <>
+              <button
+                className="inline-link"
+                onClick={() => editRegistration(item)}
+              >
+                Editar
+              </button>
+              {item.payments?.length ? (
+                [...item.payments]
+                  .sort((a, b) => a.id - b.id)
+                  .map((payment) => (
+                    <button
+                      key={payment.id}
+                      className="secondary-button grid-action-button"
+                      title={`${payment.originalName} - ${formatRegistrationDate(payment.createdAt)}`}
+                      onClick={() =>
+                        openRegistrationPaymentProof(item.id, payment.id).catch(
+                          (reason: Error) => setError(reason.message),
+                        )
+                      }
+                    >
+                      {payment.kind === "ADDITIONAL"
+                        ? "Comprobante suplente"
+                        : payment.kind === "REPLACEMENT"
+                          ? "Comprobante actualizado"
+                          : "Comprobante inicial"}
+                      {payment.amount > 0
+                        ? ` - $${payment.amount.toLocaleString("es-AR")}`
+                        : ""}
+                    </button>
+                  ))
+              ) : !item.feeWaived && item.paymentProofStoredName ? (
+                <button
+                  className="secondary-button grid-action-button"
+                  onClick={() =>
+                    openRegistrationPaymentProof(item.id).catch(
+                      (reason: Error) => setError(reason.message),
+                    )
+                  }
+                >
+                  Comprobante
+                </button>
+              ) : null}
+              <button
+                className="danger-link"
+                onClick={() => removeRegistration(item)}
+              >
+                Eliminar
+              </button>
+              {grants.find((grant) => grant.id === item.accessGrantId) ? (
+                <button
+                  className="danger-link"
+                  onClick={() =>
+                    void openCompleteRemoval(
+                      grants.find((grant) => grant.id === item.accessGrantId)!,
+                    )
+                  }
+                >
+                  Dar de baja equipo
+                </button>
+              ) : null}
+            </>
+          )}
+        />
+      </section>
+      {openGrant ? (
+        <AdminDialog title="Habilitar equipo" onClose={closeGrant}>
+          <form className="editor-form" onSubmit={create}>
+            {error ? (
+              <div className="form-error dialog-form-error span-2" role="alert">
+                {error}
+              </div>
+            ) : null}
+            <label className="span-2">
+              Localidad / equipo *
+              <select
+                value={creatingLocality ? "" : (grant.localityId ?? "")}
+                onChange={(event) => {
+                  setCreatingLocality(false);
+                  setGrant({
+                    ...grant,
+                    localityId: event.target.value
+                      ? Number(event.target.value)
+                      : undefined,
+                  });
+                }}
+                required={!creatingLocality}
+                disabled={creatingLocality}
+              >
+                <option value="">Seleccionar equipo existente</option>
+                {getRegistrationLocalities(localities).map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}, {item.provinceName} - {item.category?.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="span-2 form-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => {
+                  setCreatingLocality(!creatingLocality);
+                  setGrant({ ...grant, localityId: undefined });
+                }}
+              >
+                {creatingLocality
+                  ? "Usar equipo existente"
+                  : "Crear nuevo equipo"}
+              </button>
+            </div>
+            {creatingLocality ? (
+              <>
+                <label>
+                  Nuevo equipo / localidad *
+                  <input
+                    value={localityDraft.name}
+                    onChange={(event) =>
+                      setLocalityDraft({
+                        ...localityDraft,
+                        name: event.target.value,
+                      })
+                    }
+                    required
+                  />
+                </label>
+                <label>
+                  Provincia *
+                  <input
+                    value={localityDraft.provinceName}
+                    onChange={(event) =>
+                      setLocalityDraft({
+                        ...localityDraft,
+                        provinceName: event.target.value,
+                      })
+                    }
+                    required
+                  />
+                </label>
+                <label className="span-2">
+                  Categoria *
+                  <select
+                    value={localityDraft.categoryId ?? ""}
+                    onChange={(event) =>
+                      setLocalityDraft({
+                        ...localityDraft,
+                        categoryId: event.target.value
+                          ? Number(event.target.value)
+                          : null,
+                      })
+                    }
+                    required
+                  >
+                    <option value="">Seleccionar categoria</option>
+                    {categories
+                      .filter((item) => item.active)
+                      .map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+              </>
+            ) : null}
+            <label>
+              Nombre del contacto *
+              <input
+                value={grant.contactName ?? ""}
+                onChange={(event) =>
+                  setGrant({ ...grant, contactName: event.target.value })
+                }
+                required
+              />
+            </label>
+            <label>
+              Email (opcional)
+              <input
+                type="email"
+                value={grant.contactEmail ?? ""}
+                onChange={(event) =>
+                  setGrant({ ...grant, contactEmail: event.target.value })
+                }
+              />
+            </label>
+            <label>
+              Numero de WhatsApp *
+              <input
+                type="tel"
+                value={grant.contactPhone ?? ""}
+                onChange={(event) =>
+                  setGrant({ ...grant, contactPhone: event.target.value })
+                }
+                placeholder="Ej. +54 9 11 1234-5678"
+                required
+              />
+            </label>
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={grant.feeWaived ?? false}
+                onChange={(event) =>
+                  setGrant({
+                    ...grant,
+                    feeWaived: event.target.checked,
+                    paymentDeferredUntilConfirmed: event.target.checked
+                      ? false
+                      : grant.paymentDeferredUntilConfirmed,
+                  })
+                }
+              />
+              Inscripcion bonificada
+            </label>
+            <label className="checkbox-row span-2">
+              <input
+                type="checkbox"
+                checked={grant.paymentDeferredUntilConfirmed ?? false}
+                onChange={(event) =>
+                  setGrant({
+                    ...grant,
+                    paymentDeferredUntilConfirmed: event.target.checked,
+                    feeWaived: event.target.checked ? false : grant.feeWaived,
+                  })
+                }
+              />
+              Lista de espera: solicitar pago al confirmar
+            </label>
+            <label className="span-2">
+              Notas
+              <textarea
+                rows={3}
+                value={grant.notes ?? ""}
+                onChange={(event) =>
+                  setGrant({ ...grant, notes: event.target.value })
+                }
+              />
+            </label>
+            <div className="span-2 form-actions">
+              <button className="primary-button" disabled={savingGrant}>
+                {savingGrant ? "Generando..." : "Generar token"}
+              </button>
+            </div>
+          </form>
+        </AdminDialog>
+      ) : null}
+      {editing ? (
+        <AdminDialog
+          title="Editar inscripción"
+          onClose={() => setEditing(null)}
+        >
+          <form className="editor-form" onSubmit={saveRegistration}>
+            {error ? (
+              <div className="form-error dialog-form-error span-2" role="alert">
+                {error}
+              </div>
+            ) : null}
+            <label className="span-2">
+              Estado
+              <select
+                value={draft.status}
+                onChange={(event) =>
+                  setDraft({
+                    ...draft,
+                    status: event.target.value as RegistrationStatus,
+                  })
+                }
+              >
+                {Object.entries(registrationStatusLabels).map(
+                  ([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ),
+                )}
+              </select>
+            </label>
+            <label className="checkbox-row span-2">
+              <input
+                type="checkbox"
+                checked={draft.feeWaived}
+                onChange={(event) =>
+                  setDraft({ ...draft, feeWaived: event.target.checked })
+                }
+              />
+              Inscripción bonificada
+            </label>
+            <p className="field-hint span-2">
+              Al bonificarla, sus pagos dejan de computarse como ingresos en
+              Caja. Los comprobantes se conservan.
+            </p>
+            <label className="span-2">
+              Nota interna
+              <textarea
+                rows={5}
+                value={draft.adminNotes}
+                onChange={(event) =>
+                  setDraft({ ...draft, adminNotes: event.target.value })
+                }
+              />
+            </label>
+            <div className="span-2 form-actions">
+              <button className="primary-button">Guardar</button>
+            </div>
+          </form>
+        </AdminDialog>
+      ) : null}
+      {completeRemoval ? (
+        <CompleteTeamRemovalDialog
+          state={completeRemoval}
+          removing={removingComplete}
+          error={error}
+          onConfirmation={(confirmation) =>
+            setCompleteRemoval((current) =>
+              current ? { ...current, confirmation } : current,
+            )
+          }
+          onClose={() => {
+            if (!removingComplete) setCompleteRemoval(null);
+          }}
+          onConfirm={() => void confirmCompleteRemoval()}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function CompleteTeamRemovalDialog({
+  state,
+  removing,
+  error,
+  onConfirmation,
+  onClose,
+  onConfirm,
+}: {
+  state: {
+    grant: RegistrationAccessGrant;
+    impact: CompleteTeamRemovalImpact | null;
+    confirmation: string;
+  };
+  removing: boolean;
+  error: string | null;
+  onConfirmation: (value: string) => void;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const impact = state.impact;
+  return (
+    <AdminDialog
+      title="Dar de baja y eliminar equipo"
+      className="complete-removal-dialog"
+      onClose={onClose}
+    >
+      {!impact ? (
+        <p className="inline-state">Calculando datos asociados...</p>
+      ) : (
+        <form
+          className="complete-removal-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onConfirm();
+          }}
+        >
+          {error ? (
+            <div className="form-error dialog-form-error" role="alert">
+              {error}
+            </div>
+          ) : null}
+          <p className="complete-removal-warning" role="alert">
+            Esta acción es permanente. Se eliminará el equipo{" "}
+            <strong>{impact.teamName}</strong>, sus habilitaciones,
+            inscripciones, pagos y jugadoras. También se quitará de las zonas
+            y se invalidarán los resultados de los partidos afectados.
+          </p>
+          <ul className="data-list complete-removal-impact">
+            <li>
+              <span>Habilitaciones / tokens</span>
+              <strong>{impact.accessGrants}</strong>
+            </li>
+            <li>
+              <span>Inscripciones</span>
+              <strong>{impact.registrations}</strong>
+            </li>
+            <li>
+              <span>Jugadoras que se eliminarán</span>
+              <strong>{impact.players}</strong>
+            </li>
+            <li>
+              <span>Pagos y comprobantes</span>
+              <strong>{impact.payments}</strong>
+            </li>
+            <li>
+              <span>Ingreso que se quitará de Caja</span>
+              <strong>{money.format(impact.cashIncomeAmount)}</strong>
+            </li>
+            <li>
+              <span>Asignaciones a zonas</span>
+              <strong>{impact.zoneAssignments}</strong>
+            </li>
+            <li>
+              <span>Partidos afectados</span>
+              <strong>{impact.affectedMatches}</strong>
+            </li>
+            <li>
+              <span>Resultados que se invalidarán</span>
+              <strong>{impact.playedMatches}</strong>
+            </li>
+          </ul>
+          {impact.retainedPlayers > 0 ? (
+            <p className="field-hint">
+              {impact.retainedPlayers}{" "}
+              {impact.retainedPlayers === 1
+                ? "jugadora se conservará"
+                : "jugadoras se conservarán"}{" "}
+              porque también figura en otra inscripción.
+            </p>
+          ) : null}
+          <label>
+            Para confirmar, escribí <strong>{impact.teamName}</strong>
+            <input
+              autoFocus
+              value={state.confirmation}
+              disabled={removing}
+              onChange={(event) => onConfirmation(event.target.value)}
+              autoComplete="off"
+            />
+          </label>
+          <div className="form-actions">
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={removing}
+              onClick={onClose}
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="danger-button"
+              disabled={
+                removing || state.confirmation.trim() !== impact.teamName
+              }
+            >
+              {removing ? "Eliminando..." : "Eliminar todo definitivamente"}
+            </button>
+          </div>
+        </form>
+      )}
+    </AdminDialog>
+  );
 }

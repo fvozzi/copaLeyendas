@@ -58,6 +58,16 @@ export class RegistrationsController {
     return this.registrationsService.removeAccessGrant(id);
   }
 
+  @Get('access-grants/:id/complete-removal-impact')
+  getCompleteTeamRemovalImpact(@Param('id', ParseIntPipe) id: number) {
+    return this.registrationsService.getCompleteTeamRemovalImpact(id);
+  }
+
+  @Delete('access-grants/:id/complete')
+  removeCompleteTeam(@Param('id', ParseIntPipe) id: number) {
+    return this.registrationsService.removeCompleteTeam(id);
+  }
+
   @Get()
   list(@Query() query: QueryRegistrationsDto) {
     return this.registrationsService.list(query);

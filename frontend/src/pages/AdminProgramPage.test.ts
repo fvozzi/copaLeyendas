@@ -29,6 +29,7 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.resetAllMocks(); });
 
 it('shows all courts in a venue, including empty ones, and filters their games', async () => {
+  expect(container.querySelector('.program-header > button')?.textContent).toBe('Configurar calendario y sedes');
   await click('Sedes');
   expect(container.querySelector('[aria-label="Canchas de la sede"]')?.textContent).toContain('Cancha 2 (0)');
   await click('Cancha 2 (0)');
@@ -47,7 +48,7 @@ it('summarizes each category and zone once for the entire venue, including its k
     { ...slot, id: 14, sequence: 5, tournamentCategoryId: 2, tournamentCategory: { category: { name: 'Damas B' } }, zoneName: 'C' } as TournamentScheduleSlot,
     { ...slot, id: 15, sequence: 6, zoneName: 'D', courtId: elsewhere.id, court: elsewhere },
   ]);
-  await click('Completar sin cambiar horarios');
+  await click('Asignar canchas pendientes');
   await click('Sedes');
   const summary = container.querySelector('[aria-label="Categorías y zonas de la sede"]')!;
   expect([...summary.querySelectorAll('dt')].map((item) => item.textContent)).toEqual(['Damas A', 'Damas B']);
@@ -61,7 +62,7 @@ it('summarizes each category and zone once for the entire venue, including its k
 it('shows actual pairs and submits results to the real fixture match, not the planning row', async () => {
   const actual = { ...slot, matchId: 500, match: { id: 500, zoneId: 9, matchOrder: 1, status: 'READY', homeRegistration: { playerOneName: 'Ana', playerTwoName: 'Bea', locality: { name: 'Junin' } }, awayRegistration: { playerOneName: 'Carla', playerTwoName: 'Dora', locality: { name: 'Salta' } }, homeScore: null, awayScore: null } } as TournamentScheduleSlot;
   vi.mocked(redistributeTournamentCourts).mockResolvedValue([actual]);
-  await click('Completar sin cambiar horarios');
+  await click('Asignar canchas pendientes');
   expect(container.textContent).toContain('Ana / Bea (Junin) vs Carla / Dora (Salta)');
   expect(container.querySelector('a[href="/app/zonas/9"]')).toBeTruthy();
   vi.mocked(getTournamentScheduleGrid).mockResolvedValue([{ ...actual, match: { ...actual.match!, status: 'PLAYED', homeScore: 25, awayScore: 0 } }]);
@@ -79,7 +80,7 @@ it('shows actual pairs and submits results to the real fixture match, not the pl
 it('redistributes existing games and refreshes court counts', async () => {
   vi.mocked(redistributeTournamentCourts).mockResolvedValue([{ ...slot, courtId: 2, court: courts[1] }]);
   await click('Sedes');
-  await click('Completar sin cambiar horarios');
+  await click('Asignar canchas pendientes');
   expect(redistributeTournamentCourts).toHaveBeenCalledWith(1);
   expect(container.querySelector('[aria-label="Canchas de la sede"]')?.textContent).toContain('Cancha 2 (1)');
   expect(container.querySelector('[role="status"]')?.textContent).toContain('Se conservaron los horarios');
@@ -88,7 +89,7 @@ it('redistributes existing games and refreshes court counts', async () => {
 it('keeps existing assignments visible if redistribution fails', async () => {
   vi.mocked(redistributeTournamentCourts).mockRejectedValue(new Error('No hay una cancha activa disponible'));
   await click('Sedes');
-  await click('Completar sin cambiar horarios');
+  await click('Asignar canchas pendientes');
   expect(container.querySelector('[role="alert"]')?.textContent).toContain('No hay una cancha activa disponible');
   expect(container.querySelector('[aria-label="Canchas de la sede"]')?.textContent).toContain('Cancha 1 (1)');
 });

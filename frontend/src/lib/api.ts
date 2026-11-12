@@ -14,6 +14,7 @@ import type {
   PublicProgramMapData,
   TournamentDistribution,
   RegistrationAccessGrant,
+  CompleteTeamRemovalImpact,
   RegistrationStatusPayload,
   ContentPost,
   Locality,
@@ -487,6 +488,14 @@ export function updateAccessGrantStatus(id: number, payload: AccessGrantStatusPa
 
 export function deleteAccessGrant(id: number) {
   return request<{ success: boolean }>(`/registrations/access-grants/${id}`, { method: 'DELETE' }, true);
+}
+
+export function getCompleteTeamRemovalImpact(id: number) {
+  return request<CompleteTeamRemovalImpact>(`/registrations/access-grants/${id}/complete-removal-impact`, {}, true);
+}
+
+export function deleteCompleteTeam(id: number) {
+  return request<{ success: boolean } & CompleteTeamRemovalImpact>(`/registrations/access-grants/${id}/complete`, { method: 'DELETE' }, true);
 }
 
 export function sendAccessGrantTokenByWhatsApp(id: number) {

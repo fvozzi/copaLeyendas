@@ -48,7 +48,7 @@ export function AdminPlayersPage() {
 
   return <div className="admin-panel">
     <div className="panel-header"><div><p className="eyebrow">ABM</p><h1>Jugadores y jugadoras</h1></div><div className="list-actions"><button type="button" className="secondary-button" onClick={() => exportPlayers('insurance')}>Excel para seguro</button><button type="button" className="secondary-button" onClick={() => exportPlayers('full')}>Excel completo</button><button type="button" className="primary-button" onClick={openCreate}>Agregar jugadora</button></div></div>
-    <p className="field-hint">Esta nómina es la fuente de verdad de cada equipo. Los cambios de nombre y los reemplazos se reflejan en la inscripción, la distribución y el programa.</p>
+    <p className="field-hint">Esta nómina es la fuente de verdad de cada equipo. Los cambios de nombre y los reemplazos se reflejan en la inscripción, el armado de zonas y la programación.</p>
     <div className="toolbar"><input placeholder="Buscar por nombre, DNI o localidad" value={search} onChange={(event) => setSearch(event.target.value)} /><button type="button" className="secondary-button" onClick={load}>Buscar</button></div>
     {error ? <div className="inline-state">{error}</div> : null}
     <section className="data-card players-data-card"><AdminDataGrid columns={[

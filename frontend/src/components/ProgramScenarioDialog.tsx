@@ -70,7 +70,7 @@ export function ProgramScenarioDialog({ tournamentId, courts, venues, onClose, o
   };
   const categoryName = (id: number) => detail?.categories.find((category) => category.id === id)?.category.name ?? '';
   const visibleRules = config?.rules.filter((rule) => (!categoryFilter || rule.categoryId === categoryFilter) && (!venueFilter || rule.venueId === venueFilter)) ?? [];
-  return <AdminDialog title="Repartir partidos" className="scenario-dialog" onClose={() => { if (!busy) onClose(); }}><div className="program-scenario">
+  return <AdminDialog title="Configurar calendario y sedes" className="scenario-dialog" onClose={() => { if (!busy) onClose(); }}><div className="program-scenario">
     {error && <div className="inline-state" role="alert">{error}</div>}
     {!config || !detail ? !error && <p>Cargando categorías, zonas y canchas…</p> : <>
       <p className="field-hint">Probá distintos escenarios. La vista previa no cambia los horarios; al aplicar se guardan las canchas, las sedes de las zonas y los nuevos horarios.</p>

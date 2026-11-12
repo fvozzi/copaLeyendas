@@ -61,7 +61,8 @@ textarea {
 
 button,
 .primary-button,
-.secondary-button {
+.secondary-button,
+.danger-button {
   border-radius: 8px;
   border: none;
   cursor: pointer;
@@ -70,7 +71,8 @@ button,
 
 button:hover,
 .primary-button:hover,
-.secondary-button:hover {
+.secondary-button:hover,
+.danger-button:hover {
   transform: translateY(-1px);
 }
 
@@ -246,7 +248,8 @@ img {
 
 .primary-button,
 .secondary-button,
-.ghost-button {
+.ghost-button,
+.danger-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -256,6 +259,11 @@ img {
 
 .primary-button {
   background: var(--clay);
+  color: var(--white);
+}
+
+.danger-button {
+  background: #9e3a22;
   color: var(--white);
 }
 
@@ -1452,6 +1460,13 @@ textarea {
   background: rgba(166, 61, 35, 0.08);
   white-space: pre-line;
 }
+
+.complete-removal-dialog { width: min(42rem, 100%); }
+.complete-removal-form { display: grid; gap: 1rem; }
+.complete-removal-warning { margin: 0; padding: 0.85rem 1rem; border-left: 4px solid #9e3a22; background: #9e3a220d; line-height: 1.5; }
+.complete-removal-impact { padding: 1rem; border: 1px solid var(--line); border-radius: 8px; }
+.complete-removal-form > label { display: grid; gap: 0.45rem; font-weight: 700; }
+.complete-removal-form .form-actions { justify-content: flex-end; }
 
 .field-error {
   display: block;

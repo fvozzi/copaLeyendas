@@ -77,7 +77,7 @@ export function AdminProgramPage() {
       const items = await redistributeTournamentCourts(tournamentId);
       setSlots(items);
       const withoutDate = items.filter((slot) => !slot.scheduledAt).length;
-      setNotice(`Programa actualizado y partidos repartidos entre las canchas activas. Se conservaron los horarios existentes.${withoutDate ? ` Quedaron ${withoutDate} partidos sin horario: revisá los días de juego y la disponibilidad de las sedes.` : ' Todos los partidos tienen horario.'}`);
+      setNotice(`Programación actualizada y partidos asignados entre las canchas activas. Se conservaron los horarios existentes.${withoutDate ? ` Quedaron ${withoutDate} partidos sin horario: revisá los días de juego y la disponibilidad de las sedes.` : ' Todos los partidos tienen horario.'}`);
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudieron repartir los partidos.'); }
     finally { setSaving(false); }
   };
@@ -139,13 +139,13 @@ export function AdminProgramPage() {
   const categoryOptions = Object.keys(byCategory).sort().map((name) => ({ id: name, label: name }));
   const selectedCategory = byCategory[categoryTab] ? categoryTab : categoryOptions[0]?.id;
   return <div className="admin-panel program-page">
-    <div className="program-header"><h1>Programa</h1>
+    <div className="program-header"><h1>Programación de partidos</h1>
       <label>Torneo<select aria-label="Seleccionar torneo" disabled={saving} value={tournamentId} onChange={(event) => { setTournamentId(Number(event.target.value)); setVenueTab(''); setCourtTab('all'); setCategoryTab(''); }}><option value="0">Seleccionar torneo</option>{tournaments.map((tournament) => <option key={tournament.id} value={tournament.id}>{tournament.name}</option>)}</select></label>
-      <details className="program-options"><summary>Opciones</summary><div>
+      <button type="button" className="primary-button" disabled={saving || !tournamentId} onClick={() => setScenarioOpen(true)}>Configurar calendario y sedes</button>
+      <details className="program-options"><summary>Más acciones</summary><div>
         <Link className="secondary-button" to="/app/canchas/internas">Administrar canchas</Link>
-        <button type="button" className="secondary-button" disabled={saving || !tournamentId} onClick={() => setScenarioOpen(true)}>Repartir entre canchas</button>
-        <small>Configurá días, sedes y canchas, y probá los horarios antes de aplicar.</small>
-        <button type="button" className="inline-link" disabled={saving || !tournamentId} onClick={() => void redistribute()}>{saving ? 'Guardando…' : 'Completar sin cambiar horarios'}</button>
+        <button type="button" className="inline-link" disabled={saving || !tournamentId} onClick={() => void redistribute()}>{saving ? 'Guardando…' : 'Asignar canchas pendientes'}</button>
+        <small>Completa asignaciones automáticas sin modificar los horarios existentes.</small>
       </div></details>
     </div>
     {error && <div className="inline-state" role="alert">{error}</div>}

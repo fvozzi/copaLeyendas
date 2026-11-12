@@ -7,16 +7,26 @@ import { RegistrationPayment } from './registration-payment.entity';
 import { RegistrationAccessGrantStatus, RegistrationStatus } from './registration.enums';
 import { RegistrationsService } from './registrations.service';
 import { Locality } from '../localities/locality.entity';
+import { Player } from '../players/player.entity';
+import { ZoneEntry } from '../tournaments/zone-entry.entity';
+import { TournamentMatch } from '../tournaments/tournament-match.entity';
+import { WhatsAppDelivery } from '../whatsapp/whatsapp-delivery.entity';
+import { removeMatchResultPhoto } from '../tournaments/match-result-photo-storage';
 
 vi.mock('./pair-registration.entity', () => ({ PairRegistration: class PairRegistration {} }));
 vi.mock('./registration-payment.entity', () => ({ RegistrationPayment: class RegistrationPayment {} }));
 vi.mock('./registration-access-grant.entity', () => ({ RegistrationAccessGrant: class RegistrationAccessGrant {} }));
 vi.mock('../localities/locality.entity', () => ({ Locality: class Locality {} }));
+vi.mock('../players/player.entity', () => ({ Player: class Player {} }));
+vi.mock('../tournaments/zone-entry.entity', () => ({ ZoneEntry: class ZoneEntry {} }));
+vi.mock('../tournaments/tournament-match.entity', () => ({ TournamentMatch: class TournamentMatch {} }));
+vi.mock('../whatsapp/whatsapp-delivery.entity', () => ({ WhatsAppDelivery: class WhatsAppDelivery {} }));
+vi.mock('../tournaments/match-result-photo-storage', () => ({ removeMatchResultPhoto: vi.fn() }));
 vi.mock('../tournaments/tournament.entity', () => ({ Tournament: class Tournament {} }));
 vi.mock('../categories/category.entity', () => ({ Category: class Category {} }));
 vi.mock('../players/players.service', () => ({ PlayersService: class PlayersService {} }));
 vi.mock('./google-drive-photo-storage.service', () => ({ GoogleDrivePhotoStorageService: class GoogleDrivePhotoStorageService {} }));
-vi.mock('./payment-proof-storage', () => ({ ensurePaymentProofDir: vi.fn() }));
+vi.mock('./payment-proof-storage', () => ({ ensurePaymentProofDir: vi.fn(() => '.') }));
 
 function setup() {
   const grant = {
@@ -33,6 +43,7 @@ function setup() {
     findOneBy: vi.fn(async (entity) => entity === Locality ? grant.locality : null),
     update: vi.fn().mockResolvedValue({ affected: 1 }),
     save: vi.fn(async (_entity, registration) => ({ ...registration, id: 10 })),
+    delete: vi.fn().mockResolvedValue({ affected: 1 }),
   };
   const registrations = {
     findOne: vi.fn().mockResolvedValue(null),
@@ -136,6 +147,56 @@ describe('registration tracking', () => {
     expect(await service.updateAccessGrantStatus(7, { status: RegistrationAccessGrantStatus.ACTIVE })).toMatchObject({ status: 'ACTIVE' });
     expect(grants.update).toHaveBeenCalledWith({ id: 7, status: 'USED' }, { status: 'ACTIVE' });
     await expect(service.updateAccessGrantStatus(7, { status: RegistrationAccessGrantStatus.USED })).rejects.toThrow(BadRequestException);
+  });
+
+  it('removes a withdrawn team and invalidates its assigned and downstream matches in one transaction', async () => {
+    const { service, grant, manager } = setup();
+    const registration = {
+      id: 10, accessGrantId: grant.id, localityId: grant.localityId,
+      playerOneDni: '10000001', playerTwoDni: '10000002', playerThreeDni: null,
+      feeWaived: false, payments: [{ id: 1, amount: 30000, storedName: 'pago.pdf' }],
+      paymentProofStoredName: 'pago.pdf', playerOnePhotoStoredName: null,
+      playerTwoPhotoStoredName: null, playerThreePhotoStoredName: null,
+    };
+    const players = [
+      { id: 1, dni: '10000001', localityId: grant.localityId },
+      { id: 2, dni: '10000002', localityId: grant.localityId },
+    ];
+    const zoneEntry = { id: 20, zoneId: 30, registrationId: registration.id };
+    const assigned = {
+      id: 40, status: 'PLAYED', homeRegistrationId: registration.id, awayRegistrationId: 99,
+      winnerRegistrationId: registration.id, homeQualifierZoneId: null, awayQualifierZoneId: null,
+      homeSourceMatchId: null, awaySourceMatchId: null, homeScore: 25, awayScore: 10,
+      resultPhotoStoredName: 'resultado.jpg', resultPhotoOriginalName: 'foto.jpg',
+      resultPhotoMimeType: 'image/jpeg', resultPhotoSize: 100, resultSubmittedById: 1,
+      resultSubmittedAt: new Date(),
+    };
+    const downstream = {
+      ...assigned, id: 41, status: 'READY', homeRegistrationId: registration.id,
+      awayRegistrationId: 98, winnerRegistrationId: null, homeSourceMatchId: assigned.id,
+      homeScore: null, awayScore: null, resultPhotoStoredName: null,
+    };
+    manager.find.mockImplementation(async (entity, options) => {
+      if (entity === RegistrationAccessGrant) return [grant];
+      if (entity === PairRegistration) return [registration];
+      if (entity === Player) return players;
+      if (entity === ZoneEntry) return [zoneEntry];
+      if (entity === TournamentMatch) return [assigned, downstream];
+      return [];
+    });
+    const result = await service.removeCompleteTeam(grant.id);
+    expect(result).toMatchObject({
+      success: true, teamName: 'Junin', registrations: 1, players: 2,
+      payments: 1, cashIncomeAmount: 30000, zoneAssignments: 1,
+      affectedMatches: 2, playedMatches: 1,
+    });
+    expect(assigned).toMatchObject({ homeRegistrationId: null, awayRegistrationId: 99, homeScore: null, winnerRegistrationId: null, status: 'PENDING' });
+    expect(downstream).toMatchObject({ homeRegistrationId: null, awayRegistrationId: 98, status: 'PENDING' });
+    expect(manager.delete).toHaveBeenCalledWith(PairRegistration, expect.anything());
+    expect(manager.delete).toHaveBeenCalledWith(RegistrationAccessGrant, expect.anything());
+    expect(manager.delete).toHaveBeenCalledWith(Player, expect.anything());
+    expect(manager.delete).toHaveBeenCalledWith(Locality, { id: grant.localityId });
+    expect(removeMatchResultPhoto).toHaveBeenCalledWith('resultado.jpg');
   });
 
   it('marks an existing registration and its access grant as fee-waived', async () => {

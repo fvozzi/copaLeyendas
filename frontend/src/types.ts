@@ -136,6 +136,19 @@ export interface RegistrationAccessGrant {
   updatedAt: string;
 }
 
+export interface CompleteTeamRemovalImpact {
+  teamName: string;
+  accessGrants: number;
+  registrations: number;
+  players: number;
+  retainedPlayers: number;
+  payments: number;
+  cashIncomeAmount: number;
+  zoneAssignments: number;
+  affectedMatches: number;
+  playedMatches: number;
+}
+
 export interface PublicAccessGrant {
   id: number;
   token: string;

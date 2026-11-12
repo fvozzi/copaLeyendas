@@ -65,7 +65,7 @@ it('deletes an unused zone from the list after warning about its pending games',
   await act(async () => remove.click());
   expect(confirm).toHaveBeenCalledWith(expect.stringContaining('zona C de Silvina Cimadamore'));
   expect(deleteTournamentZone).toHaveBeenCalledWith(12);
-  expect(container.textContent).toContain('Usá Distribución automática');
+  expect(container.textContent).toContain('Usá Armado de zonas');
 });
 
 it('shows the server reason and keeps the zone when it has assigned pairs', async () => {

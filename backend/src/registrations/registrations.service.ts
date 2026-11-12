@@ -10,7 +10,7 @@ import {
   StreamableFile,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, Repository } from 'typeorm';
+import { Brackets, EntityManager, In, Repository } from 'typeorm';
 import { CreatePublicRegistrationDto } from './dto/create-public-registration.dto';
 import { CreateAccessGrantDto } from './dto/create-access-grant.dto';
 import { ensurePaymentProofDir } from './payment-proof-storage';
@@ -33,12 +33,43 @@ import { Tournament } from '../tournaments/tournament.entity';
 import { TournamentStatus } from '../tournaments/tournament.enums';
 import { WhatsAppService } from '../whatsapp/whatsapp.service';
 import { WhatsAppDelivery } from '../whatsapp/whatsapp-delivery.entity';
+import { Player } from '../players/player.entity';
+import { ZoneEntry } from '../tournaments/zone-entry.entity';
+import { TournamentMatch } from '../tournaments/tournament-match.entity';
+import { MatchStatus } from '../tournaments/tournament.enums';
+import { removeMatchResultPhoto } from '../tournaments/match-result-photo-storage';
 
 interface RegistrationFiles {
   paymentProof?: Express.Multer.File;
   playerOnePhoto?: Express.Multer.File;
   playerTwoPhoto?: Express.Multer.File;
   playerThreePhoto?: Express.Multer.File;
+}
+
+export interface CompleteTeamRemovalImpact {
+  teamName: string;
+  accessGrants: number;
+  registrations: number;
+  players: number;
+  retainedPlayers: number;
+  payments: number;
+  cashIncomeAmount: number;
+  zoneAssignments: number;
+  affectedMatches: number;
+  playedMatches: number;
+}
+
+interface CompleteTeamRemovalData {
+  impact: CompleteTeamRemovalImpact;
+  localityId: number;
+  grantIds: number[];
+  registrations: PairRegistration[];
+  playersToDelete: Player[];
+  zoneEntries: ZoneEntry[];
+  matches: TournamentMatch[];
+  affectedMatchIds: Set<number>;
+  affectedZoneIds: Set<number>;
+  whatsappMessageIds: string[];
 }
 
 @Injectable()
@@ -194,11 +225,82 @@ export class RegistrationsService {
     });
 
     if (registrationsCount > 0) {
-      throw new BadRequestException('Primero debe eliminar el registro asociado a este equipo');
+      throw new BadRequestException('Este equipo tiene una inscripción asociada. Usá “Dar de baja” para revisar el impacto y eliminar todo.');
     }
 
     await this.accessGrantsRepository.remove(grant);
     return { success: true };
+  }
+
+  async getCompleteTeamRemovalImpact(id: number) {
+    const data = await this.loadCompleteTeamRemovalData(
+      this.registrationsRepository.manager,
+      id,
+    );
+    return data.impact;
+  }
+
+  async removeCompleteTeam(id: number) {
+    const registrationFiles = new Set<string>();
+    const resultPhotos = new Set<string>();
+    const impact = await this.registrationsRepository.manager.transaction(async (manager) => {
+      const data = await this.loadCompleteTeamRemovalData(manager, id, true);
+      const registrationIds = data.registrations.map((registration) => registration.id);
+
+      for (const registration of data.registrations) {
+        [
+          registration.paymentProofStoredName,
+          ...(registration.payments ?? []).map((payment) => payment.storedName),
+          registration.playerOnePhotoStoredName,
+          registration.playerTwoPhotoStoredName,
+          registration.playerThreePhotoStoredName,
+        ].forEach((storedName) => { if (storedName) registrationFiles.add(storedName); });
+      }
+
+      const removedRegistrationIds = new Set(registrationIds);
+      for (const match of data.matches.filter((item) => data.affectedMatchIds.has(item.id))) {
+        if (match.resultPhotoStoredName) resultPhotos.add(match.resultPhotoStoredName);
+        if (
+          (match.homeRegistrationId && removedRegistrationIds.has(match.homeRegistrationId))
+          || (match.homeSourceMatchId && data.affectedMatchIds.has(match.homeSourceMatchId))
+          || (match.homeQualifierZoneId && data.affectedZoneIds.has(match.homeQualifierZoneId))
+        ) match.homeRegistrationId = null;
+        if (
+          (match.awayRegistrationId && removedRegistrationIds.has(match.awayRegistrationId))
+          || (match.awaySourceMatchId && data.affectedMatchIds.has(match.awaySourceMatchId))
+          || (match.awayQualifierZoneId && data.affectedZoneIds.has(match.awayQualifierZoneId))
+        ) match.awayRegistrationId = null;
+        match.homeScore = null;
+        match.awayScore = null;
+        match.winnerRegistrationId = null;
+        match.resultPhotoStoredName = null;
+        match.resultPhotoOriginalName = null;
+        match.resultPhotoMimeType = null;
+        match.resultPhotoSize = null;
+        match.resultSubmittedById = null;
+        match.resultSubmittedAt = null;
+        match.status = match.homeRegistrationId && match.awayRegistrationId
+          ? MatchStatus.READY
+          : MatchStatus.PENDING;
+      }
+
+      const affectedMatches = data.matches.filter((item) => data.affectedMatchIds.has(item.id));
+      if (affectedMatches.length) await manager.save(TournamentMatch, affectedMatches);
+      if (data.zoneEntries.length) await manager.delete(ZoneEntry, { id: In(data.zoneEntries.map((entry) => entry.id)) });
+      if (registrationIds.length) await manager.delete(PairRegistration, { id: In(registrationIds) });
+      if (data.whatsappMessageIds.length) await manager.delete(WhatsAppDelivery, { messageId: In(data.whatsappMessageIds) });
+      if (data.grantIds.length) await manager.delete(RegistrationAccessGrant, { id: In(data.grantIds) });
+      if (data.playersToDelete.length) await manager.delete(Player, { id: In(data.playersToDelete.map((player) => player.id)) });
+      await manager.delete(Locality, { id: data.localityId });
+      return data.impact;
+    });
+
+    registrationFiles.forEach((storedName) => this.cleanupStoredPaymentProof(storedName));
+    const photoResults = await Promise.allSettled([...resultPhotos].map((storedName) => removeMatchResultPhoto(storedName)));
+    if (photoResults.some((result) => result.status === 'rejected')) {
+      this.logger.warn(`El equipo ${impact.teamName} fue eliminado, pero no se pudieron borrar todas las fotos de resultados.`);
+    }
+    return { success: true, ...impact };
   }
 
   async getPublicAccessGrant(token: string) {
@@ -480,7 +582,7 @@ export class RegistrationsService {
     } catch (error) {
       if (isForeignKeyViolation(error)) {
         throw new BadRequestException(
-          'No se puede eliminar un registro asignado a una zona o a partidos',
+          'Este registro tiene zonas o partidos asignados. Usá “Dar de baja equipo” para revisar el impacto y eliminar todo.',
         );
       }
       throw error;
@@ -569,6 +671,73 @@ export class RegistrationsService {
     }
   }
 
+  private async loadCompleteTeamRemovalData(
+    manager: EntityManager,
+    accessGrantId: number,
+    lock = false,
+  ): Promise<CompleteTeamRemovalData> {
+    const grant = await manager.findOne(RegistrationAccessGrant, {
+      where: { id: accessGrantId },
+      ...(lock ? { lock: { mode: 'pessimistic_write' as const } } : {}),
+    });
+    if (!grant) throw new NotFoundException('Equipo habilitado no encontrado');
+    const locality = await manager.findOneBy(Locality, { id: grant.localityId });
+    if (!locality) throw new NotFoundException('Equipo no encontrado');
+
+    const grants = await manager.find(RegistrationAccessGrant, { where: { localityId: locality.id } });
+    const registrations = await manager.find(PairRegistration, {
+      where: { localityId: locality.id },
+      relations: { payments: true },
+    });
+    const registrationIds = registrations.map((registration) => registration.id);
+    const players = await manager.find(Player, { where: { localityId: locality.id } });
+    const allRegistrations = await manager.find(PairRegistration);
+    const otherRegistrations = allRegistrations.filter((registration) => !registrationIds.includes(registration.id));
+    const usedElsewhere = (dni: string) => otherRegistrations.some((registration) => [
+      registration.playerOneDni,
+      registration.playerTwoDni,
+      registration.playerThreeDni,
+    ].some((value) => value?.trim() === dni.trim()));
+    const playersToDelete = players.filter((player) => !usedElsewhere(player.dni));
+    const zoneEntries = registrationIds.length
+      ? await manager.find(ZoneEntry, { where: { registrationId: In(registrationIds) } })
+      : [];
+    const affectedZoneIds = new Set(zoneEntries.map((entry) => entry.zoneId));
+    const matches = await manager.find(TournamentMatch);
+    const affectedMatchIds = collectAffectedMatchIds(
+      matches,
+      new Set(registrationIds),
+      affectedZoneIds,
+    );
+    const affectedMatches = matches.filter((match) => affectedMatchIds.has(match.id));
+    const payments = registrations.flatMap((registration) => registration.payments ?? []);
+    return {
+      impact: {
+        teamName: locality.name,
+        accessGrants: grants.length,
+        registrations: registrations.length,
+        players: playersToDelete.length,
+        retainedPlayers: players.length - playersToDelete.length,
+        payments: payments.length,
+        cashIncomeAmount: registrations.reduce((total, registration) => total + (registration.feeWaived
+          ? 0
+          : (registration.payments ?? []).reduce((subtotal, payment) => subtotal + Math.max(0, payment.amount), 0)), 0),
+        zoneAssignments: zoneEntries.length,
+        affectedMatches: affectedMatches.length,
+        playedMatches: affectedMatches.filter((match) => match.status === MatchStatus.PLAYED).length,
+      },
+      localityId: locality.id,
+      grantIds: grants.map((item) => item.id),
+      registrations,
+      playersToDelete,
+      zoneEntries,
+      matches,
+      affectedMatchIds,
+      affectedZoneIds,
+      whatsappMessageIds: grants.flatMap((item) => item.whatsappMessageId ? [item.whatsappMessageId] : []),
+    };
+  }
+
   private async uploadPlayerPhotos(files: RegistrationFiles, dto: CreatePublicRegistrationDto) {
     if (!this.googleDrivePhotos.enabled()) return {};
     try {
@@ -628,4 +797,33 @@ function buildToken() {
 
 function isForeignKeyViolation(error: unknown) {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === '23503';
+}
+
+function collectAffectedMatchIds(
+  matches: TournamentMatch[],
+  registrationIds: Set<number>,
+  zoneIds: Set<number>,
+) {
+  const affected = new Set(matches.filter((match) =>
+    (match.homeRegistrationId !== null && registrationIds.has(match.homeRegistrationId))
+    || (match.awayRegistrationId !== null && registrationIds.has(match.awayRegistrationId))
+    || (match.winnerRegistrationId !== null && registrationIds.has(match.winnerRegistrationId))
+    || (match.homeQualifierZoneId !== null && zoneIds.has(match.homeQualifierZoneId))
+    || (match.awayQualifierZoneId !== null && zoneIds.has(match.awayQualifierZoneId)),
+  ).map((match) => match.id));
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const match of matches) {
+      if (affected.has(match.id)) continue;
+      if (
+        (match.homeSourceMatchId !== null && affected.has(match.homeSourceMatchId))
+        || (match.awaySourceMatchId !== null && affected.has(match.awaySourceMatchId))
+      ) {
+        affected.add(match.id);
+        changed = true;
+      }
+    }
+  }
+  return affected;
 }

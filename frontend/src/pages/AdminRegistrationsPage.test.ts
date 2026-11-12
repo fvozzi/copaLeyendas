@@ -2,16 +2,18 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { AdminRegistrationsPage } from './AdminRegistrationsPage';
-import { getAccessGrants, getCategories, getLocalities, getRegistrations, updateRegistrationStatus } from '../lib/api';
+import { deleteCompleteTeam, getAccessGrants, getCategories, getCompleteTeamRemovalImpact, getLocalities, getRegistrations, updateRegistrationStatus } from '../lib/api';
 import type { PairRegistration, RegistrationAccessGrant } from '../types';
 
 vi.mock('../lib/api', () => ({
   createAccessGrant: vi.fn(),
   createLocality: vi.fn(),
   deleteAccessGrant: vi.fn(),
+  deleteCompleteTeam: vi.fn(),
   deleteRegistration: vi.fn(),
   getAccessGrants: vi.fn(),
   getCategories: vi.fn(),
+  getCompleteTeamRemovalImpact: vi.fn(),
   getLocalities: vi.fn(),
   getRegistrations: vi.fn(),
   openRegistrationPaymentProof: vi.fn(),
@@ -119,4 +121,33 @@ it('allows Direction to waive an existing registration so Caja stops counting it
   await act(async () => waived.click());
   await act(async () => dialog.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
   expect(updateRegistrationStatus).toHaveBeenCalledWith(10, expect.objectContaining({ status: 'RECEIVED', feeWaived: true }));
+});
+
+it('warns about every affected record before completely removing a withdrawn team', async () => {
+  await render();
+  const impact = {
+    teamName: 'Equipo pendiente', accessGrants: 1, registrations: 1, players: 2,
+    retainedPlayers: 0, payments: 1, cashIncomeAmount: 30000,
+    zoneAssignments: 1, affectedMatches: 3, playedMatches: 1,
+  };
+  vi.mocked(getCompleteTeamRemovalImpact).mockResolvedValue(impact);
+  vi.mocked(deleteCompleteTeam).mockResolvedValue({ success: true, ...impact });
+  const remove = [...container.querySelectorAll<HTMLButtonElement>('button')]
+    .find((button) => button.textContent === 'Dar de baja')!;
+  await act(async () => remove.click());
+  const dialog = document.querySelector('[role="dialog"]')!;
+  expect(dialog.textContent).toContain('3');
+  expect(dialog.textContent).toContain('Resultados que se invalidarán');
+  expect(dialog.textContent).toContain('$ 30.000');
+  const submit = [...dialog.querySelectorAll<HTMLButtonElement>('button')]
+    .find((button) => button.textContent === 'Eliminar todo definitivamente')!;
+  expect(submit.disabled).toBe(true);
+  const confirmation = dialog.querySelector<HTMLInputElement>('input')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(confirmation, impact.teamName);
+    confirmation.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(submit.disabled).toBe(false);
+  await act(async () => submit.click());
+  expect(deleteCompleteTeam).toHaveBeenCalledWith(1);
 });

@@ -27,7 +27,7 @@ export function AdminDistributionPage() {
     if (!id) return;
     setLoading(true); setError(null);
     try { setDistribution(await getTournamentDistribution(id)); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo calcular la distribución.'); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo calcular el armado de zonas.'); }
     finally { setLoading(false); }
   };
 
@@ -43,7 +43,7 @@ export function AdminDistributionPage() {
     if (!window.confirm(message)) return;
     setApplying(true); setError(null);
     try { setDistribution(await applyTournamentDistribution(tournamentId, distribution.baseVersion, resetProgram)); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo aplicar la distribución.'); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo aplicar el armado de zonas.'); }
     finally { setApplying(false); }
   };
 
@@ -69,7 +69,7 @@ export function AdminDistributionPage() {
     try {
       const [detail, venues, slots] = await Promise.all([getTournament(tournamentId), getVenues(), getTournamentScheduleGrid(tournamentId)]);
       const zone = detail.zones.find((item) => item.id === zoneId);
-      if (!zone) throw new Error('La zona ya no existe. Recalculá la distribución.');
+      if (!zone) throw new Error('La zona ya no existe. Recalculá el armado de zonas.');
       setZoneEditor({ zone, venues, slots: slots.filter((slot) => slot.match?.zoneId === zoneId) });
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo abrir la zona.'); }
     finally { setLoading(false); }
@@ -86,11 +86,11 @@ export function AdminDistributionPage() {
 
   return <div className="admin-panel distribution-page">
     <div className="panel-header">
-      <div><p className="eyebrow">Competencia</p><h1>Distribución</h1></div>
-      <Link className="secondary-button" to="/app/programa">Programa / Mapa</Link>
+      <div><p className="eyebrow">Competencia</p><h1>Armado de zonas</h1></div>
+      <Link className="secondary-button" to="/app/programa">Ir a Programación</Link>
     </div>
     <section className="data-card distribution-rules">
-      <div><h2>Planificación de zonas y sedes</h2><p>Asigná primero cada zona a una sede. La vista previa recalcula las parejas sin crear partidos hasta que la apliques.</p></div>
+      <div><h2>Asignación de parejas a zonas</h2><p>Definí la sede de cada zona y revisá cómo quedan agrupadas las parejas. Los partidos se crean recién al aplicar la vista previa.</p></div>
       <ol>{(distribution?.rules ?? [
         'El cuadro usa hasta cuatro zonas completas de 3 o 4 parejas.',
         'De 12 a 16 parejas se mantienen cuatro zonas.',
@@ -101,12 +101,12 @@ export function AdminDistributionPage() {
     <div className="distribution-toolbar">
       <label>Torneo<select value={tournamentId} onChange={(event) => setTournamentId(Number(event.target.value))}><option value="0">Seleccionar</option>{tournaments.map((tournament) => <option key={tournament.id} value={tournament.id}>{tournament.name}</option>)}</select></label>
       <button type="button" className="secondary-button" disabled={!tournamentId || loading} onClick={() => void calculate()}>{loading ? 'Calculando...' : 'Recalcular vista previa'}</button>
-      {distribution?.mode === 'PREVIEW' && <button type="button" className="primary-button" disabled={!distribution.canApply || applying} onClick={() => void apply(false)}>{applying ? 'Generando...' : distribution.replacesPendingFixture ? 'Aplicar conservando Programa' : 'Aplicar y generar partidos'}</button>}
-      {distribution?.mode === 'PREVIEW' && distribution.replacesPendingFixture && <button type="button" className="danger-link" disabled={!distribution.canApply || applying} onClick={() => void apply(true)}>Rehacer Programa desde cero</button>}
+      {distribution?.mode === 'PREVIEW' && <button type="button" className="primary-button" disabled={!distribution.canApply || applying} onClick={() => void apply(false)}>{applying ? 'Generando...' : distribution.replacesPendingFixture ? 'Aplicar conservando programación' : 'Aplicar y generar partidos'}</button>}
+      {distribution?.mode === 'PREVIEW' && distribution.replacesPendingFixture && <button type="button" className="danger-link" disabled={!distribution.canApply || applying} onClick={() => void apply(true)}>Rehacer programación desde cero</button>}
     </div>
     {error && <div className="inline-state" role="alert">{error}</div>}
-    {distribution?.mode === 'PREVIEW' && distribution.replacesPendingFixture && <div className="inline-state">La asistencia o las zonas cambiaron. Al aplicar se conservan las sedes, canchas y horarios editados en Programa para los partidos equivalentes. Usá “Rehacer Programa desde cero” sólo si querés descartarlos.</div>}
-    {distribution?.mode === 'CURRENT' && <div className="inline-state inline-state-success">La distribución ya está aplicada: hay {distribution.matchCount} partidos reales. Cualquier cambio hecho desde Programa / Mapa modifica estos mismos partidos.</div>}
+    {distribution?.mode === 'PREVIEW' && distribution.replacesPendingFixture && <div className="inline-state">La asistencia o las zonas cambiaron. Al aplicar se conservan las sedes, canchas y horarios editados en Programación para los partidos equivalentes. Usá “Rehacer programación desde cero” sólo si querés descartarlos.</div>}
+    {distribution?.mode === 'CURRENT' && <div className="inline-state inline-state-success">El armado de zonas ya está aplicado: hay {distribution.matchCount} partidos reales. Cualquier cambio hecho desde Programación modifica estos mismos partidos.</div>}
     {distribution?.mode === 'PREVIEW' && !distribution.canApply && !loading && <div className="inline-state">La vista previa no se puede aplicar todavía. Revisá las observaciones y que exista al menos una sede activa.</div>}
     <div className="distribution-category-grid">
       {distribution?.plans.map((plan) => <article className="data-card distribution-category" key={plan.tournamentCategoryId}>
