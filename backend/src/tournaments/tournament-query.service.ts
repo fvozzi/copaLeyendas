@@ -21,6 +21,18 @@ export class TournamentQueryService {
   async detail(id: number) { const tournament = await this.tournaments.findOneBy({ id }); if (!tournament) throw new NotFoundException('Torneo no encontrado'); return { ...tournament, categories: await this.categories.find({ where: { tournamentId: id }, relations: { category: true } }), zones: await this.zones.find({ where: { tournamentCategory: { tournamentId: id } }, relations: { venue: true, tournamentCategory: { category: true } } }) }; }
   async zone(id: number) { const zone = await this.zones.findOne({ where: { id }, relations: { venue: true, tournamentCategory: { category: true } } }); if (!zone) throw new NotFoundException('Zona no encontrada'); return { ...zone, entries: await this.entries.find({ where: { zoneId: id }, relations: { registration: { locality: true } }, order: { seed: 'ASC', id: 'ASC' } }) }; }
   async availableRegistrations(tournamentCategoryId: number) { const category = await this.categories.findOne({ where: { id: tournamentCategoryId } }); if (!category) throw new NotFoundException('Categoria de torneo no encontrada'); const assigned = await this.entries.createQueryBuilder('entry').innerJoin('entry.zone', 'zone').where('zone.tournamentCategoryId = :id', { id: tournamentCategoryId }).select('entry.registrationId', 'id').getRawMany<{ id: number }>(); return this.registrations.createQueryBuilder('registration').leftJoinAndSelect('registration.category', 'category').leftJoinAndSelect('registration.locality', 'locality').where('registration.categoryId = :categoryId', { categoryId: category.categoryId }).andWhere('registration.status = :status', { status: RegistrationStatus.CONFIRMED }).andWhere(assigned.length ? 'registration.id NOT IN (:...ids)' : '1=1', { ids: assigned.map((item) => item.id) }).orderBy('locality.name', 'ASC').getMany(); }
+  async registrationPlacements(tournamentCategoryId: number) {
+    const category = await this.categories.findOne({ where: { id: tournamentCategoryId } });
+    if (!category) throw new NotFoundException('Categoria de torneo no encontrada');
+    const [registrations, entries] = await Promise.all([
+      this.registrations.createQueryBuilder('registration').leftJoinAndSelect('registration.category', 'category').leftJoinAndSelect('registration.locality', 'locality').where('registration.categoryId = :categoryId', { categoryId: category.categoryId }).andWhere('registration.status = :status', { status: RegistrationStatus.CONFIRMED }).orderBy('locality.name', 'ASC').addOrderBy('registration.id', 'ASC').getMany(),
+      this.entries.find({ where: { zone: { tournamentCategoryId } }, relations: { zone: true } }),
+    ]);
+    return registrations.map((registration) => {
+      const entry = entries.find((item) => item.registrationId === registration.id);
+      return { registration, zoneId: entry?.zoneId ?? null, zoneName: entry?.zone.name ?? null, seed: entry?.seed ?? null };
+    });
+  }
   async currentPublic() {
     const tournament = await this.tournaments.findOne({ where: { status: TournamentStatus.ACTIVE }, order: { startsAt: 'ASC', id: 'ASC' } });
     if (!tournament) return { tournament: null, courts: [] };

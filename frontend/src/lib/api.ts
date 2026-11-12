@@ -22,7 +22,7 @@ import type {
   Player,
   PlayerPayload,
   Category, CategoryPayload, Court, CourtPayload, Venue, VenuePayload,
-  Tournament, TournamentPayload, TournamentDetail, TournamentMatch, ZoneDetail, AdminUser, AdminUserPayload, CashExpense, CashExpensePayload, CashIncomePayload, CashSummary, TournamentScheduleSlot,
+  Tournament, TournamentPayload, TournamentDetail, TournamentMatch, ZoneDetail, ZoneRegistrationPlacement, AdminUser, AdminUserPayload, CashExpense, CashExpensePayload, CashIncomePayload, CashSummary, TournamentScheduleSlot,
   ActivityLogPage, TournamentOperations,
 } from '../types';
 
@@ -344,6 +344,17 @@ export function setTournamentDistributionVenue(id: number, tournamentCategoryId:
 export function applyTournamentDistribution(id: number, baseVersion: string, resetProgram = false) { return request<TournamentDistribution>(`/tournaments/${id}/distribution/apply`, { method: 'POST', body: JSON.stringify({ baseVersion, resetProgram }) }, true); }
 export function setTournamentAttendance(id: number, registrationId: number, present: boolean) { return request<TournamentDistribution>(`/tournaments/${id}/attendance/${registrationId}`, { method: 'PATCH', body: JSON.stringify({ present }) }, true); }
 export function getTournamentScheduleGrid(id: number) { return request<TournamentScheduleSlot[]>(`/tournaments/${id}/schedule-grid`, {}, true); }
+export async function downloadTournamentVenueWorksheet(tournamentId: number, venueId: number, venueName: string) {
+  const token = getToken();
+  const response = await fetch(`${API_URL}/tournaments/${tournamentId}/venues/${venueId}/worksheet.pdf`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!response.ok) throw new Error(await readError(response));
+  const url = URL.createObjectURL(await response.blob());
+  const safeVenue = venueName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'sede';
+  const link = document.createElement('a');
+  link.href = url; link.download = `planilla-a3-${safeVenue}.pdf`;
+  document.body.append(link); link.click(); link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 export function redistributeTournamentCourts(id: number) { return request<TournamentScheduleSlot[]>(`/tournaments/${id}/redistribute-courts`, { method: 'POST' }, true); }
 export function previewProgramScenario(id: number, payload: ProgramScenario) { return request<ProgramScenarioPreview>(`/tournaments/${id}/program-scenario/preview`, { method: 'POST', body: JSON.stringify(payload) }, true); }
 export function applyProgramScenario(id: number, payload: ProgramScenario) { return request<ProgramScenarioPreview>(`/tournaments/${id}/program-scenario/apply`, { method: 'POST', body: JSON.stringify(payload) }, true); }
@@ -367,6 +378,7 @@ export async function openMatchResultPhoto(id: number) {
 export function updateMatchSchedule(id: number, scheduledAt: string) { return request<TournamentMatch>(`/tournaments/matches/${id}/schedule`, { method: 'PATCH', body: JSON.stringify({ scheduledAt }) }, true); }
 export function getZone(id: number) { return request<ZoneDetail>(`/tournaments/zones/${id}`, {}, true); }
 export function getAvailableZoneRegistrations(categoryId: number) { return request<PairRegistration[]>(`/tournaments/categories/${categoryId}/registrations`, {}, true); }
+export function getZoneRegistrationPlacements(categoryId: number) { return request<ZoneRegistrationPlacement[]>(`/tournaments/categories/${categoryId}/registration-placements`, {}, true); }
 export function addZoneEntry(zoneId: number, registrationId: number) { return request(`/tournaments/zones/${zoneId}/entries`, { method: 'POST', body: JSON.stringify({ registrationId }) }, true); }
 export function assignZonePlace(zoneId: number, seed: number, registrationId: number) { return request(`/tournaments/zones/${zoneId}/places/${seed}`, { method: 'PATCH', body: JSON.stringify({ registrationId }) }, true); }
 

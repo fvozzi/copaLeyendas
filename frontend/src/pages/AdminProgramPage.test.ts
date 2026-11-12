@@ -3,10 +3,10 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AdminProgramPage } from './AdminProgramPage';
-import { getCourts, getVenues, getTournaments, getTournamentScheduleGrid, updateTournamentScheduleSlot, redistributeTournamentCourts, saveMatchResult } from '../lib/api';
+import { downloadTournamentVenueWorksheet, getCourts, getVenues, getTournaments, getTournamentScheduleGrid, updateTournamentScheduleSlot, redistributeTournamentCourts, saveMatchResult } from '../lib/api';
 import type { Court, Venue, Tournament, TournamentScheduleSlot } from '../types';
 
-vi.mock('../lib/api', () => ({ getCourts: vi.fn(), getVenues: vi.fn(), getTournaments: vi.fn(), getTournamentScheduleGrid: vi.fn(), updateTournamentScheduleSlot: vi.fn(), redistributeTournamentCourts: vi.fn(), saveMatchResult: vi.fn() }));
+vi.mock('../lib/api', () => ({ downloadTournamentVenueWorksheet: vi.fn(), getCourts: vi.fn(), getVenues: vi.fn(), getTournaments: vi.fn(), getTournamentScheduleGrid: vi.fn(), updateTournamentScheduleSlot: vi.fn(), redistributeTournamentCourts: vi.fn(), saveMatchResult: vi.fn() }));
 let root: Root;
 let container: HTMLDivElement;
 const venue = { id: 1, name: 'Club con nombre largo', active: true } as Venue;
@@ -37,6 +37,12 @@ it('shows all courts in a venue, including empty ones, and filters their games',
   expect(container.textContent).toContain('No hay partidos asignados');
   await click('Cancha 1 (1)');
   expect(container.querySelectorAll('tbody tr')).toHaveLength(1);
+});
+
+it('downloads the current A3 worksheet for the selected venue', async () => {
+  await click('Sedes');
+  await click('Descargar planilla A3');
+  expect(downloadTournamentVenueWorksheet).toHaveBeenCalledWith(1, 1, venue.name);
 });
 
 it('summarizes each category and zone once for the entire venue, including its knockout stages', async () => {

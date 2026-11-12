@@ -335,6 +335,7 @@ export interface TournamentDistribution { tournament: Pick<Tournament, 'id' | 'n
 export interface TournamentMatch { id: number; zoneId?: number | null; sequence?: number | null; homeQualifierZoneId?: number | null; awayQualifierZoneId?: number | null; homeQualifierRank?: number | null; awayQualifierRank?: number | null; matchOrder: number; status: string; court?: Court | null; homeRegistration: PairRegistration | null; awayRegistration: PairRegistration | null; homeSource?: 'DIRECT' | 'WINNER' | 'LOSER'; awaySource?: 'DIRECT' | 'WINNER' | 'LOSER'; homeSourceMatchId?: number | null; awaySourceMatchId?: number | null; homeScore: number | null; awayScore: number | null; scheduledAt: string | null; resultPhotoAvailable?: boolean; resultPhotoOriginalName?: string | null; resultSubmittedAt?: string | null; }
 export interface ZoneEntry { id: number; seed: number; registration: PairRegistration; }
 export interface ZoneDetail extends TournamentZone { entries: ZoneEntry[]; }
+export interface ZoneRegistrationPlacement { registration: PairRegistration; zoneId: number | null; zoneName: string | null; seed: number | null; }
 
 export interface ProgramScenarioRule { categoryId: number; stage: 'ZONE' | 'QUARTERFINAL' | 'SEMIFINAL' | 'FINAL'; zoneId?: number; matchOrder?: number; venueId: number; courtId?: number | null; day: 'MAIN' | 'FINALS'; }
 export interface ProgramMatchOverride { sequence: number; courtId: number; scheduledAt: string; }

@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, Param, ParseIntPipe, Patch, Post, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, Param, ParseIntPipe, Patch, Post, Res, StreamableFile, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { IsBoolean, IsDateString, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -10,6 +10,7 @@ import { TournamentQueryService } from './tournament-query.service';
 import { TournamentStatus } from './tournament.enums';
 import { TournamentsService } from './tournaments.service';
 import { ProgramScenarioDto } from './program-scenario.dto';
+import { TournamentVenuePdfService } from './tournament-venue-pdf.service';
 
 class ScheduleMatchDto { @IsDateString() scheduledAt: string; }
 class ResultDto { @IsInt() homeScore: number; @IsInt() awayScore: number; }
@@ -21,11 +22,12 @@ class AttendanceDto { @IsBoolean() present: boolean; }
 @Controller('tournaments')
 @UseGuards(JwtAuthGuard)
 export class TournamentsController {
-  constructor(private s: TournamentsService, private q: TournamentQueryService) {}
+  constructor(private s: TournamentsService, private q: TournamentQueryService, private venuePdf: TournamentVenuePdfService) {}
   @Get() list() { return this.s.list(); }
   @Get('operations') operations(@CurrentUser() user: AuthenticatedUser) { return this.s.operations(user); }
   @Get('zones/:id') async zone(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { await this.s.assertZoneAccess(user, id); return this.q.zone(id); }
   @Get('categories/:id/registrations') registrations(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { this.assertDirector(user); return this.q.availableRegistrations(id); }
+  @Get('categories/:id/registration-placements') registrationPlacements(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { this.assertDirector(user); return this.q.registrationPlacements(id); }
   @Get('zones/:id/matches') async matches(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { await this.s.assertZoneAccess(user, id); return this.s.matches(id); }
   @Get(':id') detail(@Param('id', ParseIntPipe) id: number) { return this.q.detail(id); }
   @Get(':id/distribution') distribution(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { this.assertDirector(user); return this.s.distributionPreview(id); }
@@ -33,6 +35,15 @@ export class TournamentsController {
   @Post(':id/distribution/apply') applyDistribution(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: ApplyDistributionDto) { this.assertDirector(user); return this.s.applyDistribution(id, dto.baseVersion, dto.resetProgram ?? false); }
   @Patch(':id/attendance/:registrationId') attendance(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Param('registrationId', ParseIntPipe) registrationId: number, @Body() dto: AttendanceDto) { this.assertDirector(user); return this.s.setAttendance(id, registrationId, dto.present); }
   @Get(':id/schedule-grid') scheduleGrid(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { this.assertDirector(user); return this.s.scheduleGrid(id); }
+  @Get(':id/venues/:venueId/worksheet.pdf')
+  async venueWorksheet(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Param('venueId', ParseIntPipe) venueId: number, @Res({ passthrough: true }) response: Response) {
+    this.assertDirector(user);
+    const file = await this.venuePdf.generate(id, venueId);
+    response.setHeader('Content-Type', 'application/pdf');
+    response.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(file.fileName)}`);
+    response.setHeader('Cache-Control', 'no-store');
+    return new StreamableFile(file.buffer);
+  }
   @Post(':id/redistribute-courts') redistributeCourts(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { this.assertDirector(user); return this.s.redistributeCourts(id); }
   @Post(':id/program-scenario/preview') previewScenario(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: ProgramScenarioDto) { this.assertDirector(user); return this.s.scenario(id, dto); }
   @Post(':id/program-scenario/apply') applyScenario(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: ProgramScenarioDto) { this.assertDirector(user); return this.s.scenario(id, dto, true); }

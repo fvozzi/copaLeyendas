@@ -4,7 +4,7 @@ import { AdminDataGrid, type AdminGridColumn } from '../components/AdminDataGrid
 import { AdminDialog } from '../components/AdminDialog';
 import { ProgramMap } from '../components/ProgramMap';
 import { ProgramScenarioDialog } from '../components/ProgramScenarioDialog';
-import { getCourts, getVenues, getTournamentScheduleGrid, getTournaments, updateTournamentScheduleSlot, redistributeTournamentCourts, saveMatchResult } from '../lib/api';
+import { downloadTournamentVenueWorksheet, getCourts, getVenues, getTournamentScheduleGrid, getTournaments, updateTournamentScheduleSlot, redistributeTournamentCourts, saveMatchResult } from '../lib/api';
 import type { Court, Venue, Tournament, TournamentScheduleSlot } from '../types';
 
 type ProgramTab = 'matches' | 'venues' | 'categories' | 'map';
@@ -46,6 +46,7 @@ export function AdminProgramPage() {
   const [courtTab, setCourtTab] = useState('all');
   const [categoryTab, setCategoryTab] = useState('');
   const [saving, setSaving] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [scenarioOpen, setScenarioOpen] = useState(false);
   const [mapRevision, setMapRevision] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +81,13 @@ export function AdminProgramPage() {
       setNotice(`Programación actualizada y partidos asignados entre las canchas activas. Se conservaron los horarios existentes.${withoutDate ? ` Quedaron ${withoutDate} partidos sin horario: revisá los días de juego y la disponibilidad de las sedes.` : ' Todos los partidos tienen horario.'}`);
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudieron repartir los partidos.'); }
     finally { setSaving(false); }
+  };
+  const downloadVenueWorksheet = async (venueId: number, venueName: string) => {
+    if (downloadingPdf) return;
+    setDownloadingPdf(true); setError(null);
+    try { await downloadTournamentVenueWorksheet(tournamentId, venueId, venueName); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo generar la planilla PDF de la sede.'); }
+    finally { setDownloadingPdf(false); }
   };
   useEffect(() => {
     Promise.all([getTournaments(), getCourts(), getVenues()]).then(([items, courtItems, venueItems]) => {
@@ -155,7 +163,7 @@ export function AdminProgramPage() {
     {scenarioOpen && <ProgramScenarioDialog tournamentId={tournamentId} courts={courts} venues={venues} onClose={() => setScenarioOpen(false)} onApplied={(items) => { setSlots(items); setScenarioOpen(false); setMapRevision((value) => value + 1); setNotice('Escenario aplicado: sedes, canchas y horarios actualizados.'); }} />}
     {tab === 'matches' && <ProgramTable title="Todos los partidos" slots={[...slots].sort((a, b) => a.sequence - b.sequence)} columns={columns} />}
     {tab === 'venues' && <ProgramSubTabs options={venueOptions} selected={selectedVenue} onSelect={(id) => { setVenueTab(id); setCourtTab('all'); }} ariaLabel="Sedes del programa">
-      {selectedVenue && <section className="data-card"><div className="panel-header"><div className="program-venue-heading"><h2>{venueOptions.find((venue) => venue.id === selectedVenue)?.label}</h2><VenueAssignments slots={venueSlots} /></div></div>
+      {selectedVenue && <section className="data-card"><div className="panel-header"><div className="program-venue-heading"><h2>{venueOptions.find((venue) => venue.id === selectedVenue)?.label}</h2><VenueAssignments slots={venueSlots} /></div>{selectedVenue !== 'unassigned' && <button type="button" className="primary-button" disabled={downloadingPdf || !tournamentId} onClick={() => void downloadVenueWorksheet(Number(selectedVenue), venueOptions.find((venue) => venue.id === selectedVenue)?.label ?? 'Sede')}>{downloadingPdf ? 'Generando PDF…' : 'Descargar planilla A3'}</button>}</div>
         <ProgramSubTabs options={courtOptions} selected={selectedCourt} onSelect={setCourtTab} ariaLabel="Canchas de la sede">
           {!venueCourts.length && selectedVenue !== 'unassigned' && <p className="field-hint">Esta sede no tiene canchas activas. Agregalas desde Administrar canchas.</p>}
           <AdminDataGrid rows={venueSlots.filter((slot) => selectedCourt === 'all' || String(slot.courtId) === selectedCourt).sort(bySchedule)} columns={columns} emptyMessage="No hay partidos asignados a esta cancha o sede." />

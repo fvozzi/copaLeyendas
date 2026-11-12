@@ -173,29 +173,61 @@ export class TournamentsService {
         throw new BadRequestException('Selecciona una pareja confirmada de esta categoria');
       }
       const matches = await manager.getRepository(TournamentMatch).find({ where: { zoneId }, order: { matchOrder: 'ASC' } });
-      if (matches.some((match) => match.status === MatchStatus.PLAYED)) throw new BadRequestException('No se pueden reemplazar parejas cuando ya hay resultados cargados');
       const entries = await this.orderedEntries(manager, zoneId);
       const capacity = matches.length === 3 ? 3 : zone.capacity;
       const seed = requestedSeed ?? Array.from({ length: capacity }, (_, index) => index + 1).find((position) => !entries.some((entry) => entry.seed === position));
       if (!seed || !Number.isInteger(seed) || seed < 1 || seed > capacity) throw new BadRequestException('El lugar no esta disponible en esta zona');
-      const entry = entries.find((item) => item.seed === seed);
-      const assigned = await manager.getRepository(ZoneEntry).findOne({ where: { registrationId, zone: { tournamentCategoryId: zone.tournamentCategoryId } } });
-      if (assigned && assigned.id !== entry?.id) throw new BadRequestException('La pareja ya esta asignada a un lugar de esta categoria');
-      const saved = await manager.getRepository(ZoneEntry).save(entry ? { ...entry, registrationId } : { zoneId, registrationId, seed });
-      const positions = new Map(entries.map((item) => [item.seed, item.registrationId]));
-      positions.set(seed, registrationId);
-      const pairings = matches.length === 3 ? [[1, 2], [1, 3], [2, 3]] : [[1, 2], [3, 4]];
-      for (const match of matches) {
-        if (match.homeSource !== ParticipantSource.DIRECT || match.awaySource !== ParticipantSource.DIRECT) continue;
-        const pairing = pairings[match.matchOrder - 1];
-        if (!pairing) continue;
-        match.homeRegistrationId = positions.get(pairing[0]) ?? null;
-        match.awayRegistrationId = positions.get(pairing[1]) ?? null;
-        match.status = match.homeRegistrationId && match.awayRegistrationId ? MatchStatus.READY : MatchStatus.PENDING;
-        await manager.getRepository(TournamentMatch).save(match);
+      const targetEntry = entries.find((item) => item.seed === seed);
+      const sourceEntry = await manager.getRepository(ZoneEntry).findOne({ where: { registrationId, zone: { tournamentCategoryId: zone.tournamentCategoryId } } });
+      if (sourceEntry?.zoneId === zoneId && sourceEntry.id !== targetEntry?.id) throw new BadRequestException('La pareja ya está asignada a otro lugar de esta zona');
+      if (sourceEntry && sourceEntry.id === targetEntry?.id) return { entry: sourceEntry, swappedEntry: null };
+
+      const affectedZoneIds = [...new Set([zoneId, ...(sourceEntry ? [sourceEntry.zoneId] : [])])];
+      const affectedMatches = await manager.getRepository(TournamentMatch).find({ where: affectedZoneIds.map((affectedZoneId) => ({ zoneId: affectedZoneId })) });
+      if (affectedMatches.some((match) => match.status === MatchStatus.PLAYED)) throw new BadRequestException('No se pueden intercambiar parejas cuando alguna de las zonas ya tiene resultados cargados');
+
+      const repository = manager.getRepository(ZoneEntry);
+      let swappedEntry: ZoneEntry | null = null;
+      if (sourceEntry) {
+        const previousRegistrationId = targetEntry?.registrationId ?? null;
+        if (targetEntry) {
+          targetEntry.registrationId = registrationId;
+          await repository.save(targetEntry);
+        } else {
+          sourceEntry.zoneId = zoneId;
+          sourceEntry.seed = seed;
+        }
+        if (previousRegistrationId !== null) {
+          sourceEntry.registrationId = previousRegistrationId;
+          swappedEntry = await repository.save(sourceEntry);
+        } else if (!targetEntry) swappedEntry = await repository.save(sourceEntry);
+      } else if (targetEntry) {
+        targetEntry.registrationId = registrationId;
+        await repository.save(targetEntry);
+      } else {
+        await repository.save({ zoneId, registrationId, seed });
       }
-      return saved;
+
+      for (const affectedZoneId of affectedZoneIds) await this.syncZoneDirectParticipants(manager, affectedZoneId);
+      return { entry: await repository.findOne({ where: { zoneId, registrationId } }), swappedEntry };
     });
+  }
+
+  private async syncZoneDirectParticipants(manager: EntityManager, zoneId: number) {
+    const entries = await this.orderedEntries(manager, zoneId);
+    const positions = new Map(entries.map((entry) => [entry.seed, entry.registrationId]));
+    const repository = manager.getRepository(TournamentMatch);
+    const matches = await repository.find({ where: { zoneId }, order: { matchOrder: 'ASC' } });
+    const pairings = matches.length === 3 ? [[1, 2], [1, 3], [2, 3]] : [[1, 2], [3, 4]];
+    for (const match of matches) {
+      if (match.homeSource !== ParticipantSource.DIRECT || match.awaySource !== ParticipantSource.DIRECT) continue;
+      const pairing = pairings[match.matchOrder - 1];
+      if (!pairing) continue;
+      match.homeRegistrationId = positions.get(pairing[0]) ?? null;
+      match.awayRegistrationId = positions.get(pairing[1]) ?? null;
+      match.status = match.homeRegistrationId && match.awayRegistrationId ? MatchStatus.READY : MatchStatus.PENDING;
+      await repository.save(match);
+    }
   }
 
   private withLockedZone<T>(zoneId: number, action: (manager: EntityManager, zone: Zone) => Promise<T>) {

@@ -247,7 +247,7 @@ function setup(capacity = 4) {
   const matches: any[] = [];
   const registration = { id: 10, categoryId: 3, status: RegistrationStatus.CONFIRMED };
   const entryRepository = {
-    find: vi.fn(async () => [...entries].sort((a, b) => a.seed - b.seed || a.id - b.id)),
+    find: vi.fn(async ({ where }: any = {}) => entries.filter((entry) => where?.zoneId === undefined || (entry.zoneId ?? 1) === where.zoneId).sort((a, b) => a.seed - b.seed || a.id - b.id)),
     findOne: vi.fn(async ({ where }: any) => entries.find((entry) => entry.registrationId === where.registrationId) ?? null),
     save: vi.fn(async (value: any) => {
       if (Array.isArray(value)) return value;
@@ -258,7 +258,7 @@ function setup(capacity = 4) {
     }),
   };
   const matchRepository = {
-    find: vi.fn(async ({ where }: any) => Array.isArray(where) ? matches.filter((match) => where.some((condition) => Object.entries(condition).every(([key, value]) => match[key] === value))) : matches),
+    find: vi.fn(async ({ where }: any) => matches.filter((match) => (Array.isArray(where) ? where : [where]).some((condition) => Object.entries(condition).every(([key, value]) => match[key] === value)))),
     findOne: vi.fn(async ({ where }: any) => matches.find((match) => match.id === where.id) ?? null),
     findOneBy: vi.fn(async ({ id }: any) => matches.find((match) => match.id === id) ?? null),
     create: vi.fn((value) => ({ homeRegistrationId: null, awayRegistrationId: null, homeScore: null, awayScore: null, homeSource: ParticipantSource.DIRECT, awaySource: ParticipantSource.DIRECT, ...value })),
@@ -334,6 +334,27 @@ describe('fixtures with unassigned places', () => {
     expect(matches[2].awayRegistrationId).toBe(30);
   });
 
+  it('swaps pairs between zones and updates both pending fixtures without changing the games', async () => {
+    const { service, entries, matches } = setup();
+    entries.push(
+      { id: 1, zoneId: 1, seed: 1, registrationId: 10 },
+      { id: 2, zoneId: 1, seed: 2, registrationId: 30 },
+      { id: 3, zoneId: 2, seed: 1, registrationId: 20 },
+      { id: 4, zoneId: 2, seed: 2, registrationId: 40 },
+    );
+    matches.push(
+      { id: 1, zoneId: 1, matchOrder: 1, homeSource: ParticipantSource.DIRECT, awaySource: ParticipantSource.DIRECT, homeRegistrationId: 10, awayRegistrationId: 30, status: MatchStatus.READY },
+      { id: 2, zoneId: 2, matchOrder: 1, homeSource: ParticipantSource.DIRECT, awaySource: ParticipantSource.DIRECT, homeRegistrationId: 20, awayRegistrationId: 40, status: MatchStatus.READY },
+    );
+
+    await service.assignPlace(1, 20, 1);
+
+    expect(entries.find((entry) => entry.zoneId === 1 && entry.seed === 1)?.registrationId).toBe(20);
+    expect(entries.find((entry) => entry.zoneId === 2 && entry.seed === 1)?.registrationId).toBe(10);
+    expect(matches.find((match) => match.zoneId === 1)).toMatchObject({ id: 1, homeRegistrationId: 20, awayRegistrationId: 30, status: MatchStatus.READY });
+    expect(matches.find((match) => match.zoneId === 2)).toMatchObject({ id: 2, homeRegistrationId: 10, awayRegistrationId: 40, status: MatchStatus.READY });
+  });
+
   it('resolves winners and losers after filling the previously empty fixture', async () => {
     const { service, matches } = setup();
     await service.fixture(1);
@@ -369,10 +390,10 @@ describe('fixtures with unassigned places', () => {
     expect(matches[0].homeScore).toBe(25);
   });
 
-  it('rejects duplicate assignments, wrong categories, unconfirmed pairs and invalid places', async () => {
+  it('rejects moving within the same zone, wrong categories, unconfirmed pairs and invalid places', async () => {
     const { service, registration } = setup();
     await service.assignPlace(1, 10, 1);
-    await expect(service.assignPlace(1, 10, 2)).rejects.toThrow('ya esta asignada');
+    await expect(service.assignPlace(1, 10, 2)).rejects.toThrow('otro lugar de esta zona');
     await expect(service.assignPlace(1, 20, 5)).rejects.toThrow('lugar');
     registration.categoryId = 9;
     await expect(service.assignPlace(1, 20, 2)).rejects.toThrow('confirmada');

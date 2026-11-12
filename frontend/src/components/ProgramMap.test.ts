@@ -3,9 +3,9 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ProgramMap } from './ProgramMap';
 import { programMapFixture } from '../test/program-map-fixture';
-import { assignZonePlace, getAvailableZoneRegistrations, getTournament, getZone, updateTournamentZone } from '../lib/api';
+import { assignZonePlace, getTournament, getZone, getZoneRegistrationPlacements, updateTournamentZone } from '../lib/api';
 
-vi.mock('../lib/api', () => ({ getTournament: vi.fn(), getZone: vi.fn(), getAvailableZoneRegistrations: vi.fn(), updateTournamentZone: vi.fn(), assignZonePlace: vi.fn() }));
+vi.mock('../lib/api', () => ({ getTournament: vi.fn(), getZone: vi.fn(), getZoneRegistrationPlacements: vi.fn(), updateTournamentZone: vi.fn(), assignZonePlace: vi.fn() }));
 let container: HTMLDivElement; let root: Root;
 let fixture: ReturnType<typeof programMapFixture>;
 const onChanged = vi.fn(async () => {}), onMatch = vi.fn();
@@ -14,7 +14,7 @@ beforeEach(async () => {
   fixture = programMapFixture();
   vi.mocked(getTournament).mockResolvedValue(fixture.tournament);
   vi.mocked(getZone).mockResolvedValue({ ...fixture.tournament.zones[0], entries: [] });
-  vi.mocked(getAvailableZoneRegistrations).mockResolvedValue([{ id: 900, playerOneName: 'Ana', playerTwoName: 'Bea', locality: { name: 'Junin' } }] as never);
+  vi.mocked(getZoneRegistrationPlacements).mockResolvedValue([{ registration: { id: 900, playerOneName: 'Ana', playerTwoName: 'Bea', locality: { name: 'Junin' } }, zoneId: null, zoneName: null, seed: null }] as never);
   container = document.createElement('div'); document.body.append(container); root = createRoot(container);
   await act(async () => root.render(createElement(ProgramMap, { tournamentId: 1, slots: fixture.slots, venues: fixture.venues, busy: false, onChanged, onMatch })));
 });
@@ -76,6 +76,23 @@ it('edits a zone and assigns a pair from the map using existing endpoints', asyn
   const assign = document.querySelector('.map-zone-places button') as HTMLButtonElement;
   await act(async () => assign.click());
   expect(assignZonePlace).toHaveBeenCalledWith(1, 1, 900);
+});
+
+it('swaps a pair from another zone and explains that both pending fixtures change', async () => {
+  const current = { id: 100, playerOneName: 'Carolina', playerTwoName: 'Cinthia', locality: { name: 'Ciudad' } };
+  const incoming = { id: 200, playerOneName: 'Tiziana', playerTwoName: 'Sol', locality: { name: 'Gure Echea' } };
+  vi.mocked(getZone).mockResolvedValue({ ...fixture.tournament.zones[0], entries: [{ id: 1, seed: 1, registration: current }] } as never);
+  vi.mocked(getZoneRegistrationPlacements).mockResolvedValue([
+    { registration: current, zoneId: 1, zoneName: 'Zona A', seed: 1 },
+    { registration: incoming, zoneId: 2, zoneName: 'Zona B', seed: 1 },
+  ] as never);
+  vi.spyOn(window, 'confirm').mockReturnValue(true);
+  await act(async () => (container.querySelector('[data-map-node="zone-1"]') as HTMLButtonElement).click());
+  await change('Pareja 1 de zona A', '200');
+  const swap = [...document.querySelectorAll<HTMLButtonElement>('.map-zone-places button')].find((button) => button.textContent === 'Intercambiar')!;
+  await act(async () => swap.click());
+  expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('Los partidos pendientes de ambas zonas se actualizarán'));
+  expect(assignZonePlace).toHaveBeenCalledWith(1, 1, 200);
 });
 
 it('keeps the zone editor open and the map unchanged when a venue move conflicts', async () => {
