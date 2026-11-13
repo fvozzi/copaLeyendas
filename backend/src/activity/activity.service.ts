@@ -41,7 +41,7 @@ export class ActivityService {
         .where('LOWER(activity.message) LIKE :search', { search: `%${search}%` })
         .orWhere('LOWER(activity.path) LIKE :search', { search: `%${search}%` })
         .orWhere('LOWER(COALESCE(activity.actorName, \'\')) LIKE :search', { search: `%${search}%` })
-        .orWhere('LOWER(activity.requestId::text) LIKE :search', { search: `%${search}%` })));
+        .orWhere('LOWER(CAST(activity.requestId AS text)) LIKE :search', { search: `%${search}%` })));
     }
     const [items, total] = await qb.skip((page - 1) * pageSize).take(pageSize).getManyAndCount();
     return { items, total, page, pageSize, pages: Math.max(1, Math.ceil(total / pageSize)) };

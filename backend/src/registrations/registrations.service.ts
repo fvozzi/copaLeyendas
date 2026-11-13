@@ -262,9 +262,17 @@ export class RegistrationsService {
       throw new BadRequestException('Todas las jugadoras de este equipo ya tienen CUIL cargado');
     }
     const contactName = grant.contactName?.trim() || grant.locality.name;
-    const result = await this.whatsAppService.sendCuilRequest(
-      grant.contactPhone, contactName, grant.token, grant.locality.name, siteUrl,
-    );
+    let result;
+    try {
+      result = await this.whatsAppService.sendCuilRequest(
+        grant.contactPhone, contactName, grant.token, grant.locality.name, siteUrl,
+      );
+    } catch (error) {
+      // This endpoint is authenticated and is explicitly used to test Meta one
+      // recipient at a time. Return Meta's safe API message instead of letting
+      // the global 5xx filter replace it with "Internal server error".
+      throw new BadRequestException(`WhatsApp no pudo enviar el pedido: ${publicErrorMessage(error)}`);
+    }
     const messageId = result.messages?.[0]?.id;
     if (!messageId) throw new BadGatewayException('WhatsApp no confirmo la aceptacion del mensaje');
     return {

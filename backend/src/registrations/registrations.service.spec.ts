@@ -119,6 +119,21 @@ describe('registration tracking', () => {
     );
   });
 
+  it('shows Meta rejection details for an authenticated individual CUIL test', async () => {
+    const { service, grant, registrations, manager, whatsapp } = setup();
+    registrations.findOne.mockResolvedValue({
+      accessGrantId: grant.id, playerOneDni: '12345678', playerTwoDni: '87654321',
+    } as never);
+    manager.find.mockResolvedValue([
+      { id: 1, dni: '12345678', cuil: null }, { id: 2, dni: '87654321', cuil: null },
+    ] as never);
+    whatsapp.sendCuilRequest.mockRejectedValue(new BadGatewayException({
+      message: 'Template name does not exist in the translation', code: 132001,
+    }));
+    await expect(service.sendAccessGrantCuilRequestByWhatsApp(grant.id, 'https://copa.example.com'))
+      .rejects.toThrow('WhatsApp no pudo enviar el pedido: Template name does not exist in the translation');
+  });
+
   it('preserves the previous send time when Meta rejects a retry', async () => {
     const { service, grants, whatsapp } = setup();
     whatsapp.sendRegistrationToken.mockRejectedValue(new Error('Meta rechazo el mensaje'));
