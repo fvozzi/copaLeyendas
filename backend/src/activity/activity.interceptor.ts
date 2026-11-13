@@ -57,6 +57,7 @@ function safeRoute(request: Request) {
   const route = configured ? `${request.baseUrl ?? ''}${configured}` : request.originalUrl.split('?')[0];
   return route
     .replace(/\/public\/registrations\/access\/[^/]+$/i, '/public/registrations/access/:token')
+    .replace(/\/public\/registrations\/cuil\/[^/]+$/i, '/public/registrations/cuil/:token')
     .slice(0, 300);
 }
 
@@ -67,6 +68,7 @@ function excluded(method: string, path: string) {
 function describeActivity(method: string, path: string, status: number) {
   const failed = status >= 400;
   if (method === 'GET' && path.includes('/public/registrations/access/')) return failed ? 'Falló la consulta de un token de inscripción' : 'Token de inscripción consultado';
+  if (path.includes('/public/registrations/cuil/')) return failed ? 'Falló la carga de CUIL del equipo' : method === 'POST' ? 'CUIL del equipo actualizados' : 'Formulario de CUIL consultado';
   if (method === 'POST' && path.endsWith('/public/registrations')) return failed ? 'Falló el envío de una inscripción' : 'Inscripción enviada';
   if (method === 'POST' && path.includes('/send-whatsapp')) return failed ? 'Falló un envío por WhatsApp' : 'Token enviado por WhatsApp';
   if (method === 'POST') return failed ? 'Falló una creación' : 'Registro creado';

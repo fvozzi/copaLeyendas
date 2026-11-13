@@ -17,6 +17,7 @@ import { TournamentStatus } from '../tournaments/tournament.enums';
 import { Zone } from '../tournaments/zone.entity';
 import { ZoneEntry } from '../tournaments/zone-entry.entity';
 import { ShirtModel } from './shirt-model';
+import { cuilMatchesDni, formatCuil, normalizeAndValidateCuil } from './cuil';
 
 @Injectable()
 export class PlayersService {
@@ -86,10 +87,19 @@ export class PlayersService {
     return player;
   }
 
+  async getCuilProgress() {
+    const [total, withCuil] = await Promise.all([
+      this.playersRepository.count(),
+      this.playersRepository.count({ where: { cuil: Not(IsNull()) } }),
+    ]);
+    return { total, withCuil };
+  }
+
   async create(dto: CreatePlayerDto) {
     const locality = await this.resolveLocality(dto.localityId);
     const player = await this.playersRepository.save(this.playersRepository.create({
       fullName: dto.fullName.trim(), dni: dto.dni.trim(), birthDate: normalizeOptional(dto.birthDate),
+      cuil: dto.cuil?.trim() ? normalizeAndValidateCuil(dto.cuil, dto.dni) : null,
       phone: normalizeOptional(dto.phone), instagram: normalizeOptional(dto.instagram), shirtSize: dto.shirtSize ?? null,
       shirtModel: dto.shirtModel ?? null,
       localityId: locality?.id ?? null,
@@ -113,6 +123,8 @@ export class PlayersService {
     }
     if (dto.fullName !== undefined) player.fullName = dto.fullName.trim();
     if (dto.dni !== undefined) player.dni = dto.dni.trim();
+    if (dto.cuil !== undefined) player.cuil = dto.cuil.trim() ? normalizeAndValidateCuil(dto.cuil, player.dni) : null;
+    else if (dto.dni !== undefined && player.cuil) normalizeAndValidateCuil(player.cuil, player.dni);
     if (dto.birthDate !== undefined) player.birthDate = normalizeOptional(dto.birthDate);
     if (dto.phone !== undefined) player.phone = normalizeOptional(dto.phone);
     if (dto.instagram !== undefined) player.instagram = normalizeOptional(dto.instagram);
@@ -138,13 +150,13 @@ export class PlayersService {
     if (kind === 'insurance') {
       return {
         filename: 'jugadoras-seguro.csv',
-        content: toCsv(['Nombre completo', 'Fecha nacimiento', 'DNI'], players.map((player) => [player.fullName, player.birthDate ?? '', player.dni])),
+        content: toCsv(['Nombre completo', 'Fecha nacimiento', 'DNI', 'CUIL'], players.map((player) => [player.fullName, player.birthDate ?? '', player.dni, formatCuil(player.cuil)])),
       };
     }
     if (kind === 'full') {
       return {
         filename: 'jugadoras-completo.csv',
-        content: toCsv(['ID', 'Nombre completo', 'DNI', 'Fecha nacimiento', 'Celular', 'Instagram', 'Marca / acuerdo', 'Talle camiseta', 'Modelo asignado', 'Localidad / equipo', 'Provincia', 'Fecha de alta', 'Ultima actualizacion'], players.map((player) => [player.id, player.fullName, player.dni, player.birthDate ?? '', player.phone ?? '', player.instagram ?? '', player.hasCommercialAgreement === null ? 'Sin datos' : player.hasCommercialAgreement ? player.commercialAgreementDetails ?? 'Marca no especificada' : 'Sin acuerdo', player.shirtSize ?? '', player.shirtModel ?? '', player.locality?.name ?? '', player.locality?.provinceName ?? '', player.createdAt.toISOString(), player.updatedAt.toISOString()])),
+        content: toCsv(['ID', 'Nombre completo', 'DNI', 'CUIL', 'Fecha nacimiento', 'Celular', 'Instagram', 'Marca / acuerdo', 'Talle camiseta', 'Modelo asignado', 'Localidad / equipo', 'Provincia', 'Fecha de alta', 'Ultima actualizacion'], players.map((player) => [player.id, player.fullName, player.dni, formatCuil(player.cuil), player.birthDate ?? '', player.phone ?? '', player.instagram ?? '', player.hasCommercialAgreement === null ? 'Sin datos' : player.hasCommercialAgreement ? player.commercialAgreementDetails ?? 'Marca no especificada' : 'Sin acuerdo', player.shirtSize ?? '', player.shirtModel ?? '', player.locality?.name ?? '', player.locality?.provinceName ?? '', player.createdAt.toISOString(), player.updatedAt.toISOString()])),
       };
     }
     throw new BadRequestException('Tipo de exportacion invalido');
@@ -270,6 +282,7 @@ export class PlayersService {
       }
       await players.save(players.create({
         ...player, dni, fullName: name, localityId: registration.localityId,
+        cuil: cuilMatchesDni(player?.cuil ?? null, dni) ? player!.cuil : null,
         birthDate: registration[`${prefix}BirthDate`], phone: registration[`${prefix}Phone`],
         instagram: registration[`${prefix}Instagram`], shirtSize: registration[`${prefix}ShirtSize`],
       }));

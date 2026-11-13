@@ -28,6 +28,7 @@ import { SectionPage } from './pages/SectionPage';
 import { TournamentEditionPage } from './pages/TournamentEditionPage';
 import { AdminResultsPage } from './pages/AdminResultsPage';
 import { AdminDistributionPage } from './pages/AdminDistributionPage';
+import { TeamCuilPage } from './pages/TeamCuilPage';
 
 export default function App() {
   return (
@@ -40,6 +41,7 @@ export default function App() {
             <Route path="/torneos/:edition" element={<TournamentEditionPage />} />
             <Route path="/post/:slug" element={<PostPage />} />
             <Route path="/inscripcion" element={<RegistrationPage />} />
+            <Route path="/cuil" element={<TeamCuilPage />} />
           </Route>
           <Route path="/app/login" element={<AdminLoginPage />} />
           <Route element={<ProtectedRoute />}>

@@ -34,12 +34,13 @@ export class DashboardService {
   ) {}
 
   async getSummary() {
-    const [posts, registrations, accessGrants, tournament, categories] = await Promise.all([
+    const [posts, registrations, accessGrants, tournament, categories, players] = await Promise.all([
       this.postsRepository.find(),
       this.registrationsRepository.find({ relations: { category: true, locality: true } }),
       this.accessGrantsRepository.find({ relations: { category: true, locality: true } }),
       this.tournamentsRepository.findOne({ where: { status: TournamentStatus.ACTIVE }, order: { startsAt: 'ASC', id: 'ASC' } }),
       this.categoriesRepository.find({ order: { sortOrder: 'ASC', name: 'ASC' } }),
+      this.playersService.getCuilProgress(),
     ]);
     const zones = tournament ? await this.zonesRepository.find({ where: { tournamentCategory: { tournamentId: tournament.id } }, relations: { venue: true, tournamentCategory: { category: true } } }) : [];
     const zoneEntries = zones.length ? await this.zoneEntriesRepository.find({ where: zones.map(zone => ({ zoneId: zone.id })) }) : [];
@@ -56,6 +57,7 @@ export class DashboardService {
         featured: posts.filter((post) => post.featured).length,
         bySection: countBy(posts, 'section'),
       },
+      players,
       registrations: {
         total: registrations.length,
         byCategory: countByCategory(registrations, categories),

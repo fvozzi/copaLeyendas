@@ -69,9 +69,9 @@ export function AdminDashboardPage() {
           <span>{summary.posts.published} publicadas</span>
         </article>
         <article className="stat-card">
-          <p className="stat-label">Destacadas</p>
-          <strong>{summary.posts.featured}</strong>
-          <span>Notas priorizadas en home</span>
+          <p className="stat-label">Jugadoras</p>
+          <strong>{summary.players.total}</strong>
+          <span>{summary.players.withCuil} con CUIL cargado</span>
         </article>
         <article className="stat-card">
           <p className="stat-label">Inscripciones</p>

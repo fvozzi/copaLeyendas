@@ -11,9 +11,16 @@ vi.mock('../categories/category.entity', () => ({ Category: class Category {} })
 
 const shirtAssignments = () => ({
   getShirtDistribution: vi.fn(async (registrations, zoneEntries) => distributeShirts(registrations, zoneEntries)),
+  getCuilProgress: vi.fn(async () => ({ total: 12, withCuil: 5 })),
 });
 
 describe('shirt summary', () => {
+  it('includes the player and completed CUIL totals', async () => {
+    const empty = { find: vi.fn(async () => []) };
+    const service = new DashboardService(empty as never, empty as never, empty as never,
+      { findOne: vi.fn(async () => null) } as never, empty as never, empty as never, empty as never, shirtAssignments() as never);
+    expect((await service.getSummary()).players).toEqual({ total: 12, withCuil: 5 });
+  });
   it('ignores a saved default size when the third player is absent, but counts actual third players', async () => {
     const registration = { locality: { name: 'Equipo' }, playerOneName: 'One', playerTwoName: 'Two', playerThreeName: ' ', playerOneShirtSize: 'M', playerTwoShirtSize: 'M', playerThreeShirtSize: 'M' };
     const empty = { find: vi.fn(async () => []) };

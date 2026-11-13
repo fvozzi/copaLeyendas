@@ -341,6 +341,14 @@ export function AdminRegistrationsPage() {
       setSendingGrantId(null);
     }
   };
+  const requestCuilByWhatsApp = (item: RegistrationAccessGrant) => {
+    if (!item.contactPhone) return;
+    const link = `${window.location.origin}/cuil?token=${encodeURIComponent(item.token)}`;
+    const contact = item.contactName?.trim() ? ` ${item.contactName.trim()}` : '';
+    const message = `Hola${contact}, necesitamos completar los CUIL de las jugadoras de ${item.locality.name} para el seguro del torneo. Podes cargarlos de forma segura en este enlace: ${link}`;
+    const phone = item.contactPhone.replace(/\D/g, '');
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
+  };
   return (
     <div className="admin-panel registrations-page">
       <div className="panel-header">
@@ -490,6 +498,13 @@ export function AdminRegistrationsPage() {
                       ? "Al confirmar"
                       : "Pendiente",
             },
+            {
+              label: "CUIL",
+              sortValue: (item) => item.cuilStatus?.completed ?? -1,
+              render: (item) => item.cuilStatus?.total
+                ? <span className={`status-chip ${item.cuilStatus.completed === item.cuilStatus.total ? "status-live" : "status-draft"}`}>{item.cuilStatus.completed}/{item.cuilStatus.total}</span>
+                : "Sin inscripción",
+            },
           ]}
           renderActions={(item) => (
             <>
@@ -511,6 +526,15 @@ export function AdminRegistrationsPage() {
                 onClick={() => sendTokenByWhatsApp(item)}
               >
                 {sendingGrantId === item.id ? "Enviando..." : "Enviar WhatsApp"}
+              </button>
+              <button
+                type="button"
+                className="secondary-button grid-action-button"
+                disabled={!item.contactPhone || !item.cuilStatus?.total}
+                title={!item.contactPhone ? "Este equipo no tiene telefono de contacto" : !item.cuilStatus?.total ? "El equipo todavia no tiene una inscripcion" : `Pedir CUIL a ${item.contactName ?? item.locality.name}`}
+                onClick={() => requestCuilByWhatsApp(item)}
+              >
+                Pedir CUIL
               </button>
               <button
                 className="inline-link"

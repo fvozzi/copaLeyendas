@@ -88,7 +88,7 @@ it('keeps both registration lists as sortable tables on mobile', async () => {
   await render();
   expect(container.querySelector('.registrations-grants-card .preserve-table-mobile')).toBeTruthy();
   expect(container.querySelector('.registrations-received-card .preserve-table-mobile')).toBeTruthy();
-  expect(container.querySelectorAll('.registrations-grants-card .admin-grid-sort')).toHaveLength(8);
+  expect(container.querySelectorAll('.registrations-grants-card .admin-grid-sort')).toHaveLength(9);
   expect(container.querySelectorAll('.registrations-received-card .admin-grid-sort')).toHaveLength(5);
 });
 

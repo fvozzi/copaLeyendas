@@ -86,6 +86,7 @@ export interface ContentPost {
 }
 
 export interface DashboardSummary {
+  players: { total: number; withCuil: number };
   posts: {
     total: number;
     published: number;
@@ -132,6 +133,7 @@ export interface RegistrationAccessGrant {
   whatsappSentAt: string | null;
   whatsappMessageId?: string | null;
   whatsappDelivery?: { messageId: string; status: 'accepted' | 'sent' | 'delivered' | 'read' | 'failed'; statusAt: string; errorCode: number | null; errorMessage: string | null } | null;
+  cuilStatus?: { completed: number; total: number };
   createdAt: string;
   updatedAt: string;
 }
@@ -358,6 +360,7 @@ export interface Player {
   id: number;
   fullName: string;
   dni: string;
+  cuil: string | null;
   birthDate: string | null;
   phone: string | null;
   instagram: string | null;
@@ -381,12 +384,19 @@ export interface BackupOverview extends BackupSettings { timezone: string; backu
 export interface PlayerPayload {
   fullName: string;
   dni: string;
+  cuil?: string;
   birthDate?: string;
   phone?: string;
   instagram?: string;
   shirtSize?: ShirtSize | '';
   shirtModel?: ShirtModel | '' | null;
   localityId?: number | null;
+}
+
+export interface PublicTeamCuilRoster {
+  teamName: string;
+  categoryName: string;
+  players: { id: number; fullName: string; maskedDni: string; completed: boolean; cuilLastDigits: string | null }[];
 }
 
 export interface CashIncome {

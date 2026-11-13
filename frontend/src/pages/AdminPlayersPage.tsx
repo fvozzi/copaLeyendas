@@ -5,7 +5,7 @@ import { createPlayer, deletePlayer, downloadPlayersExport, getLocalities, getPl
 import { shirtModelLabels, shirtSizeLabels } from '../lib/content';
 import type { Locality, Player, PlayerPayload } from '../types';
 
-const initialForm: PlayerPayload = { fullName: '', dni: '', birthDate: '', phone: '', instagram: '', shirtSize: '', shirtModel: '', localityId: null };
+const initialForm: PlayerPayload = { fullName: '', dni: '', cuil: '', birthDate: '', phone: '', instagram: '', shirtSize: '', shirtModel: '', localityId: null };
 
 export function AdminPlayersPage() {
   const [players, setPlayers] = useState<Player[]>([]);
@@ -39,9 +39,9 @@ export function AdminPlayersPage() {
   const load = () => getPlayers(search || undefined).then(setPlayers).catch((reason: Error) => setError(reason.message));
   useEffect(() => { load(); getLocalities().then(setLocalities).catch((reason: Error) => setError(reason.message)); }, []);
   const openCreate = () => { setEditing(null); setForm(initialForm); setError(null); setModalError(null); setDialogOpen(true); };
-  const openEdit = (player: Player) => { setEditing(player); setForm({ fullName: player.fullName, dni: player.dni, birthDate: player.birthDate ?? '', phone: player.phone ?? '', instagram: player.instagram ?? '', shirtSize: player.shirtSize ?? '', shirtModel: player.shirtModel ?? '', localityId: player.localityId }); setError(null); setModalError(null); setDialogOpen(true); };
+  const openEdit = (player: Player) => { setEditing(player); setForm({ fullName: player.fullName, dni: player.dni, cuil: player.cuil ?? '', birthDate: player.birthDate ?? '', phone: player.phone ?? '', instagram: player.instagram ?? '', shirtSize: player.shirtSize ?? '', shirtModel: player.shirtModel ?? '', localityId: player.localityId }); setError(null); setModalError(null); setDialogOpen(true); };
   const closeDialog = (force = false) => { if (saving && !force) return; setDialogOpen(false); setEditing(null); setForm(initialForm); setModalError(null); };
-  const toPayload = (): PlayerPayload => ({ ...form, birthDate: form.birthDate || undefined, phone: form.phone || undefined, instagram: form.instagram || undefined, shirtSize: form.shirtSize || undefined, shirtModel: form.shirtModel || null });
+  const toPayload = (): PlayerPayload => ({ ...form, cuil: form.cuil || '', birthDate: form.birthDate || undefined, phone: form.phone || undefined, instagram: form.instagram || undefined, shirtSize: form.shirtSize || undefined, shirtModel: form.shirtModel || null });
   const save = async (event: React.FormEvent<HTMLFormElement>) => { event.preventDefault(); setSaving(true); setModalError(null); try { if (editing) await updatePlayer(editing.id, toPayload()); else await createPlayer(toPayload()); closeDialog(true); await load(); } catch (reason) { setModalError(reason instanceof Error ? reason.message : 'No se pudo guardar la jugadora.'); } finally { setSaving(false); } };
   const remove = async (player: Player) => { if (!window.confirm(`Se eliminará la ficha de ${player.fullName}. Si integra una pareja, el equipo debe tener antes una reemplazante cargada.`)) return; setError(null); try { await deletePlayer(player.id); await load(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo eliminar la jugadora.'); } };
   const exportPlayers = async (kind: 'full' | 'insurance') => { try { await downloadPlayersExport(kind); } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo descargar el archivo.'); } };
@@ -54,6 +54,7 @@ export function AdminPlayersPage() {
     <section className="data-card players-data-card"><AdminDataGrid columns={[
       { label: 'Nombre y apellido', render: (item) => <strong>{item.fullName}</strong> },
       { label: 'DNI', render: (item) => item.dni },
+      { label: 'CUIL', render: (item) => item.cuil ? `${item.cuil.slice(0, 2)}-${item.cuil.slice(2, 10)}-${item.cuil.slice(10)}` : <span className="status-chip status-draft">Falta</span> },
       { label: 'Nacimiento', sortValue: (item) => item.birthDate ?? '', render: (item) => item.birthDate ? item.birthDate.split('-').reverse().join('/') : '-' },
       { label: 'Localidad / equipo', render: (item) => item.locality ? `${item.locality.name}, ${item.locality.provinceName}` : 'Sin asignar' },
       { label: 'Categoria', render: (item) => item.categoryName ?? 'Sin asignar' },
@@ -68,6 +69,7 @@ export function AdminPlayersPage() {
       {modalError ? <div className="inline-state span-2" role="alert">{modalError}</div> : null}
       <label>Nombre y apellido<input value={form.fullName} onChange={(event) => setForm({ ...form, fullName: event.target.value })} required /></label>
       <label>DNI<input value={form.dni} onChange={(event) => setForm({ ...form, dni: event.target.value })} required /></label>
+      <label>CUIL<input inputMode="numeric" value={form.cuil ?? ''} onChange={(event) => setForm({ ...form, cuil: event.target.value })} placeholder="20-12345678-6" /></label>
       <label>Fecha de nacimiento<input type="date" value={form.birthDate ?? ''} onChange={(event) => setForm({ ...form, birthDate: event.target.value })} /></label>
       <label>Celular<input value={form.phone ?? ''} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></label>
       <label>Instagram<input value={form.instagram ?? ''} onChange={(event) => setForm({ ...form, instagram: event.target.value })} /></label>

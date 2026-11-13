@@ -6,6 +6,7 @@ import { diskStorage } from 'multer';
 import { CreatePublicRegistrationDto } from './dto/create-public-registration.dto';
 import { ensurePaymentProofDir } from './payment-proof-storage';
 import { RegistrationsService } from './registrations.service';
+import { UpdateTeamCuilsDto } from './dto/update-team-cuils.dto';
 
 @Controller('public/registrations')
 export class PublicRegistrationsController {
@@ -15,6 +16,18 @@ export class PublicRegistrationsController {
   @Header('Cache-Control', 'no-store')
   getAccessToken(@Param('token') token: string) {
     return this.registrationsService.getPublicAccessGrant(token);
+  }
+
+  @Get('cuil/:token')
+  @Header('Cache-Control', 'no-store')
+  getCuilRoster(@Param('token') token: string) {
+    return this.registrationsService.getPublicCuilRoster(token);
+  }
+
+  @Post('cuil/:token')
+  @Header('Cache-Control', 'no-store')
+  updateCuilRoster(@Param('token') token: string, @Body() dto: UpdateTeamCuilsDto) {
+    return this.registrationsService.updatePublicCuilRoster(token, dto);
   }
 
   @Post()

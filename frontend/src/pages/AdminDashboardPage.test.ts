@@ -14,6 +14,7 @@ afterEach(async () => { await act(async () => root.unmount()); container.remove(
 it('includes unused tokens in category totals and applies capacity only to confirmed pairs', async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   vi.mocked(getDashboardSummary).mockResolvedValue({
+    players: { total: 40, withCuil: 17 },
     posts: { total: 0, published: 0, featured: 0, bySection: {} },
     registrations: { total: 20, byCategory: { 'Damas A': 4, 'Damas B': 16, 'Damas C': 0 }, confirmedByCategory: { 'Damas A': 1, 'Damas B': 16, 'Damas C': 0 }, byCategoryAndStatus: {
       'Damas A': { RECEIVED: 1, UNDER_REVIEW: 1, CONFIRMED: 1, WAITLIST: 0, REJECTED: 1 },
@@ -27,6 +28,9 @@ it('includes unused tokens in category totals and applies capacity only to confi
   container = document.createElement('div'); document.body.append(container); root = createRoot(container);
   await act(async () => root.render(createElement(MemoryRouter, { future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(AdminDashboardPage))));
   const rows = container.querySelectorAll('.category-summary-table tbody tr');
+  const playerCard = [...container.querySelectorAll('.stat-card')].find((card) => card.textContent?.includes('Jugadoras'))!;
+  expect(playerCard.textContent).toContain('40');
+  expect(playerCard.textContent).toContain('17 con CUIL cargado');
   expect(rows).toHaveLength(3);
   expect(Array.from(rows[0].querySelectorAll('strong')).map((cell) => cell.textContent)).toEqual(['16', '1', '1', '1', '0', '1']);
   expect(rows[0].textContent).not.toContain('Cupo completo');

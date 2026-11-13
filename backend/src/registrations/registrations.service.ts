@@ -38,6 +38,8 @@ import { ZoneEntry } from '../tournaments/zone-entry.entity';
 import { TournamentMatch } from '../tournaments/tournament-match.entity';
 import { MatchStatus } from '../tournaments/tournament.enums';
 import { removeMatchResultPhoto } from '../tournaments/match-result-photo-storage';
+import { UpdateTeamCuilsDto } from './dto/update-team-cuils.dto';
+import { normalizeAndValidateCuil } from '../players/cuil';
 
 interface RegistrationFiles {
   paymentProof?: Express.Multer.File;
@@ -149,7 +151,28 @@ export class RegistrationsService {
 
     qb.orderBy('grant.createdAt', 'DESC');
 
-    return qb.getMany();
+    const grants = await qb.getMany();
+    if (!grants.length) return grants;
+    const registrations = await this.registrationsRepository.find({
+      where: { accessGrantId: In(grants.map((grant) => grant.id)) },
+    });
+    const registrationByGrant = new Map(registrations.map((registration) => [registration.accessGrantId, registration]));
+    const dnis = [...new Set(registrations.flatMap(registrationDnis))];
+    const players = dnis.length
+      ? await this.registrationsRepository.manager.find(Player, { where: { dni: In(dnis) } })
+      : [];
+    const playerByDni = new Map(players.map((player) => [player.dni.trim(), player]));
+    return grants.map((grant) => {
+      const registration = registrationByGrant.get(grant.id);
+      const rosterDnis = registration ? registrationDnis(registration) : [];
+      return {
+        ...grant,
+        cuilStatus: {
+          completed: rosterDnis.filter((dni) => Boolean(playerByDni.get(dni)?.cuil)).length,
+          total: rosterDnis.length,
+        },
+      };
+    });
   }
 
   async updateAccessGrantStatus(id: number, dto: UpdateAccessGrantStatusDto) {
@@ -326,6 +349,65 @@ export class RegistrationsService {
       enabled: grant.status === RegistrationAccessGrantStatus.ACTIVE,
       registration: registration ? publicRegistrationDraft(registration) : null,
     };
+  }
+
+  async getPublicCuilRoster(token: string) {
+    const grant = await this.findAccessGrantByToken(token);
+    if (grant.status === RegistrationAccessGrantStatus.REVOKED) {
+      throw new BadRequestException('Este enlace ya no se encuentra habilitado');
+    }
+    const registration = await this.registrationsRepository.findOne({ where: { accessGrantId: grant.id } });
+    if (!registration) throw new BadRequestException('El equipo todavia no tiene una inscripcion cargada');
+    const dnis = registrationDnis(registration);
+    const players = await this.registrationsRepository.manager.find(Player, { where: { dni: In(dnis) } });
+    const playerByDni = new Map(players.map((player) => [player.dni.trim(), player]));
+    const roster = dnis.map((dni) => playerByDni.get(dni));
+    if (roster.some((player) => !player)) throw new BadRequestException('No se pudo encontrar la nomina completa del equipo');
+    return {
+      teamName: grant.locality.name,
+      categoryName: grant.category.name,
+      players: roster.map((player) => ({
+        id: player!.id,
+        fullName: player!.fullName,
+        maskedDni: maskDni(player!.dni),
+        completed: Boolean(player!.cuil),
+        cuilLastDigits: player!.cuil?.slice(-3) ?? null,
+      })),
+    };
+  }
+
+  async updatePublicCuilRoster(token: string, dto: UpdateTeamCuilsDto) {
+    await this.registrationsRepository.manager.transaction(async (manager) => {
+      const grant = await manager.findOne(RegistrationAccessGrant, {
+        where: { token: token.trim().toUpperCase() }, lock: { mode: 'pessimistic_write' },
+      });
+      if (!grant || grant.status === RegistrationAccessGrantStatus.REVOKED) {
+        throw new BadRequestException('Este enlace ya no se encuentra habilitado');
+      }
+      const registration = await manager.findOne(PairRegistration, { where: { accessGrantId: grant.id } });
+      if (!registration) throw new BadRequestException('El equipo todavia no tiene una inscripcion cargada');
+      const rosterDnis = registrationDnis(registration);
+      const players = await manager.find(Player, { where: { dni: In(rosterDnis) } });
+      const allowedIds = new Set(players.map((player) => player.id));
+      const submittedIds = new Set(dto.players.map((player) => player.playerId));
+      if (players.length !== rosterDnis.length || submittedIds.size !== players.length
+        || dto.players.some((player) => !allowedIds.has(player.playerId))) {
+        throw new BadRequestException('La nomina enviada no coincide con el equipo');
+      }
+      for (const submitted of dto.players) {
+        const player = players.find((candidate) => candidate.id === submitted.playerId)!;
+        if (!submitted.cuil.trim()) {
+          if (!player.cuil) throw new BadRequestException(`Falta completar el CUIL de ${player.fullName}`);
+          continue;
+        }
+        const cuil = normalizeAndValidateCuil(submitted.cuil, player.dni);
+        const assigned = await manager.findOne(Player, { where: { cuil } });
+        if (assigned && assigned.id !== player.id) throw new BadRequestException('Ese CUIL ya esta asignado a otra jugadora');
+        player.cuil = cuil;
+        await manager.save(Player, player);
+      }
+    });
+    return { success: true };
   }
 
   async createPublic(dto: CreatePublicRegistrationDto, files: RegistrationFiles = {}) {
@@ -781,6 +863,17 @@ function publicRegistrationDraft(registration: PairRegistration) {
 function normalizeOptional(value?: string | null) {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
+}
+
+function registrationDnis(registration: PairRegistration) {
+  return [registration.playerOneDni, registration.playerTwoDni, registration.playerThreeDni]
+    .map((dni) => dni?.trim())
+    .filter((dni): dni is string => Boolean(dni));
+}
+
+function maskDni(value: string) {
+  const digits = value.replace(/\D/g, '');
+  return `${'*'.repeat(Math.max(0, digits.length - 3))}${digits.slice(-3)}`;
 }
 
 function buildToken() {

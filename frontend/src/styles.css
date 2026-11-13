@@ -1318,6 +1318,39 @@ img {
   border: 1px solid rgba(23, 63, 57, 0.08);
 }
 
+.cuil-page {
+  width: min(980px, 100%);
+}
+
+.cuil-form {
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.cuil-player {
+  display: grid;
+  align-content: start;
+  gap: 0.55rem;
+  padding: 1rem;
+  border-radius: 8px;
+  background: rgba(23, 63, 57, 0.04);
+}
+
+.cuil-player > span {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.cuil-player small {
+  color: var(--ink-soft);
+}
+
+.cuil-loaded {
+  color: var(--green) !important;
+  font-weight: 700;
+}
+
 .player-grid {
   display: grid;
   gap: 1rem;

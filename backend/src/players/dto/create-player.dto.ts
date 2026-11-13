@@ -15,6 +15,11 @@ export class CreatePlayerDto {
   dni: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  cuil?: string;
+
+  @IsOptional()
   @IsDateString()
   birthDate?: string;
 

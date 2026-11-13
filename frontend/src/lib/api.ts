@@ -21,6 +21,7 @@ import type {
   LocalityPayload,
   Player,
   PlayerPayload,
+  PublicTeamCuilRoster,
   Category, CategoryPayload, Court, CourtPayload, Venue, VenuePayload,
   Tournament, TournamentPayload, TournamentDetail, TournamentMatch, ZoneDetail, ZoneRegistrationPlacement, AdminUser, AdminUserPayload, CashExpense, CashExpensePayload, CashIncomePayload, CashSummary, TournamentScheduleSlot,
   ActivityLogPage, TournamentOperations,
@@ -162,6 +163,16 @@ export function getPublicPostBySlug(slug: string) {
 
 export function getPublicRegistrationAccess(token: string) {
   return request<PublicAccessGrant>(`/public/registrations/access/${encodeURIComponent(token)}`);
+}
+
+export function getPublicTeamCuilRoster(token: string) {
+  return request<PublicTeamCuilRoster>(`/public/registrations/cuil/${encodeURIComponent(token)}`);
+}
+
+export function updatePublicTeamCuilRoster(token: string, players: { playerId: number; cuil: string }[]) {
+  return request<{ success: boolean }>(`/public/registrations/cuil/${encodeURIComponent(token)}`, {
+    method: 'POST', body: JSON.stringify({ players }),
+  });
 }
 
 export function getPublicCurrentTournament() {

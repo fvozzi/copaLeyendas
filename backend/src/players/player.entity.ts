@@ -14,6 +14,9 @@ export class Player {
   @Column({ unique: true })
   dni: string;
 
+  @Column({ type: 'varchar', nullable: true, unique: true })
+  cuil: string | null;
+
   @Column({ type: 'date', nullable: true })
   birthDate: string | null;
 
