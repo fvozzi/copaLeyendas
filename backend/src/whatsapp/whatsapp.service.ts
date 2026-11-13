@@ -68,15 +68,15 @@ export class WhatsAppService {
     ].map((value) => value.replace(/\s+/g, ' ').trim()));
   }
 
-  sendCuilRequest(to: string, contactName: string, token: string, localityName: string, siteUrl: string) {
+  sendCuilRequest(to: string, contactName: string, token: string, localityName: string, categoryName: string, siteUrl: string) {
     const cuilUrl = new URL('/cuil', siteUrl);
     cuilUrl.searchParams.set('token', token);
     const template = this.cuilTemplate();
-    return this.sendTemplate(to, template.name, template.languageCode, [
-      contactName,
-      localityName,
-      cuilUrl.toString(),
-    ].map((value) => value.replace(/\s+/g, ' ').trim()));
+    const parameters = template.usesRegistrationTemplate
+      ? [contactName, localityName, categoryName, cuilUrl.toString()]
+      : [contactName, localityName, cuilUrl.toString()];
+    return this.sendTemplate(to, template.name, template.languageCode,
+      parameters.map((value) => value.replace(/\s+/g, ' ').trim()));
   }
 
   sendTemplate(to: string, templateName: string, languageCode = 'es_AR', bodyParameters: string[] = []) {
@@ -189,9 +189,14 @@ export class WhatsAppService {
   }
 
   private cuilTemplate() {
+    const configuredName = this.config('WHATSAPP_CUIL_TEMPLATE_NAME');
+    if (!configuredName) {
+      return { ...this.registrationTemplate(), usesRegistrationTemplate: true };
+    }
     return {
-      name: this.config('WHATSAPP_CUIL_TEMPLATE_NAME') || 'solicitud_cuil_copa_leyendas',
+      name: configuredName,
       languageCode: this.config('WHATSAPP_CUIL_TEMPLATE_LANGUAGE') || 'es_AR',
+      usesRegistrationTemplate: false,
     };
   }
 

@@ -265,7 +265,7 @@ export class RegistrationsService {
     let result;
     try {
       result = await this.whatsAppService.sendCuilRequest(
-        grant.contactPhone, contactName, grant.token, grant.locality.name, siteUrl,
+        grant.contactPhone, contactName, grant.token, grant.locality.name, grant.category.name, siteUrl,
       );
     } catch (error) {
       // This endpoint is authenticated and is explicitly used to test Meta one
@@ -294,7 +294,7 @@ export class RegistrationsService {
       const results = await Promise.allSettled(batch.map(async ({ grant }) => {
         const contactName = grant.contactName?.trim() || grant.locality.name;
         const result = await this.whatsAppService.sendCuilRequest(
-          grant.contactPhone!, contactName, grant.token, grant.locality.name, siteUrl,
+          grant.contactPhone!, contactName, grant.token, grant.locality.name, grant.category.name, siteUrl,
         );
         if (!result.messages?.[0]?.id) throw new BadGatewayException('WhatsApp no confirmo la aceptacion del mensaje');
       }));

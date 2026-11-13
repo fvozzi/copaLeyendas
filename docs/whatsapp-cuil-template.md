@@ -2,6 +2,8 @@
 
 El envío masivo desde **Inscripciones → Equipos habilitados → Enviar pedido de CUIL** necesita una plantilla de utilidad aprobada en Meta.
 
+Mientras `WHATSAPP_CUIL_TEMPLATE_NAME` no esté configurada, el sistema reutiliza la plantilla de inscripción ya aprobada y conserva sus cuatro variables, cambiando únicamente el enlace por el formulario de CUIL. Esto permite enviar sin esperar otra aprobación, aunque el texto será el genérico de inscripción.
+
 - Nombre: `solicitud_cuil_copa_leyendas`
 - Idioma: `es_AR`
 - Categoría: `UTILITY`

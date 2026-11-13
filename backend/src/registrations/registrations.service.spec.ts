@@ -99,7 +99,7 @@ describe('registration tracking', () => {
     const result = await service.sendPendingCuilRequests('https://copa.example.com');
     expect(result).toMatchObject({ pending: 1, sent: 1, failed: 0 });
     expect(whatsapp.sendCuilRequest).toHaveBeenCalledWith(
-      grant.contactPhone, grant.contactName, grant.token, grant.locality.name, 'https://copa.example.com',
+      grant.contactPhone, grant.contactName, grant.token, grant.locality.name, grant.category.name, 'https://copa.example.com',
     );
   });
 
@@ -115,7 +115,7 @@ describe('registration tracking', () => {
     const result = await service.sendAccessGrantCuilRequestByWhatsApp(grant.id, 'https://copa.example.com');
     expect(result).toMatchObject({ success: true, messageId: 'wamid.cuil', teamName: grant.locality.name });
     expect(whatsapp.sendCuilRequest).toHaveBeenCalledWith(
-      grant.contactPhone, grant.contactName, grant.token, grant.locality.name, 'https://copa.example.com',
+      grant.contactPhone, grant.contactName, grant.token, grant.locality.name, grant.category.name, 'https://copa.example.com',
     );
   });
 
