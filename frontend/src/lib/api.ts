@@ -530,6 +530,14 @@ export function sendAccessGrantTokenByWhatsApp(id: number) {
   );
 }
 
+export function sendAccessGrantCuilRequestByWhatsApp(id: number) {
+  return request<{ success: boolean; messageId: string; contactName: string; contactPhone: string; teamName: string }>(
+    `/registrations/access-grants/${id}/send-cuil-whatsapp`,
+    { method: 'POST', body: JSON.stringify({ siteUrl: window.location.origin }) },
+    true,
+  );
+}
+
 export function getCuilWhatsAppPreview() {
   return request<CuilWhatsAppPreview>('/registrations/access-grants/cuil-whatsapp/preview', {}, true);
 }

@@ -19,6 +19,7 @@ import {
   getRegistrations,
   openRegistrationPaymentProof,
   sendAccessGrantTokenByWhatsApp,
+  sendAccessGrantCuilRequestByWhatsApp,
   sendPendingCuilRequests,
   updateAccessGrantStatus,
   updateRegistrationStatus,
@@ -82,6 +83,7 @@ export function AdminRegistrationsPage() {
   const [openGrant, setOpenGrant] = useState(false);
   const [sendingGrantId, setSendingGrantId] = useState<number | null>(null);
   const [sendingCuilRequests, setSendingCuilRequests] = useState(false);
+  const [sendingCuilGrantId, setSendingCuilGrantId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [completeRemoval, setCompleteRemoval] = useState<{
@@ -344,13 +346,18 @@ export function AdminRegistrationsPage() {
       setSendingGrantId(null);
     }
   };
-  const requestCuilByWhatsApp = (item: RegistrationAccessGrant) => {
-    if (!item.contactPhone) return;
-    const link = `${window.location.origin}/cuil?token=${encodeURIComponent(item.token)}`;
-    const contact = item.contactName?.trim() ? ` ${item.contactName.trim()}` : '';
-    const message = `Hola${contact}, necesitamos completar los CUIL de las jugadoras de ${item.locality.name} para el seguro del torneo. Podes cargarlos de forma segura en este enlace: ${link}`;
-    const phone = item.contactPhone.replace(/\D/g, '');
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
+  const requestCuilByWhatsApp = async (item: RegistrationAccessGrant) => {
+    setError(null);
+    setSuccess(null);
+    setSendingCuilGrantId(item.id);
+    try {
+      const result = await sendAccessGrantCuilRequestByWhatsApp(item.id);
+      setSuccess(`WhatsApp acepto el pedido de CUIL para ${result.teamName} (${result.contactPhone}).`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "No se pudo enviar el pedido de CUIL.");
+    } finally {
+      setSendingCuilGrantId(null);
+    }
   };
   const sendAllPendingCuilRequests = async () => {
     setError(null);
@@ -370,7 +377,8 @@ export function AdminRegistrationsPage() {
       if (!window.confirm(`Se enviara un pedido de CUIL por WhatsApp a ${preview.pending} equipos.${omitted} ¿Continuar?`)) return;
       const result = await sendPendingCuilRequests();
       if (result.failed) {
-        setError(`Se enviaron ${result.sent} mensajes y fallaron ${result.failed}: ${result.failures.map((failure) => failure.teamName).join(", ")}.`);
+        const first = result.failures[0];
+        setError(`Se enviaron ${result.sent} mensajes y fallaron ${result.failed}. Primer error: ${first.teamName}: ${first.message}. Proba ese equipo con el envio individual para ver el detalle.`);
       } else {
         setSuccess(`WhatsApp acepto ${result.sent} pedidos de CUIL.`);
       }
@@ -566,11 +574,17 @@ export function AdminRegistrationsPage() {
               <button
                 type="button"
                 className="secondary-button grid-action-button"
-                disabled={!item.contactPhone || !item.cuilStatus?.total}
-                title={!item.contactPhone ? "Este equipo no tiene telefono de contacto" : !item.cuilStatus?.total ? "El equipo todavia no tiene una inscripcion" : `Pedir CUIL a ${item.contactName ?? item.locality.name}`}
-                onClick={() => requestCuilByWhatsApp(item)}
+                disabled={!item.contactPhone || !item.cuilStatus?.total || item.cuilStatus.completed === item.cuilStatus.total || sendingCuilGrantId !== null}
+                title={!item.contactPhone
+                  ? "Este equipo no tiene telefono de contacto"
+                  : !item.cuilStatus?.total
+                    ? "El equipo todavia no tiene una inscripcion"
+                    : item.cuilStatus.completed === item.cuilStatus.total
+                      ? "Todas las jugadoras ya tienen CUIL"
+                      : `Enviar por Meta el pedido de CUIL a ${item.contactName ?? item.locality.name}`}
+                onClick={() => void requestCuilByWhatsApp(item)}
               >
-                Pedir CUIL
+                {sendingCuilGrantId === item.id ? "Enviando CUIL..." : "Pedir CUIL"}
               </button>
               <button
                 className="inline-link"

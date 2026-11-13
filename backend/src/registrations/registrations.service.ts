@@ -245,6 +245,37 @@ export class RegistrationsService {
     };
   }
 
+  async sendAccessGrantCuilRequestByWhatsApp(id: number, siteUrl: string) {
+    const grant = await this.accessGrantsRepository.findOne({
+      where: { id }, relations: { locality: true, category: true },
+    });
+    if (!grant) throw new NotFoundException('Equipo habilitado no encontrado');
+    if (grant.status === RegistrationAccessGrantStatus.REVOKED) {
+      throw new BadRequestException('El token del equipo esta revocado');
+    }
+    if (!grant.contactPhone?.trim()) throw new BadRequestException('El equipo no tiene telefono de contacto');
+    const registration = await this.registrationsRepository.findOne({ where: { accessGrantId: grant.id } });
+    if (!registration) throw new BadRequestException('El equipo todavia no tiene una inscripcion cargada');
+    const dnis = registrationDnis(registration);
+    const players = await this.registrationsRepository.manager.find(Player, { where: { dni: In(dnis) } });
+    if (dnis.every((dni) => players.find((player) => player.dni.trim() === dni)?.cuil)) {
+      throw new BadRequestException('Todas las jugadoras de este equipo ya tienen CUIL cargado');
+    }
+    const contactName = grant.contactName?.trim() || grant.locality.name;
+    const result = await this.whatsAppService.sendCuilRequest(
+      grant.contactPhone, contactName, grant.token, grant.locality.name, siteUrl,
+    );
+    const messageId = result.messages?.[0]?.id;
+    if (!messageId) throw new BadGatewayException('WhatsApp no confirmo la aceptacion del mensaje');
+    return {
+      success: true,
+      messageId,
+      contactName,
+      contactPhone: grant.contactPhone,
+      teamName: grant.locality.name,
+    };
+  }
+
   async sendPendingCuilRequests(siteUrl: string) {
     const audience = await this.loadCuilWhatsAppAudience();
     const failures: { grantId: number; teamName: string; message: string }[] = [];

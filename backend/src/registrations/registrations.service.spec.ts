@@ -103,6 +103,22 @@ describe('registration tracking', () => {
     );
   });
 
+  it('sends one CUIL request through Meta so an individual team can be tested', async () => {
+    const { service, grant, registrations, manager, whatsapp } = setup();
+    registrations.findOne.mockResolvedValue({
+      accessGrantId: grant.id, playerOneDni: '12345678', playerTwoDni: '87654321',
+    } as never);
+    manager.find.mockResolvedValue([
+      { id: 1, dni: '12345678', cuil: null },
+      { id: 2, dni: '87654321', cuil: '27876543219' },
+    ] as never);
+    const result = await service.sendAccessGrantCuilRequestByWhatsApp(grant.id, 'https://copa.example.com');
+    expect(result).toMatchObject({ success: true, messageId: 'wamid.cuil', teamName: grant.locality.name });
+    expect(whatsapp.sendCuilRequest).toHaveBeenCalledWith(
+      grant.contactPhone, grant.contactName, grant.token, grant.locality.name, 'https://copa.example.com',
+    );
+  });
+
   it('preserves the previous send time when Meta rejects a retry', async () => {
     const { service, grants, whatsapp } = setup();
     whatsapp.sendRegistrationToken.mockRejectedValue(new Error('Meta rechazo el mensaje'));

@@ -2,7 +2,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { AdminRegistrationsPage } from './AdminRegistrationsPage';
-import { deleteCompleteTeam, getAccessGrants, getCategories, getCompleteTeamRemovalImpact, getCuilWhatsAppPreview, getLocalities, getRegistrations, sendPendingCuilRequests, updateRegistrationStatus } from '../lib/api';
+import { deleteCompleteTeam, getAccessGrants, getCategories, getCompleteTeamRemovalImpact, getCuilWhatsAppPreview, getLocalities, getRegistrations, sendAccessGrantCuilRequestByWhatsApp, sendPendingCuilRequests, updateRegistrationStatus } from '../lib/api';
 import type { PairRegistration, RegistrationAccessGrant } from '../types';
 
 vi.mock('../lib/api', () => ({
@@ -19,6 +19,7 @@ vi.mock('../lib/api', () => ({
   getRegistrations: vi.fn(),
   openRegistrationPaymentProof: vi.fn(),
   sendAccessGrantTokenByWhatsApp: vi.fn(),
+  sendAccessGrantCuilRequestByWhatsApp: vi.fn(),
   sendPendingCuilRequests: vi.fn(),
   updateAccessGrantStatus: vi.fn(),
   updateRegistrationStatus: vi.fn(),
@@ -74,9 +75,9 @@ const registrations = [{
   payments: [],
 }] as unknown as PairRegistration[];
 
-async function render() {
+async function render(grantRows = grants) {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-  vi.mocked(getAccessGrants).mockResolvedValue(grants);
+  vi.mocked(getAccessGrants).mockResolvedValue(grantRows);
   vi.mocked(getRegistrations).mockResolvedValue(registrations);
   vi.mocked(getLocalities).mockResolvedValue([]);
   vi.mocked(getCategories).mockResolvedValue([]);
@@ -123,6 +124,19 @@ it('confirms and sends a bulk CUIL request from the enabled teams heading', asyn
   expect(confirm).toHaveBeenCalledWith(expect.stringContaining('1 equipos con pendientes no tienen telefono'));
   expect(sendPendingCuilRequests).toHaveBeenCalledOnce();
   expect(container.textContent).toContain('WhatsApp acepto 2 pedidos de CUIL');
+});
+
+it('uses the Meta API for an individual CUIL request', async () => {
+  const grantWithPendingCuil = { ...grants[0], contactPhone: '+5491112345678', cuilStatus: { completed: 0, total: 2 } };
+  await render([grantWithPendingCuil]);
+  vi.mocked(sendAccessGrantCuilRequestByWhatsApp).mockResolvedValue({
+    success: true, messageId: 'wamid.cuil', contactName: 'Contacto', contactPhone: '+5491112345678', teamName: 'Equipo pendiente',
+  });
+  const button = [...container.querySelectorAll<HTMLButtonElement>('button')]
+    .find((candidate) => candidate.textContent === 'Pedir CUIL')!;
+  await act(async () => button.click());
+  expect(sendAccessGrantCuilRequestByWhatsApp).toHaveBeenCalledWith(grantWithPendingCuil.id);
+  expect(container.textContent).toContain('WhatsApp acepto el pedido de CUIL para Equipo pendiente');
 });
 
 it('allows Direction to waive an existing registration so Caja stops counting it', async () => {
