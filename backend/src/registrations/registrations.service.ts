@@ -236,6 +236,48 @@ export class RegistrationsService {
     };
   }
 
+  async getCuilWhatsAppPreview() {
+    const audience = await this.loadCuilWhatsAppAudience();
+    return {
+      pending: audience.eligible.length,
+      withoutPhone: audience.withoutPhone,
+      complete: audience.complete,
+    };
+  }
+
+  async sendPendingCuilRequests(siteUrl: string) {
+    const audience = await this.loadCuilWhatsAppAudience();
+    const failures: { grantId: number; teamName: string; message: string }[] = [];
+    let sent = 0;
+    const batchSize = 5;
+    for (let index = 0; index < audience.eligible.length; index += batchSize) {
+      const batch = audience.eligible.slice(index, index + batchSize);
+      const results = await Promise.allSettled(batch.map(async ({ grant }) => {
+        const contactName = grant.contactName?.trim() || grant.locality.name;
+        const result = await this.whatsAppService.sendCuilRequest(
+          grant.contactPhone!, contactName, grant.token, grant.locality.name, siteUrl,
+        );
+        if (!result.messages?.[0]?.id) throw new BadGatewayException('WhatsApp no confirmo la aceptacion del mensaje');
+      }));
+      results.forEach((result, resultIndex) => {
+        if (result.status === 'fulfilled') sent += 1;
+        else failures.push({
+          grantId: batch[resultIndex].grant.id,
+          teamName: batch[resultIndex].grant.locality.name,
+          message: publicErrorMessage(result.reason),
+        });
+      });
+    }
+    return {
+      pending: audience.eligible.length,
+      withoutPhone: audience.withoutPhone,
+      complete: audience.complete,
+      sent,
+      failed: failures.length,
+      failures,
+    };
+  }
+
   async removeAccessGrant(id: number) {
     const grant = await this.accessGrantsRepository.findOne({ where: { id } });
 
@@ -820,6 +862,37 @@ export class RegistrationsService {
     };
   }
 
+  private async loadCuilWhatsAppAudience() {
+    const registrations = await this.registrationsRepository.find({
+      relations: { accessGrant: { locality: true, category: true } },
+    });
+    const dnis = [...new Set(registrations.flatMap(registrationDnis))];
+    const players = dnis.length
+      ? await this.registrationsRepository.manager.find(Player, { where: { dni: In(dnis) } })
+      : [];
+    const playerByDni = new Map(players.map((player) => [player.dni.trim(), player]));
+    const eligible = new Map<number, { grant: RegistrationAccessGrant; missingPlayers: number }>();
+    let withoutPhone = 0;
+    let complete = 0;
+
+    for (const registration of registrations) {
+      const grant = registration.accessGrant;
+      if (!grant || grant.status === RegistrationAccessGrantStatus.REVOKED) continue;
+      const missingPlayers = registrationDnis(registration)
+        .filter((dni) => !playerByDni.get(dni)?.cuil).length;
+      if (!missingPlayers) {
+        complete += 1;
+        continue;
+      }
+      if (!grant.contactPhone?.trim()) {
+        withoutPhone += 1;
+        continue;
+      }
+      eligible.set(grant.id, { grant, missingPlayers });
+    }
+    return { eligible: [...eligible.values()], withoutPhone, complete };
+  }
+
   private async uploadPlayerPhotos(files: RegistrationFiles, dto: CreatePublicRegistrationDto) {
     if (!this.googleDrivePhotos.enabled()) return {};
     try {
@@ -874,6 +947,16 @@ function registrationDnis(registration: PairRegistration) {
 function maskDni(value: string) {
   const digits = value.replace(/\D/g, '');
   return `${'*'.repeat(Math.max(0, digits.length - 3))}${digits.slice(-3)}`;
+}
+
+function publicErrorMessage(error: unknown) {
+  if (error instanceof BadGatewayException) {
+    const response = error.getResponse();
+    if (typeof response === 'object' && response && 'message' in response && typeof response.message === 'string') {
+      return response.message;
+    }
+  }
+  return error instanceof Error ? error.message : 'No se pudo enviar el mensaje';
 }
 
 function buildToken() {

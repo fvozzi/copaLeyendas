@@ -52,6 +52,9 @@ export function AdminDashboardPage() {
 
   const matchesByVenue = summary.matchesByVenue ?? { tournamentName: null, venues: [], totalMatches: 0 };
   const categoryNames = [...new Set([...Object.keys(summary.accessGrants.byCategory), ...Object.keys(summary.registrations.byCategory)])];
+  const cuilPercentage = summary.players.total
+    ? Math.round((summary.players.withCuil / summary.players.total) * 100)
+    : 0;
 
   return (
     <div className="admin-panel">
@@ -68,10 +71,22 @@ export function AdminDashboardPage() {
           <strong>{summary.posts.total}</strong>
           <span>{summary.posts.published} publicadas</span>
         </article>
-        <article className="stat-card">
-          <p className="stat-label">Jugadoras</p>
-          <strong>{summary.players.total}</strong>
-          <span>{summary.players.withCuil} con CUIL cargado</span>
+        <article className="stat-card player-cuil-stat">
+          <p className="stat-label">CUIL de jugadoras</p>
+          <div className="player-cuil-values">
+            <div className="player-cuil-value">
+              <strong>{summary.players.total}</strong>
+              <span>Jugadoras</span>
+            </div>
+            <div className="player-cuil-value player-cuil-value-complete">
+              <strong>{summary.players.withCuil}</strong>
+              <span>Con CUIL</span>
+            </div>
+          </div>
+          <div className="player-cuil-progress" role="progressbar" aria-label="CUIL cargados" aria-valuemin={0} aria-valuemax={summary.players.total} aria-valuenow={summary.players.withCuil}>
+            <span style={{ width: `${cuilPercentage}%` }} />
+          </div>
+          <small>{cuilPercentage}% completado</small>
         </article>
         <article className="stat-card">
           <p className="stat-label">Inscripciones</p>

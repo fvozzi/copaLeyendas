@@ -14,10 +14,12 @@ import {
   getAccessGrants,
   getCategories,
   getCompleteTeamRemovalImpact,
+  getCuilWhatsAppPreview,
   getLocalities,
   getRegistrations,
   openRegistrationPaymentProof,
   sendAccessGrantTokenByWhatsApp,
+  sendPendingCuilRequests,
   updateAccessGrantStatus,
   updateRegistrationStatus,
 } from "../lib/api";
@@ -79,6 +81,7 @@ export function AdminRegistrationsPage() {
   const [search, setSearch] = useState("");
   const [openGrant, setOpenGrant] = useState(false);
   const [sendingGrantId, setSendingGrantId] = useState<number | null>(null);
+  const [sendingCuilRequests, setSendingCuilRequests] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [completeRemoval, setCompleteRemoval] = useState<{
@@ -349,6 +352,34 @@ export function AdminRegistrationsPage() {
     const phone = item.contactPhone.replace(/\D/g, '');
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
   };
+  const sendAllPendingCuilRequests = async () => {
+    setError(null);
+    setSuccess(null);
+    setSendingCuilRequests(true);
+    try {
+      const preview = await getCuilWhatsAppPreview();
+      if (!preview.pending) {
+        setSuccess(preview.withoutPhone
+          ? `No hay mensajes para enviar. Hay ${preview.withoutPhone} equipos con CUIL pendientes pero sin telefono.`
+          : "Todas las jugadoras ya tienen CUIL cargado.");
+        return;
+      }
+      const omitted = preview.withoutPhone
+        ? ` ${preview.withoutPhone} equipos con pendientes no tienen telefono y quedaran afuera.`
+        : "";
+      if (!window.confirm(`Se enviara un pedido de CUIL por WhatsApp a ${preview.pending} equipos.${omitted} ¿Continuar?`)) return;
+      const result = await sendPendingCuilRequests();
+      if (result.failed) {
+        setError(`Se enviaron ${result.sent} mensajes y fallaron ${result.failed}: ${result.failures.map((failure) => failure.teamName).join(", ")}.`);
+      } else {
+        setSuccess(`WhatsApp acepto ${result.sent} pedidos de CUIL.`);
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "No se pudieron enviar los pedidos de CUIL.");
+    } finally {
+      setSendingCuilRequests(false);
+    }
+  };
   return (
     <div className="admin-panel registrations-page">
       <div className="panel-header">
@@ -379,7 +410,11 @@ export function AdminRegistrationsPage() {
       <section className="data-card registrations-grants-card">
         <div className="registrations-section-heading">
           <h2>Equipos habilitados</h2>
-          <div
+          <div className="registrations-heading-actions">
+            <button type="button" className="secondary-button" disabled={sendingCuilRequests} onClick={() => void sendAllPendingCuilRequests()}>
+              {sendingCuilRequests ? "Enviando pedidos..." : "Enviar pedido de CUIL"}
+            </button>
+            <div
             className="program-tabs registration-grant-filters"
             role="group"
             aria-label="Filtrar equipos habilitados"
@@ -400,6 +435,7 @@ export function AdminRegistrationsPage() {
             >
               Activos aún no usados ({activeUnusedGrants.length})
             </button>
+            </div>
           </div>
         </div>
         <AdminDataGrid

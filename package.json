@@ -9,6 +9,7 @@
     "dev:frontend": "npm --prefix frontend run dev",
     "test": "npm --prefix backend run test && npm --prefix frontend run test",
     "db:migrate": "npm --prefix backend run migration:run",
+    "db:restore:local": "powershell -NoProfile -ExecutionPolicy Bypass -File backend/scripts/restore-local-backup.ps1",
     "db:seed": "npm --prefix backend run seed"
   }
 }

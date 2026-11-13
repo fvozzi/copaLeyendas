@@ -151,6 +151,18 @@ export interface CompleteTeamRemovalImpact {
   playedMatches: number;
 }
 
+export interface CuilWhatsAppPreview {
+  pending: number;
+  withoutPhone: number;
+  complete: number;
+}
+
+export interface CuilWhatsAppResult extends CuilWhatsAppPreview {
+  sent: number;
+  failed: number;
+  failures: { grantId: number; teamName: string; message: string }[];
+}
+
 export interface PublicAccessGrant {
   id: number;
   token: string;

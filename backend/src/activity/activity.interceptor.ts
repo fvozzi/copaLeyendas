@@ -71,6 +71,7 @@ function describeActivity(method: string, path: string, status: number) {
   if (path.includes('/public/registrations/cuil/')) return failed ? 'Falló la carga de CUIL del equipo' : method === 'POST' ? 'CUIL del equipo actualizados' : 'Formulario de CUIL consultado';
   if (method === 'POST' && path.endsWith('/public/registrations')) return failed ? 'Falló el envío de una inscripción' : 'Inscripción enviada';
   if (method === 'POST' && path.includes('/send-whatsapp')) return failed ? 'Falló un envío por WhatsApp' : 'Token enviado por WhatsApp';
+  if (method === 'POST' && path.includes('/cuil-whatsapp/send')) return failed ? 'Falló el envío masivo de CUIL' : 'Pedidos de CUIL enviados por WhatsApp';
   if (method === 'POST') return failed ? 'Falló una creación' : 'Registro creado';
   if (method === 'PATCH' || method === 'PUT') return failed ? 'Falló una modificación' : 'Registro modificado';
   if (method === 'DELETE') return failed ? 'Falló una eliminación' : 'Registro eliminado';

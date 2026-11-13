@@ -53,6 +53,16 @@ export class RegistrationsController {
     return this.registrationsService.sendAccessGrantTokenByWhatsApp(id, dto.siteUrl);
   }
 
+  @Get('access-grants/cuil-whatsapp/preview')
+  getCuilWhatsAppPreview() {
+    return this.registrationsService.getCuilWhatsAppPreview();
+  }
+
+  @Post('access-grants/cuil-whatsapp/send')
+  sendPendingCuilRequests(@Body() dto: SendAccessGrantWhatsAppDto) {
+    return this.registrationsService.sendPendingCuilRequests(dto.siteUrl);
+  }
+
   @Delete('access-grants/:id')
   removeAccessGrant(@Param('id', ParseIntPipe) id: number) {
     return this.registrationsService.removeAccessGrant(id);

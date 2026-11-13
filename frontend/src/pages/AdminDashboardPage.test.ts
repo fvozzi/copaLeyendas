@@ -30,7 +30,9 @@ it('includes unused tokens in category totals and applies capacity only to confi
   const rows = container.querySelectorAll('.category-summary-table tbody tr');
   const playerCard = [...container.querySelectorAll('.stat-card')].find((card) => card.textContent?.includes('Jugadoras'))!;
   expect(playerCard.textContent).toContain('40');
-  expect(playerCard.textContent).toContain('17 con CUIL cargado');
+  expect(playerCard.textContent).toContain('17');
+  expect(playerCard.textContent).toContain('Con CUIL');
+  expect(playerCard.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('17');
   expect(rows).toHaveLength(3);
   expect(Array.from(rows[0].querySelectorAll('strong')).map((cell) => cell.textContent)).toEqual(['16', '1', '1', '1', '0', '1']);
   expect(rows[0].textContent).not.toContain('Cupo completo');

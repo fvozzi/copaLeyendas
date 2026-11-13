@@ -15,6 +15,7 @@ import type {
   TournamentDistribution,
   RegistrationAccessGrant,
   CompleteTeamRemovalImpact,
+  CuilWhatsAppPreview, CuilWhatsAppResult,
   RegistrationStatusPayload,
   ContentPost,
   Locality,
@@ -527,6 +528,16 @@ export function sendAccessGrantTokenByWhatsApp(id: number) {
     { method: 'POST', body: JSON.stringify({ siteUrl: window.location.origin }) },
     true,
   );
+}
+
+export function getCuilWhatsAppPreview() {
+  return request<CuilWhatsAppPreview>('/registrations/access-grants/cuil-whatsapp/preview', {}, true);
+}
+
+export function sendPendingCuilRequests() {
+  return request<CuilWhatsAppResult>('/registrations/access-grants/cuil-whatsapp/send', {
+    method: 'POST', body: JSON.stringify({ siteUrl: window.location.origin }),
+  }, true);
 }
 
 export function getPaymentProofUrl(id: number) {

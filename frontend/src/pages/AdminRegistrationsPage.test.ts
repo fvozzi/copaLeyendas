@@ -2,7 +2,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { AdminRegistrationsPage } from './AdminRegistrationsPage';
-import { deleteCompleteTeam, getAccessGrants, getCategories, getCompleteTeamRemovalImpact, getLocalities, getRegistrations, updateRegistrationStatus } from '../lib/api';
+import { deleteCompleteTeam, getAccessGrants, getCategories, getCompleteTeamRemovalImpact, getCuilWhatsAppPreview, getLocalities, getRegistrations, sendPendingCuilRequests, updateRegistrationStatus } from '../lib/api';
 import type { PairRegistration, RegistrationAccessGrant } from '../types';
 
 vi.mock('../lib/api', () => ({
@@ -14,10 +14,12 @@ vi.mock('../lib/api', () => ({
   getAccessGrants: vi.fn(),
   getCategories: vi.fn(),
   getCompleteTeamRemovalImpact: vi.fn(),
+  getCuilWhatsAppPreview: vi.fn(),
   getLocalities: vi.fn(),
   getRegistrations: vi.fn(),
   openRegistrationPaymentProof: vi.fn(),
   sendAccessGrantTokenByWhatsApp: vi.fn(),
+  sendPendingCuilRequests: vi.fn(),
   updateAccessGrantStatus: vi.fn(),
   updateRegistrationStatus: vi.fn(),
 }));
@@ -107,6 +109,20 @@ it('filters active access grants that have not been used', async () => {
   expect(grid.textContent).toContain('Equipo pendiente');
   expect(grid.textContent).not.toContain('Equipo usado');
   expect(grid.textContent).not.toContain('Equipo revocado');
+});
+
+it('confirms and sends a bulk CUIL request from the enabled teams heading', async () => {
+  await render();
+  vi.mocked(getCuilWhatsAppPreview).mockResolvedValue({ pending: 2, withoutPhone: 1, complete: 4 });
+  vi.mocked(sendPendingCuilRequests).mockResolvedValue({ pending: 2, withoutPhone: 1, complete: 4, sent: 2, failed: 0, failures: [] });
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  const button = [...container.querySelectorAll<HTMLButtonElement>('button')]
+    .find((candidate) => candidate.textContent === 'Enviar pedido de CUIL')!;
+  await act(async () => button.click());
+  expect(confirm).toHaveBeenCalledWith(expect.stringContaining('2 equipos'));
+  expect(confirm).toHaveBeenCalledWith(expect.stringContaining('1 equipos con pendientes no tienen telefono'));
+  expect(sendPendingCuilRequests).toHaveBeenCalledOnce();
+  expect(container.textContent).toContain('WhatsApp acepto 2 pedidos de CUIL');
 });
 
 it('allows Direction to waive an existing registration so Caja stops counting it', async () => {

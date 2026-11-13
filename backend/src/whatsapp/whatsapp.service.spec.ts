@@ -179,4 +179,25 @@ describe('WhatsAppService', () => {
       }),
     );
   });
+
+  it('sends the CUIL template with the contact, team and restricted form link', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ messages: [{ id: 'wamid.cuil' }] }), {
+      status: 200, headers: { 'Content-Type': 'application/json' },
+    }));
+    await createService().sendCuilRequest(
+      '+54 9 11 1234-5678', 'Facundo', 'COPA-ABCDEFGH', 'Rosario', 'https://copa.example.com',
+    );
+    const payload = JSON.parse(fetchMock.mock.calls[0][1]!.body as string);
+    expect(payload).toMatchObject({
+      to: '5491112345678',
+      template: {
+        name: 'solicitud_cuil_copa_leyendas', language: { code: 'es_AR' },
+        components: [{ type: 'body', parameters: [
+          { type: 'text', text: 'Facundo' },
+          { type: 'text', text: 'Rosario' },
+          { type: 'text', text: 'https://copa.example.com/cuil?token=COPA-ABCDEFGH' },
+        ] }],
+      },
+    });
+  });
 });

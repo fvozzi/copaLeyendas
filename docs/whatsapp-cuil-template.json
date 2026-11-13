@@ -1,0 +1,21 @@
+{
+  "name": "solicitud_cuil_copa_leyendas",
+  "language": "es_AR",
+  "category": "UTILITY",
+  "parameter_format": "POSITIONAL",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "Hola {{1}},\n\nNecesitamos completar los CUIL de las jugadoras del equipo {{2}} para la documentación del seguro de Copa Leyendas.\n\nCargalos en este formulario seguro:\n{{3}}\n\nEl enlace sólo permite completar los CUIL del plantel.",
+      "example": {
+        "body_text": [
+          [
+            "Facundo",
+            "Junin",
+            "https://copaleyendas.com.ar/cuil?token=COPA-EJEMPLO1"
+          ]
+        ]
+      }
+    }
+  ]
+}

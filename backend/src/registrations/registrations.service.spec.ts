@@ -47,11 +47,15 @@ function setup() {
   };
   const registrations = {
     findOne: vi.fn().mockResolvedValue(null),
+    find: vi.fn().mockResolvedValue([]),
     count: vi.fn().mockResolvedValue(0), create: vi.fn((value) => value),
-    manager: { transaction: vi.fn(async (callback) => callback(manager)) },
+    manager: { find: manager.find, transaction: vi.fn(async (callback) => callback(manager)) },
   };
   const players = { syncRegistrationPlayers: vi.fn().mockResolvedValue(undefined) };
-  const whatsapp = { sendRegistrationToken: vi.fn().mockResolvedValue({ messages: [{ id: 'wamid.test' }] }) };
+  const whatsapp = {
+    sendRegistrationToken: vi.fn().mockResolvedValue({ messages: [{ id: 'wamid.test' }] }),
+    sendCuilRequest: vi.fn().mockResolvedValue({ messages: [{ id: 'wamid.cuil' }] }),
+  };
   const service = new RegistrationsService(
     registrations as never, grants as never, {} as never,
     { findOne: vi.fn().mockResolvedValue(null) } as never,
@@ -81,6 +85,22 @@ describe('registration tracking', () => {
     expect(result.whatsappSentAt.toISOString()).toBe('2026-09-09T23:05:00.000Z');
     expect(grants.update).toHaveBeenCalledWith(7, { whatsappSentAt: result.whatsappSentAt, whatsappMessageId: 'wamid.test' });
     expect(grant.status).toBe(RegistrationAccessGrantStatus.USED);
+  });
+
+  it('previews and sends CUIL requests only to registered teams with missing CUIL and a phone', async () => {
+    const { service, grant, registrations, manager, whatsapp } = setup();
+    const registration = { accessGrant: grant, playerOneDni: '12345678', playerTwoDni: '87654321' };
+    registrations.find.mockResolvedValue([registration] as never);
+    manager.find.mockResolvedValue([
+      { id: 1, dni: '12345678', cuil: null },
+      { id: 2, dni: '87654321', cuil: '27876543219' },
+    ] as never);
+    expect(await service.getCuilWhatsAppPreview()).toEqual({ pending: 1, withoutPhone: 0, complete: 0 });
+    const result = await service.sendPendingCuilRequests('https://copa.example.com');
+    expect(result).toMatchObject({ pending: 1, sent: 1, failed: 0 });
+    expect(whatsapp.sendCuilRequest).toHaveBeenCalledWith(
+      grant.contactPhone, grant.contactName, grant.token, grant.locality.name, 'https://copa.example.com',
+    );
   });
 
   it('preserves the previous send time when Meta rejects a retry', async () => {

@@ -35,6 +35,7 @@ export class WhatsAppService {
       graphApiVersion: required.WHATSAPP_GRAPH_API_VERSION || null,
       phoneNumberId: required.WHATSAPP_PHONE_NUMBER_ID || null,
       registrationTemplate: this.registrationTemplate(),
+      cuilTemplate: this.cuilTemplate(),
     };
   }
 
@@ -64,6 +65,17 @@ export class WhatsAppService {
       localityName,
       categoryName,
       registrationUrl.toString(),
+    ].map((value) => value.replace(/\s+/g, ' ').trim()));
+  }
+
+  sendCuilRequest(to: string, contactName: string, token: string, localityName: string, siteUrl: string) {
+    const cuilUrl = new URL('/cuil', siteUrl);
+    cuilUrl.searchParams.set('token', token);
+    const template = this.cuilTemplate();
+    return this.sendTemplate(to, template.name, template.languageCode, [
+      contactName,
+      localityName,
+      cuilUrl.toString(),
     ].map((value) => value.replace(/\s+/g, ' ').trim()));
   }
 
@@ -173,6 +185,13 @@ export class WhatsAppService {
     return {
       name: this.config('WHATSAPP_REGISTRATION_TEMPLATE_NAME') || 'inscripcion_copa_leyendas',
       languageCode: this.config('WHATSAPP_REGISTRATION_TEMPLATE_LANGUAGE') || 'es_AR',
+    };
+  }
+
+  private cuilTemplate() {
+    return {
+      name: this.config('WHATSAPP_CUIL_TEMPLATE_NAME') || 'solicitud_cuil_copa_leyendas',
+      languageCode: this.config('WHATSAPP_CUIL_TEMPLATE_LANGUAGE') || 'es_AR',
     };
   }
 
