@@ -353,6 +353,7 @@ export function deleteTournamentZone(id: number) { return request<{ success: boo
 export function divideTournamentZones(id: number) { return request(`/tournaments/categories/${id}/divide-zones`, { method: 'POST' }, true); }
 export function getTournamentDistribution(id: number) { return request<TournamentDistribution>(`/tournaments/${id}/distribution`, {}, true); }
 export function setTournamentDistributionVenue(id: number, tournamentCategoryId: number, zoneIndex: number, venueId: number) { return request<TournamentDistribution>(`/tournaments/${id}/distribution/venue`, { method: 'PATCH', body: JSON.stringify({ tournamentCategoryId, zoneIndex, venueId }) }, true); }
+export function setTournamentDistributionLayout(id: number, tournamentCategoryId: number, capacities: number[] | null) { return request<TournamentDistribution>(`/tournaments/${id}/distribution/layout`, { method: 'PATCH', body: JSON.stringify({ tournamentCategoryId, capacities }) }, true); }
 export function applyTournamentDistribution(id: number, baseVersion: string, resetProgram = false) { return request<TournamentDistribution>(`/tournaments/${id}/distribution/apply`, { method: 'POST', body: JSON.stringify({ baseVersion, resetProgram }) }, true); }
 export function setTournamentAttendance(id: number, registrationId: number, present: boolean) { return request<TournamentDistribution>(`/tournaments/${id}/attendance/${registrationId}`, { method: 'PATCH', body: JSON.stringify({ present }) }, true); }
 export function getTournamentScheduleGrid(id: number) { return request<TournamentScheduleSlot[]>(`/tournaments/${id}/schedule-grid`, {}, true); }
@@ -392,7 +393,10 @@ export function getZone(id: number) { return request<ZoneDetail>(`/tournaments/z
 export function getAvailableZoneRegistrations(categoryId: number) { return request<PairRegistration[]>(`/tournaments/categories/${categoryId}/registrations`, {}, true); }
 export function getZoneRegistrationPlacements(categoryId: number) { return request<ZoneRegistrationPlacement[]>(`/tournaments/categories/${categoryId}/registration-placements`, {}, true); }
 export function addZoneEntry(zoneId: number, registrationId: number) { return request(`/tournaments/zones/${zoneId}/entries`, { method: 'POST', body: JSON.stringify({ registrationId }) }, true); }
-export function assignZonePlace(zoneId: number, seed: number, registrationId: number) { return request(`/tournaments/zones/${zoneId}/places/${seed}`, { method: 'PATCH', body: JSON.stringify({ registrationId }) }, true); }
+export function assignZonePlace(zoneId: number, seed: number, team: number | { registrationId: number | null; localityId: number }) {
+  const payload = typeof team === 'number' ? { registrationId: team } : team;
+  return request(`/tournaments/zones/${zoneId}/places/${seed}`, { method: 'PATCH', body: JSON.stringify(payload) }, true);
+}
 
 export async function getPlayerPhoto(id: number) {
   const token = getToken();

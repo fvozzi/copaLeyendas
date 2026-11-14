@@ -9,6 +9,7 @@ export interface DistributionCategoryInput {
   id: number;
   name: string;
   registrations: DistributionRegistration[];
+  capacities?: number[] | null;
 }
 
 export interface DistributionVenueInput {
@@ -35,6 +36,7 @@ export interface DistributionCategoryPlan {
   categoryName: string;
   registrationCount: number;
   capacities: number[];
+  layoutMode: 'AUTOMATIC' | 'MANUAL';
   venue: DistributionVenueInput | null;
   zones: DistributionZonePlan[];
   warnings: string[];
@@ -75,9 +77,17 @@ export function planTournamentDistribution(
     const warnings: string[] = [];
     let capacities: number[] = [];
     try {
-      capacities = calculateZoneCapacities(category.registrations.length);
+      capacities = category.capacities?.length
+        ? validateConfiguredCapacities(category.capacities)
+        : calculateZoneCapacities(category.registrations.length);
     } catch (error) {
       warnings.push(error instanceof Error ? error.message : 'No se pudo calcular la cantidad de zonas.');
+    }
+    const availablePlaces = capacities.reduce((sum, capacity) => sum + capacity, 0);
+    if (category.registrations.length > availablePlaces && capacities.length) warnings.push(`Hay ${category.registrations.length} parejas y solo ${availablePlaces} lugares configurados. Agregá una zona o aumentá su capacidad.`);
+    if (category.capacities?.length && category.registrations.length < availablePlaces) {
+      const pending = availablePlaces - category.registrations.length;
+      warnings.push(`${pending === 1 ? 'Queda' : 'Quedan'} ${pending} ${pending === 1 ? 'lugar disponible' : 'lugares disponibles'} para próximas parejas confirmadas.`);
     }
     if (!category.registrations.length) warnings.push('No hay parejas confirmadas en esta categoria.');
     if (!venues.length) warnings.push('No hay sedes activas disponibles.');
@@ -99,7 +109,7 @@ export function planTournamentDistribution(
     });
     if (zones.some((zone) => !zone.venue)) {
       warnings.push('Dirección debe asignar una sede a cada zona antes de distribuir las parejas y generar los partidos.');
-      plans.push({ tournamentCategoryId: category.id, categoryName: category.name, registrationCount: category.registrations.length, capacities, venue: null, zones, warnings });
+      plans.push({ tournamentCategoryId: category.id, categoryName: category.name, registrationCount: category.registrations.length, capacities, layoutMode: category.capacities?.length ? 'MANUAL' : 'AUTOMATIC', venue: null, zones, warnings });
       continue;
     }
     const preference = (registration: DistributionRegistration) => existingAssignments.get(`${category.id}:${registration.id}`);
@@ -148,7 +158,13 @@ export function planTournamentDistribution(
     }
     const assignedVenueIds = new Set(zones.flatMap((zone) => zone.venue ? [zone.venue.id] : []));
     const venue = assignedVenueIds.size === 1 ? zones[0]?.venue ?? null : null;
-    plans.push({ tournamentCategoryId: category.id, categoryName: category.name, registrationCount: category.registrations.length, capacities, venue, zones, warnings });
+    plans.push({ tournamentCategoryId: category.id, categoryName: category.name, registrationCount: category.registrations.length, capacities, layoutMode: category.capacities?.length ? 'MANUAL' : 'AUTOMATIC', venue, zones, warnings });
   }
   return plans;
+}
+
+function validateConfiguredCapacities(capacities: number[]) {
+  if (capacities.length < 1 || capacities.length > 4) throw new Error('Configurá entre una y cuatro zonas.');
+  if (capacities.some((capacity) => capacity !== 3 && capacity !== 4)) throw new Error('Cada zona debe tener capacidad para 3 o 4 parejas.');
+  return [...capacities];
 }

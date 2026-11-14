@@ -12,6 +12,9 @@ import { Tournament } from './tournament.entity';
 import { Court } from '../courts/court.entity';
 import { Venue } from '../courts/venue.entity';
 import { TournamentZoneVenuePlan } from './tournament-zone-venue-plan.entity';
+import { RegistrationAccessGrant } from '../registrations/registration-access-grant.entity';
+import { Locality } from '../localities/locality.entity';
+import { Player } from '../players/player.entity';
 
 vi.mock('./tournament.entity', () => ({ Tournament: class Tournament {} }));
 vi.mock('./tournament-category.entity', () => ({ TournamentCategory: class TournamentCategory {} }));
@@ -20,6 +23,9 @@ vi.mock('./zone-entry.entity', () => ({ ZoneEntry: class ZoneEntry {} }));
 vi.mock('./tournament-match.entity', () => ({ TournamentMatch: class TournamentMatch {} }));
 vi.mock('./tournament-schedule-slot.entity', () => ({ TournamentScheduleSlot: class TournamentScheduleSlot {} }));
 vi.mock('../registrations/pair-registration.entity', () => ({ PairRegistration: class PairRegistration {} }));
+vi.mock('../registrations/registration-access-grant.entity', () => ({ RegistrationAccessGrant: class RegistrationAccessGrant {} }));
+vi.mock('../localities/locality.entity', () => ({ Locality: class Locality {} }));
+vi.mock('../players/player.entity', () => ({ Player: class Player {} }));
 vi.mock('../courts/court.entity', () => ({ Court: class Court {} }));
 vi.mock('../courts/venue.entity', () => ({ Venue: class Venue {} }));
 vi.mock('../courts/court-assistant-assignment.entity', () => ({ CourtAssistantAssignment: class CourtAssistantAssignment {} }));
@@ -239,6 +245,29 @@ it('persists a venue choice for a projected zone before generating matches', asy
   ], { conflictPaths: ['tournamentCategoryId', 'zoneIndex'] });
 });
 
+it('persists a manual zone layout with room for future confirmed pairs', async () => {
+  const category: any = { id: 8, tournamentId: 1, categoryId: 3, zoneSize: 4, zoneCount: null, zoneCapacities: null };
+  const categoryRepository = { findOneBy: vi.fn(async () => category), save: vi.fn(async (value) => value) };
+  const venuePlans = { delete: vi.fn(async () => undefined) };
+  const repositories = new Map<any, any>([
+    [Tournament, { findOne: vi.fn(async () => ({ id: 1 })) }],
+    [TournamentCategory, categoryRepository],
+    [TournamentZoneVenuePlan, venuePlans],
+  ]);
+  const manager = { getRepository: (entity: any) => repositories.get(entity) };
+  const transaction = vi.fn(async (work) => work(manager));
+  const service = new TournamentsService({ manager: { transaction } } as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never);
+  vi.spyOn(service as any, 'distributionPreviewInManager')
+    .mockResolvedValueOnce({ hasResults: false, plans: [{ tournamentCategoryId: 8, registrationCount: 11 }] })
+    .mockResolvedValueOnce({ hasResults: false, plans: [{ tournamentCategoryId: 8, registrationCount: 11, capacities: [3, 3, 3, 3] }] });
+
+  await service.setDistributionLayout(1, { tournamentCategoryId: 8, capacities: [3, 3, 3, 3] });
+
+  expect(category).toMatchObject({ zoneCapacities: [3, 3, 3, 3], zoneCount: 4, zoneSize: 3 });
+  expect(categoryRepository.save).toHaveBeenCalledWith(category);
+  expect(venuePlans.delete).toHaveBeenCalledWith(expect.objectContaining({ tournamentCategoryId: 8 }));
+});
+
 function setup(capacity = 4) {
   const venue = { id: 1, active: true, name: 'Club', startsAt: '10:00', matchDurationMinutes: 40, matchesPerDay: 16 };
   const zone = { id: 1, capacity, tournamentCategoryId: 8, name: 'A', venueId: 1, venue };
@@ -300,6 +329,57 @@ function setup(capacity = 4) {
 }
 
 describe('fixtures with unassigned places', () => {
+  it('creates a confirmed administrative participant when an active team has players but no registration', async () => {
+    const { service, entries, repositories } = setup();
+    const locality = { id: 99, name: 'Comodoro Rivadavia', active: true, categoryId: 3 };
+    const players = [
+      { id: 1, localityId: 99, fullName: 'Ana Sur', dni: '30111222', birthDate: '1970-01-01', phone: '5491111111111', instagram: null, shirtSize: 'M' },
+      { id: 2, localityId: 99, fullName: 'Bea Sur', dni: '30222333', birthDate: '1971-01-01', phone: '5491122222222', instagram: null, shirtSize: 'L' },
+    ];
+    const savedRegistrations: any[] = [];
+    const registrationRepository = {
+      findOneBy: vi.fn(async () => null), find: vi.fn(async () => []), count: vi.fn(async () => 1),
+      create: vi.fn((value) => value), save: vi.fn(async (value) => { const saved = { ...value, id: 77 }; savedRegistrations.push(saved); return saved; }),
+    };
+    const grantRepository = { save: vi.fn(async (value) => ({ ...value, id: 55 })), update: vi.fn() };
+    repositories.set(PairRegistration, registrationRepository);
+    repositories.set(RegistrationAccessGrant, grantRepository);
+    repositories.set(Locality, { findOneBy: vi.fn(async () => locality) });
+    repositories.set(Player, { find: vi.fn(async () => players) });
+
+    await service.assignPlace(1, undefined, 1, locality.id);
+
+    expect(savedRegistrations[0]).toMatchObject({ id: 77, localityId: 99, categoryId: 3, status: RegistrationStatus.CONFIRMED, playerOneDni: '30111222', playerTwoDni: '30222333', feeWaived: true });
+    expect(entries).toContainEqual(expect.objectContaining({ zoneId: 1, registrationId: 77, seed: 1 }));
+    expect(grantRepository.save).toHaveBeenCalledWith(expect.objectContaining({ localityId: 99, feeWaived: true }));
+  });
+
+  it('reuses the old confirmed registration when the same roster now belongs to a new active team', async () => {
+    const { service, entries, repositories } = setup();
+    const locality = { id: 99, name: 'Comodoro Rivadavia', active: true, categoryId: 3 };
+    const players = [
+      { id: 1, localityId: 99, fullName: 'Ana Sur', dni: '30111222', birthDate: '1970-01-01', phone: '5491111111111', instagram: null, shirtSize: 'M' },
+      { id: 2, localityId: 99, fullName: 'Bea Sur', dni: '30222333', birthDate: '1971-01-01', phone: '5491122222222', instagram: null, shirtSize: 'L' },
+    ];
+    const oldRegistration: any = { id: 42, accessGrantId: 7, localityId: 5, categoryId: 3, status: RegistrationStatus.CONFIRMED, playerOneDni: '30111222', playerTwoDni: '30222333', playerThreeDni: null };
+    const registrationRepository = {
+      findOneBy: vi.fn(async () => oldRegistration), find: vi.fn(async () => [oldRegistration]), count: vi.fn(async () => 1),
+      save: vi.fn(async (value) => value), create: vi.fn((value) => value),
+    };
+    const grantRepository = { save: vi.fn(), update: vi.fn(async () => undefined) };
+    repositories.set(PairRegistration, registrationRepository);
+    repositories.set(RegistrationAccessGrant, grantRepository);
+    repositories.set(Locality, { findOneBy: vi.fn(async () => locality) });
+    repositories.set(Player, { find: vi.fn(async () => players) });
+
+    await service.assignPlace(1, oldRegistration.id, 1, locality.id);
+
+    expect(oldRegistration).toMatchObject({ localityId: 99, representingText: 'Comodoro Rivadavia', playerOneName: 'Ana Sur', playerTwoName: 'Bea Sur' });
+    expect(entries).toContainEqual(expect.objectContaining({ registrationId: 42, seed: 1 }));
+    expect(grantRepository.save).not.toHaveBeenCalled();
+    expect(grantRepository.update).toHaveBeenCalledWith(7, expect.objectContaining({ localityId: 99 }));
+  });
+
   it.each([3, 4])('generates an empty %i-pair fixture with schedules and pending games', async (capacity) => {
     const { service, matches, schedule } = setup(capacity);
     await service.fixture(1);

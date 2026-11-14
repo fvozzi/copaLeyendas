@@ -338,18 +338,29 @@ export interface CourtPayload { name: string; venueId: number; active?: boolean;
 
 export interface Tournament { id: number; name: string; feePerPlayer: number; startsAt: string | null; endsAt: string | null; playingDays: string[]; city: string | null; status: 'DRAFT' | 'ACTIVE' | 'COMPLETED'; }
 export interface TournamentPayload { name: string; feePerPlayer?: number; startsAt?: string; endsAt?: string; playingDays?: string[]; city?: string; status?: 'DRAFT' | 'ACTIVE' | 'COMPLETED'; }
-export interface TournamentCategory { id: number; categoryId: number; pointsPerSet: number; setsToWin: number; zoneSize: number; zoneCount: number | null; category: Category; }
+export interface TournamentCategory { id: number; categoryId: number; pointsPerSet: number; setsToWin: number; zoneSize: number; zoneCount: number | null; zoneCapacities: number[] | null; category: Category; }
 export interface TournamentZone { id: number; name: string; capacity: number; tournamentCategoryId: number; venueId: number; venue: Venue; tournamentCategory: TournamentCategory; }
 export interface TournamentDetail extends Tournament { categories: TournamentCategory[]; zones: TournamentZone[]; }
 export interface TournamentDistributionRegistration { id: number; localityId: number; localityName: string; label: string; }
 export interface TournamentAttendanceRegistration extends TournamentDistributionRegistration { tournamentCategoryId: number; categoryName: string; present: boolean; }
 export interface TournamentDistributionZone { id?: number; name: string; capacity: number; venue?: Pick<Venue, 'id' | 'name'> | null; venueAssignment?: 'AUTOMATIC' | 'MANUAL' | 'APPLIED'; registrations: TournamentDistributionRegistration[]; }
-export interface TournamentDistributionCategory { tournamentCategoryId: number; categoryName: string; registrationCount: number; newRegistrationCount: number; capacities: number[]; venue: Pick<Venue, 'id' | 'name'> | null; zones: TournamentDistributionZone[]; warnings: string[]; }
+export interface TournamentDistributionCategory { tournamentCategoryId: number; categoryName: string; registrationCount: number; newRegistrationCount: number; capacities: number[]; layoutMode: 'AUTOMATIC' | 'MANUAL'; venue: Pick<Venue, 'id' | 'name'> | null; zones: TournamentDistributionZone[]; warnings: string[]; }
 export interface TournamentDistribution { tournament: Pick<Tournament, 'id' | 'name'>; mode: 'PREVIEW' | 'CURRENT'; canApply: boolean; baseVersion: string; matchCount: number; hasResults: boolean; replacesPendingFixture: boolean; rules: string[]; plans: TournamentDistributionCategory[]; attendance: TournamentAttendanceRegistration[]; venues: Pick<Venue, 'id' | 'name'>[]; }
 export interface TournamentMatch { id: number; zoneId?: number | null; sequence?: number | null; homeQualifierZoneId?: number | null; awayQualifierZoneId?: number | null; homeQualifierRank?: number | null; awayQualifierRank?: number | null; matchOrder: number; status: string; court?: Court | null; homeRegistration: PairRegistration | null; awayRegistration: PairRegistration | null; homeSource?: 'DIRECT' | 'WINNER' | 'LOSER'; awaySource?: 'DIRECT' | 'WINNER' | 'LOSER'; homeSourceMatchId?: number | null; awaySourceMatchId?: number | null; homeScore: number | null; awayScore: number | null; scheduledAt: string | null; resultPhotoAvailable?: boolean; resultPhotoOriginalName?: string | null; resultSubmittedAt?: string | null; }
 export interface ZoneEntry { id: number; seed: number; registration: PairRegistration; }
 export interface ZoneDetail extends TournamentZone { entries: ZoneEntry[]; }
-export interface ZoneRegistrationPlacement { registration: PairRegistration; zoneId: number | null; zoneName: string | null; seed: number | null; }
+export interface ZoneRegistrationPlacement {
+  registration: PairRegistration | null;
+  registrationId: number | null;
+  localityId: number;
+  locality: LocalityReference;
+  playerOneName: string;
+  playerTwoName: string;
+  playerThreeName: string | null;
+  zoneId: number | null;
+  zoneName: string | null;
+  seed: number | null;
+}
 
 export interface ProgramScenarioRule { categoryId: number; stage: 'ZONE' | 'QUARTERFINAL' | 'SEMIFINAL' | 'FINAL'; zoneId?: number; matchOrder?: number; venueId: number; courtId?: number | null; day: 'MAIN' | 'FINALS'; }
 export interface ProgramMatchOverride { sequence: number; courtId: number; scheduledAt: string; }

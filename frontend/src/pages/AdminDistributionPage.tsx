@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ProgramZoneEditor } from '../components/ProgramZoneEditor';
-import { applyTournamentDistribution, getTournament, getTournamentDistribution, getTournamentScheduleGrid, getTournaments, getVenues, setTournamentAttendance, setTournamentDistributionVenue } from '../lib/api';
-import type { Tournament, TournamentDistribution, TournamentScheduleSlot, TournamentZone, Venue } from '../types';
+import { applyTournamentDistribution, getTournament, getTournamentDistribution, getTournamentScheduleGrid, getTournaments, getVenues, setTournamentAttendance, setTournamentDistributionLayout, setTournamentDistributionVenue } from '../lib/api';
+import type { Tournament, TournamentDistribution, TournamentDistributionCategory, TournamentScheduleSlot, TournamentZone, Venue } from '../types';
 
 export function AdminDistributionPage() {
   const navigate = useNavigate();
@@ -13,6 +13,8 @@ export function AdminDistributionPage() {
   const [applying, setApplying] = useState(false);
   const [updatingAttendance, setUpdatingAttendance] = useState<number | null>(null);
   const [updatingVenue, setUpdatingVenue] = useState<string | null>(null);
+  const [updatingLayout, setUpdatingLayout] = useState<number | null>(null);
+  const [layoutDrafts, setLayoutDrafts] = useState<Record<number, number[]>>({});
   const [error, setError] = useState<string | null>(null);
   const [zoneEditor, setZoneEditor] = useState<{ zone: TournamentZone; venues: Venue[]; slots: TournamentScheduleSlot[] } | null>(null);
 
@@ -32,6 +34,10 @@ export function AdminDistributionPage() {
   };
 
   useEffect(() => { if (tournamentId) void calculate(tournamentId); }, [tournamentId]);
+  useEffect(() => {
+    if (!distribution) return;
+    setLayoutDrafts(Object.fromEntries(distribution.plans.map((plan) => [plan.tournamentCategoryId, [...plan.capacities]])));
+  }, [distribution]);
 
   const apply = async (resetProgram = false) => {
     if (!distribution?.canApply || applying) return;
@@ -67,6 +73,14 @@ export function AdminDistributionPage() {
     finally { setUpdatingVenue(null); }
   };
 
+  const saveLayout = async (tournamentCategoryId: number, capacities: number[] | null) => {
+    if (updatingLayout) return;
+    setUpdatingLayout(tournamentCategoryId); setError(null);
+    try { setDistribution(await setTournamentDistributionLayout(tournamentId, tournamentCategoryId, capacities)); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo guardar la configuración de zonas.'); }
+    finally { setUpdatingLayout(null); }
+  };
+
   const openZoneEditor = async (zoneId: number) => {
     setLoading(true); setError(null);
     try {
@@ -95,9 +109,9 @@ export function AdminDistributionPage() {
     <section className="data-card distribution-rules">
       <div><h2>Asignación de parejas a zonas</h2><p>Definí la sede de cada zona y revisá cómo quedan agrupadas las parejas. Los partidos se crean recién al aplicar la vista previa.</p></div>
       <ol>{(distribution?.rules ?? [
-        'El cuadro usa hasta cuatro zonas completas de 3 o 4 parejas.',
-        'De 12 a 16 parejas se mantienen cuatro zonas.',
-        'Con una baja sobre 16, el formato pasa a 4+4+4+3.',
+        'Dirección puede configurar hasta cuatro zonas de 3 o 4 parejas.',
+        'Se pueden reservar lugares para futuras parejas confirmadas.',
+        'Sin una configuración manual, el sistema calcula el esquema automáticamente.',
         'Las parejas de la misma localidad comparten sede, pero no zona.',
       ]).map((rule) => <li key={rule}>{rule}</li>)}</ol>
     </section>
@@ -114,6 +128,7 @@ export function AdminDistributionPage() {
     <div className="distribution-category-grid">
       {distribution?.plans.map((plan) => <article className="data-card distribution-category" key={plan.tournamentCategoryId}>
         <header><div><p className="eyebrow">{plan.registrationCount} parejas confirmadas{plan.newRegistrationCount > 0 ? ` · ${plan.newRegistrationCount} ${plan.newRegistrationCount === 1 ? 'nueva' : 'nuevas'}` : ''}</p><h2>{plan.categoryName}</h2></div><div className="distribution-summary"><strong>{plan.capacities.length ? plan.capacities.join(' + ') : 'Sin zonas'}</strong><span>{plan.venue?.name ?? (plan.zones.some((zone) => zone.venue) ? 'Varias sedes' : 'Sin sede asignada')}</span></div></header>
+        {!distribution.hasResults && <DistributionLayoutEditor plan={plan} capacities={layoutDrafts[plan.tournamentCategoryId] ?? plan.capacities} disabled={updatingLayout !== null || applying} onChange={(capacities) => setLayoutDrafts((current) => ({ ...current, [plan.tournamentCategoryId]: capacities }))} onSave={(capacities) => void saveLayout(plan.tournamentCategoryId, capacities)} onAutomatic={() => void saveLayout(plan.tournamentCategoryId, null)} />}
         <div className="distribution-attendance">
           {distribution.attendance.filter((registration) => registration.tournamentCategoryId === plan.tournamentCategoryId).map((registration) => <div key={registration.id} className={registration.present ? '' : 'is-absent'}>
             <span><strong>{registration.label}</strong><small>{registration.localityName}</small></span>
@@ -130,4 +145,26 @@ export function AdminDistributionPage() {
     {!loading && distribution && !distribution.plans.length && <p className="empty-copy">El torneo todavía no tiene categorías configuradas.</p>}
     {zoneEditor && <ProgramZoneEditor zone={zoneEditor.zone} venues={zoneEditor.venues} slots={zoneEditor.slots} onClose={() => setZoneEditor(null)} onChanged={refreshZoneEditor} onMatch={() => navigate('/app/programa')} />}
   </div>;
+}
+
+function DistributionLayoutEditor({ plan, capacities, disabled, onChange, onSave, onAutomatic }: {
+  plan: TournamentDistributionCategory;
+  capacities: number[];
+  disabled: boolean;
+  onChange: (capacities: number[]) => void;
+  onSave: (capacities: number[]) => void;
+  onAutomatic: () => void;
+}) {
+  const places = capacities.reduce((sum, capacity) => sum + capacity, 0);
+  const available = places - plan.registrationCount;
+  const dirty = JSON.stringify(capacities) !== JSON.stringify(plan.capacities);
+  const update = (index: number, capacity: number) => onChange(capacities.map((current, currentIndex) => currentIndex === index ? capacity : current));
+  return <section className="distribution-layout" aria-label={`Configuración de zonas de ${plan.categoryName}`}>
+    <header><div><h3>Configuración de zonas</h3><p>Agregá o quitá zonas y definí si cada una recibe 3 o 4 parejas.</p></div><span className={plan.layoutMode === 'MANUAL' ? 'is-manual' : ''}>{plan.layoutMode === 'MANUAL' ? 'Definido por Dirección' : 'Cálculo automático'}</span></header>
+    <div className="distribution-layout-zones">{capacities.map((capacity, index) => <div key={index}>
+      <label>Zona {String.fromCharCode(65 + index)}<select aria-label={`Capacidad de ${plan.categoryName} Zona ${String.fromCharCode(65 + index)}`} value={capacity} disabled={disabled} onChange={(event) => update(index, Number(event.target.value))}><option value={3}>3 parejas</option><option value={4}>4 parejas</option></select></label>
+      <button type="button" className="danger-link" aria-label={`Quitar Zona ${String.fromCharCode(65 + index)} de ${plan.categoryName}`} disabled={disabled || capacities.length === 1} onClick={() => onChange(capacities.filter((_, currentIndex) => currentIndex !== index))}>Quitar</button>
+    </div>)}</div>
+    <div className="distribution-layout-footer"><button type="button" className="secondary-button" disabled={disabled || capacities.length >= 4} onClick={() => onChange([...capacities, 3])}>Agregar zona</button><p className={available < 0 ? 'distribution-layout-error' : ''}><strong>{places} lugares</strong> para {plan.registrationCount} confirmadas{available > 0 ? ` · ${available} ${available === 1 ? 'libre' : 'libres'}` : available < 0 ? ` · faltan ${Math.abs(available)}` : ' · completo'}</p><div className="list-actions"><button type="button" className="primary-button" disabled={disabled || available < 0 || (plan.layoutMode === 'MANUAL' && !dirty)} onClick={() => onSave(capacities)}>{plan.layoutMode === 'MANUAL' ? 'Guardar esquema' : 'Fijar este esquema'}</button>{plan.layoutMode === 'MANUAL' && <button type="button" className="inline-link" disabled={disabled} onClick={onAutomatic}>Volver a automático</button>}</div></div>
+  </section>;
 }

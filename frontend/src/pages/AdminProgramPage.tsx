@@ -140,6 +140,14 @@ export function AdminProgramPage() {
       {slot.match?.status === 'READY' && <button type="button" className="inline-link" disabled={saving} onClick={() => editMatch(slot, 'result')}>Resultado</button>}
     </div> },
   ];
+  const categoryColumns = columns.filter((column) => column.label !== 'Categoría' && column.label !== 'Zona / Etapa').map((column) => {
+    if (column.label === 'Resultado') return { ...column, label: 'Estado / resultado' };
+    if (column.label !== 'Gestión') return column;
+    return { ...column, render: (slot: TournamentScheduleSlot) => <div className="list-actions">
+      {slot.match?.status !== 'PLAYED' && <button type="button" className="inline-link" disabled={saving} onClick={() => editMatch(slot, 'schedule')}>Horario</button>}
+      {slot.match?.status === 'READY' && <button type="button" className="inline-link" disabled={saving} onClick={() => editMatch(slot, 'result')}>Resultado</button>}
+    </div> };
+  });
   const byCategory = slots.reduce<Record<string, Record<string, TournamentScheduleSlot[]>>>((groups, slot) => {
     const category = slot.tournamentCategory.category.name;
     (groups[category] ??= {}); (groups[category][slot.zoneName] ??= []).push(slot); return groups;
@@ -170,7 +178,7 @@ export function AdminProgramPage() {
         </ProgramSubTabs>
       </section>}
     </ProgramSubTabs>}
-    {tab === 'categories' && <ProgramSubTabs options={categoryOptions} selected={selectedCategory} onSelect={setCategoryTab} ariaLabel="Categorías del programa">{selectedCategory && <section className="data-card"><div className="panel-header"><h2>{selectedCategory}</h2></div>{Object.entries(byCategory[selectedCategory]).sort(([a], [b]) => a.localeCompare(b)).map(([section, sectionSlots]) => <div className="program-zone" key={section}><h3>{section}</h3><AdminDataGrid rows={[...sectionSlots].sort(bySchedule)} emptyMessage="No hay partidos previstos." columns={columns} /></div>)}</section>}</ProgramSubTabs>}
+    {tab === 'categories' && <ProgramSubTabs options={categoryOptions} selected={selectedCategory} onSelect={setCategoryTab} ariaLabel="Categorías del programa">{selectedCategory && <CategoryProgramView name={selectedCategory} slots={Object.values(byCategory[selectedCategory]).flat()} columns={categoryColumns} />}</ProgramSubTabs>}
     {tournamentId > 0 && !slots.length && <div className="inline-state">Agregá categorías y zonas al torneo para generar el programa.</div>}
     {editing && <AdminDialog title={`${editing.kind === 'result' ? 'Resultado' : 'Horario'} P${editing.slot.sequence}`} onClose={() => { if (!saving) setEditing(null); }}><form className="editor-form" onSubmit={saveMatch}>
       {error && <div className="inline-state span-2" role="alert">{error}</div>}
@@ -183,6 +191,66 @@ export function AdminProgramPage() {
 
 function ProgramTable({ title, slots, columns }: { title: string; slots: TournamentScheduleSlot[]; columns: AdminGridColumn<TournamentScheduleSlot>[] }) {
   return <section className="data-card"><div className="panel-header"><h2>{title}</h2></div><AdminDataGrid rows={slots} emptyMessage="No hay partidos previstos." columns={columns} /></section>;
+}
+
+function CategoryProgramView({ name, slots, columns }: { name: string; slots: TournamentScheduleSlot[]; columns: AdminGridColumn<TournamentScheduleSlot>[] }) {
+  const zones = new Map<string, TournamentScheduleSlot[]>();
+  for (const slot of slots.filter((item) => item.stage === 'ZONE')) zones.set(slot.zoneName, [...(zones.get(slot.zoneName) ?? []), slot]);
+  const zoneSections = [...zones].sort(([left], [right]) => left.localeCompare(right, 'es', { numeric: true }));
+  const definitionSections = (['QUARTERFINAL', 'SEMIFINAL', 'FINAL'] as const).flatMap((stage) => {
+    const stageSlots = slots.filter((slot) => slot.stage === stage);
+    return stageSlots.length ? [{ stage, title: stageTitle(stage), slots: stageSlots }] : [];
+  });
+  const played = slots.filter((slot) => slot.match?.status === 'PLAYED').length;
+
+  return <section className="data-card program-category-view">
+    <header className="program-category-heading"><div><span className="eyebrow">Categoría</span><h2>{name}</h2></div><p>{zoneSections.length} {zoneSections.length === 1 ? 'zona' : 'zonas'} · {slots.length} partidos · {played} jugados</p></header>
+    <section className="program-category-overview" aria-label={`Zonas de ${name}`}>
+      <div className="program-category-section-title"><div><span className="eyebrow">Estructura</span><h3>Zonas</h3></div><p>Equipos, sede y avance de cada zona.</p></div>
+      {zoneSections.length ? <div className="program-category-zone-grid">{zoneSections.map(([zoneName, zoneSlots]) => <CategoryZoneCard key={zoneName} name={zoneName} slots={zoneSlots} />)}</div> : <div className="inline-state">Esta categoría no tiene zonas programadas.</div>}
+    </section>
+    <section className="program-category-games" aria-label={`Partidos de ${name}`}>
+      <div className="program-category-section-title"><div><span className="eyebrow">Operación</span><h3>Partidos</h3></div><p>Horarios, canchas, resultados y acciones.</p></div>
+      {zoneSections.map(([zoneName, zoneSlots]) => <CategoryMatchSection key={`zone-${zoneName}`} title={displayZoneName(zoneName)} slots={zoneSlots} columns={columns} />)}
+      {definitionSections.map((section) => <CategoryMatchSection key={section.stage} title={section.title} slots={section.slots} columns={columns} />)}
+    </section>
+  </section>;
+}
+
+function CategoryZoneCard({ name, slots }: { name: string; slots: TournamentScheduleSlot[] }) {
+  const teams = new Map<number, { locality: string; players: string }>();
+  for (const slot of [...slots].sort((left, right) => left.matchOrder - right.matchOrder)) {
+    for (const pair of [slot.match?.homeRegistration, slot.match?.awayRegistration]) {
+      if (pair && !teams.has(pair.id)) teams.set(pair.id, { locality: pair.locality.name, players: `${pair.playerOneName} / ${pair.playerTwoName}` });
+    }
+  }
+  const expected = slots[0]?.tournamentCategory.zoneSize ?? teams.size;
+  const teamRows = [...teams.values()];
+  const venues = [...new Set(slots.flatMap((slot) => slot.court?.venue?.name ? [slot.court.venue.name] : []))];
+  const zoneId = slots.find((slot) => slot.match?.zoneId)?.match?.zoneId;
+  const played = slots.filter((slot) => slot.match?.status === 'PLAYED').length;
+  return <article className="program-category-zone-card">
+    <header><div><span className="eyebrow">Zona</span><h4>{name.replace(/^zona\s+/i, '')}</h4></div><span className="program-category-progress">{played}/{slots.length} jugados</span></header>
+    <dl><div><dt>Sede</dt><dd>{venues.length ? venues.join(' · ') : 'A definir'}</dd></div><div><dt>Parejas</dt><dd>{teamRows.length}/{expected}</dd></div></dl>
+    <ol>{Array.from({ length: Math.max(expected, teamRows.length) }, (_, index) => {
+      const team = teamRows[index];
+      return <li key={index}><span>{index + 1}</span>{team ? <div><strong>{team.locality}</strong><small>{team.players}</small></div> : <em>A definir</em>}</li>;
+    })}</ol>
+    {zoneId && <Link className="secondary-button" to={`/app/zonas/${zoneId}`}>Ver o asignar parejas</Link>}
+  </article>;
+}
+
+function CategoryMatchSection({ title, slots, columns }: { title: string; slots: TournamentScheduleSlot[]; columns: AdminGridColumn<TournamentScheduleSlot>[] }) {
+  const venues = [...new Set(slots.flatMap((slot) => slot.court?.venue?.name ? [slot.court.venue.name] : []))];
+  return <section className="program-category-match-section"><header><div><h4>{title}</h4><p>{slots.length} {slots.length === 1 ? 'partido' : 'partidos'}{venues.length ? ` · ${venues.join(' · ')}` : ''}</p></div></header><AdminDataGrid rows={[...slots].sort(bySchedule)} emptyMessage="No hay partidos previstos." columns={columns} /></section>;
+}
+
+function stageTitle(stage: TournamentScheduleSlot['stage']) {
+  return ({ ZONE: 'Zona', QUARTERFINAL: 'Cuartos de final', SEMIFINAL: 'Semifinales', FINAL: 'Final' })[stage];
+}
+
+function displayZoneName(name: string) {
+  return /^zona\s+/i.test(name) ? name : `Zona ${name}`;
 }
 
 function VenueAssignments({ slots }: { slots: TournamentScheduleSlot[] }) {

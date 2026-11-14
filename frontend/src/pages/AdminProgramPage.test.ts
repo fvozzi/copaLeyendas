@@ -65,6 +65,29 @@ it('summarizes each category and zone once for the entire venue, including its k
   expect(container.querySelector('[aria-label="Categorías y zonas de la sede"]')?.textContent).toBe('Damas AZona D');
 });
 
+it('shows zone cards first and the category matches grouped underneath', async () => {
+  const pairA = { id: 101, playerOneName: 'Ana', playerTwoName: 'Bea', locality: { name: 'Beltran' } };
+  const pairB = { id: 102, playerOneName: 'Carla', playerTwoName: 'Dora', locality: { name: 'Macachin' } };
+  const zoneA = { ...slot, tournamentCategory: { ...slot.tournamentCategory, zoneSize: 4 }, matchId: 501, match: { id: 501, zoneId: 11, status: 'READY', homeRegistration: pairA, awayRegistration: pairB, homeScore: null, awayScore: null } } as TournamentScheduleSlot;
+  const zoneB = { ...zoneA, id: 11, sequence: 2, zoneName: 'Zona B', matchId: 502, match: { ...zoneA.match!, id: 502, zoneId: 12 } } as TournamentScheduleSlot;
+  const semifinal = { ...zoneA, id: 12, sequence: 3, stage: 'SEMIFINAL', zoneName: 'Semifinales', matchId: 503, match: { ...zoneA.match!, id: 503, zoneId: null } } as TournamentScheduleSlot;
+  vi.mocked(redistributeTournamentCourts).mockResolvedValue([zoneA, zoneB, semifinal]);
+
+  await click('Asignar canchas pendientes');
+  await click('Categorías');
+
+  const overview = container.querySelector('[aria-label="Zonas de Damas A"]')!;
+  const games = container.querySelector('[aria-label="Partidos de Damas A"]')!;
+  expect(overview.compareDocumentPosition(games) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(overview.querySelectorAll('.program-category-zone-card')).toHaveLength(2);
+  expect(overview.textContent).toContain('Beltran');
+  expect(overview.textContent).toContain('Ana / Bea');
+  expect(overview.querySelector('a[href="/app/zonas/11"]')).toBeTruthy();
+  expect([...games.querySelectorAll('.program-category-match-section h4')].map((heading) => heading.textContent)).toEqual(['Zona A', 'Zona B', 'Semifinales']);
+  expect([...games.querySelectorAll('th')].map((heading) => heading.textContent)).not.toContain('Categoría ↕');
+  expect([...games.querySelectorAll('th')].map((heading) => heading.textContent)).not.toContain('Zona / Etapa ↕');
+});
+
 it('shows actual pairs and submits results to the real fixture match, not the planning row', async () => {
   const actual = { ...slot, matchId: 500, match: { id: 500, zoneId: 9, matchOrder: 1, status: 'READY', homeRegistration: { playerOneName: 'Ana', playerTwoName: 'Bea', locality: { name: 'Junin' } }, awayRegistration: { playerOneName: 'Carla', playerTwoName: 'Dora', locality: { name: 'Salta' } }, homeScore: null, awayScore: null } } as TournamentScheduleSlot;
   vi.mocked(redistributeTournamentCourts).mockResolvedValue([actual]);

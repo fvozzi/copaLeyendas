@@ -2,10 +2,10 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, expect, it, vi } from 'vitest';
-import { applyTournamentDistribution, getTournamentDistribution, getTournaments, setTournamentAttendance, setTournamentDistributionVenue } from '../lib/api';
+import { applyTournamentDistribution, getTournamentDistribution, getTournaments, setTournamentAttendance, setTournamentDistributionLayout, setTournamentDistributionVenue } from '../lib/api';
 import { AdminDistributionPage } from './AdminDistributionPage';
 
-vi.mock('../lib/api', () => ({ getTournaments: vi.fn(), getTournamentDistribution: vi.fn(), applyTournamentDistribution: vi.fn(), setTournamentAttendance: vi.fn(), setTournamentDistributionVenue: vi.fn() }));
+vi.mock('../lib/api', () => ({ getTournaments: vi.fn(), getTournamentDistribution: vi.fn(), applyTournamentDistribution: vi.fn(), setTournamentAttendance: vi.fn(), setTournamentDistributionLayout: vi.fn(), setTournamentDistributionVenue: vi.fn() }));
 
 afterEach(() => { vi.restoreAllMocks(); vi.resetAllMocks(); document.body.innerHTML = ''; });
 
@@ -67,5 +67,36 @@ it('offers to add newly confirmed pairs without rebuilding the program from scra
   await act(async () => add.click());
   expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('conservando al máximo las zonas actuales'));
   expect(applyTournamentDistribution).toHaveBeenCalledWith(1, 'version-9', false);
+  await act(async () => root.unmount());
+});
+
+it('lets Direction configure four zones of three while only eleven pairs are confirmed', async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  vi.mocked(getTournaments).mockResolvedValue([{ id: 1, name: 'Copa', status: 'ACTIVE' }] as never);
+  const preview = {
+    tournament: { id: 1, name: 'Copa' }, mode: 'PREVIEW', canApply: true, baseVersion: 'version-11', matchCount: 0, hasResults: false, replacesPendingFixture: false,
+    rules: [], venues: [{ id: 2, name: 'Sede' }], attendance: [],
+    plans: [{ tournamentCategoryId: 5, categoryName: 'Damas A', registrationCount: 11, newRegistrationCount: 0, capacities: [4, 4, 3], layoutMode: 'AUTOMATIC', venue: { id: 2, name: 'Sede' }, warnings: [], zones: [] }],
+  } as const;
+  const configured = { ...preview, baseVersion: 'version-12', plans: preview.plans.map((plan) => ({ ...plan, capacities: [3, 3, 3, 3], layoutMode: 'MANUAL' as const })) };
+  vi.mocked(getTournamentDistribution).mockResolvedValue(preview as never);
+  vi.mocked(setTournamentDistributionLayout).mockResolvedValue(configured as never);
+  const container = document.createElement('div'); document.body.append(container);
+  const root = createRoot(container);
+  await act(async () => root.render(createElement(MemoryRouter, { future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(AdminDistributionPage))));
+
+  const first = container.querySelector<HTMLSelectElement>('[aria-label="Capacidad de Damas A Zona A"]')!;
+  const second = container.querySelector<HTMLSelectElement>('[aria-label="Capacidad de Damas A Zona B"]')!;
+  await act(async () => { first.value = '3'; first.dispatchEvent(new Event('change', { bubbles: true })); });
+  await act(async () => { second.value = '3'; second.dispatchEvent(new Event('change', { bubbles: true })); });
+  const add = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'Agregar zona')!;
+  await act(async () => add.click());
+  expect(container.querySelector('[aria-label="Configuración de zonas de Damas A"]')?.textContent).toContain('12 lugares para 11 confirmadas · 1 libre');
+  const save = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'Fijar este esquema')!;
+  await act(async () => save.click());
+
+  expect(setTournamentDistributionLayout).toHaveBeenCalledWith(1, 5, [3, 3, 3, 3]);
+  expect(container.textContent).toContain('Definido por Dirección');
+  expect(container.textContent).toContain('3 + 3 + 3 + 3');
   await act(async () => root.unmount());
 });

@@ -1,13 +1,16 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, In, Repository } from 'typeorm';
+import { EntityManager, In, MoreThanOrEqual, Repository } from 'typeorm';
 import { type AuthenticatedUser } from '../auth/current-user.decorator';
 import { UserRole } from '../auth/user.entity';
 import { CourtAssistantAssignment } from '../courts/court-assistant-assignment.entity';
 import { Court } from '../courts/court.entity';
 import { Venue } from '../courts/venue.entity';
 import { PairRegistration } from '../registrations/pair-registration.entity';
-import { RegistrationStatus } from '../registrations/registration.enums';
+import { RegistrationAccessGrant } from '../registrations/registration-access-grant.entity';
+import { HeardAboutSource, RegistrationAccessGrantStatus, RegistrationStatus } from '../registrations/registration.enums';
+import { Locality } from '../localities/locality.entity';
+import { Player } from '../players/player.entity';
 import { MatchStatus, ParticipantSource, TournamentStatus } from './tournament.enums';
 import { TournamentCategory } from './tournament-category.entity';
 import { TournamentMatch } from './tournament-match.entity';
@@ -18,7 +21,7 @@ import { Zone } from './zone.entity';
 import { distributeProgramCourts, redistributeExistingCourts } from './program-courts';
 import { matchView, programRelations, programView } from './program-view';
 import { standings } from './zone-standings';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import type { ProgramScenarioDto } from './program-scenario.dto';
 import { simulateProgram } from './program-scenario';
 import { readMatchResultPhoto, removeMatchResultPhoto, storeMatchResultPhoto } from './match-result-photo-storage';
@@ -165,11 +168,13 @@ export class TournamentsService {
   }
   addEntry(zoneId: number, registrationId: number) { return this.assignPlace(zoneId, registrationId); }
 
-  async assignPlace(zoneId: number, registrationId: number, requestedSeed?: number) {
+  async assignPlace(zoneId: number, registrationId?: number, requestedSeed?: number, localityId?: number) {
     return this.withLockedZone(zoneId, async (manager, zone) => {
       const category = await manager.getRepository(TournamentCategory).findOne({ where: { id: zone.tournamentCategoryId }, lock: { mode: 'pessimistic_write' } });
-      const registration = await manager.getRepository(PairRegistration).findOneBy({ id: registrationId });
-      if (!registration || registration.status !== RegistrationStatus.CONFIRMED || registration.categoryId !== category?.categoryId) {
+      if (!category) throw new NotFoundException('Categoria de torneo no encontrada');
+      const registration = await this.resolveZoneRegistration(manager, category.categoryId, registrationId, localityId);
+      registrationId = registration.id;
+      if (registration.status !== RegistrationStatus.CONFIRMED || registration.categoryId !== category.categoryId) {
         throw new BadRequestException('Selecciona una pareja confirmada de esta categoria');
       }
       const matches = await manager.getRepository(TournamentMatch).find({ where: { zoneId }, order: { matchOrder: 'ASC' } });
@@ -211,6 +216,87 @@ export class TournamentsService {
       for (const affectedZoneId of affectedZoneIds) await this.syncZoneDirectParticipants(manager, affectedZoneId);
       return { entry: await repository.findOne({ where: { zoneId, registrationId } }), swappedEntry };
     });
+  }
+
+  private async resolveZoneRegistration(manager: EntityManager, categoryId: number, registrationId?: number, localityId?: number) {
+    const registrations = manager.getRepository(PairRegistration);
+    if (registrationId) {
+      const registration = await registrations.findOneBy({ id: registrationId });
+      if (!registration || registration.status !== RegistrationStatus.CONFIRMED || registration.categoryId !== categoryId) {
+        throw new BadRequestException('Selecciona una pareja confirmada de esta categoria');
+      }
+      if (localityId && registration.localityId !== localityId) {
+        const { locality, players } = await this.zoneRoster(manager, categoryId, localityId);
+        if (!sameRegistrationRoster(registration, players)) throw new BadRequestException('La inscripcion elegida no corresponde al equipo activo seleccionado');
+        await this.reconcileAdministrativeRegistration(manager, registration, locality, players);
+      }
+      return registration;
+    }
+    if (!localityId) throw new BadRequestException('Selecciona un equipo de esta categoria');
+
+    const { locality, players } = await this.zoneRoster(manager, categoryId, localityId);
+    const confirmed = await registrations.find({ where: { categoryId, status: RegistrationStatus.CONFIRMED } });
+    const matching = confirmed.find((registration) => sameRegistrationRoster(registration, players));
+    if (matching) {
+      await this.reconcileAdministrativeRegistration(manager, matching, locality, players);
+      return matching;
+    }
+
+    const grant = await manager.getRepository(RegistrationAccessGrant).save({
+      token: `COPA-ADM-${randomBytes(8).toString('hex').toUpperCase()}`,
+      categoryId,
+      localityId: locality.id,
+      contactName: players[0].fullName.trim(),
+      contactEmail: null,
+      contactPhone: players[0].phone!.trim(),
+      notes: 'Habilitacion administrativa creada al incorporar el equipo al torneo.',
+      feeWaived: true,
+      paymentDeferredUntilConfirmed: false,
+      status: RegistrationAccessGrantStatus.USED,
+      consumedAt: new Date(),
+    });
+    return registrations.save(registrations.create({
+      accessGrantId: grant.id,
+      categoryId,
+      localityId: locality.id,
+      heardAboutSource: HeardAboutSource.OTHER,
+      heardAboutOtherText: 'Alta administrativa',
+      tournamentAvailabilityConfirmed: true,
+      representingText: locality.name,
+      contactEmail: null,
+      feeWaived: true,
+      paymentDeferredUntilConfirmed: false,
+      ...registrationRoster(players),
+      status: RegistrationStatus.CONFIRMED,
+      adminNotes: 'Inscripcion administrativa creada al asignar el equipo a una zona.',
+    }));
+  }
+
+  private async zoneRoster(manager: EntityManager, categoryId: number, localityId: number) {
+    const locality = await manager.getRepository(Locality).findOneBy({ id: localityId });
+    if (!locality || !locality.active || locality.categoryId !== categoryId) throw new BadRequestException('Selecciona un equipo activo de esta categoria');
+    const players = await manager.getRepository(Player).find({ where: { localityId }, order: { id: 'ASC' } });
+    if (players.length < 2 || players.length > 3) throw new BadRequestException('El equipo debe tener dos o tres jugadoras para incorporarlo a una zona');
+    if (players.some((player) => !player.birthDate || !player.phone?.trim() || !player.shirtSize)) {
+      throw new BadRequestException('Completa fecha de nacimiento, telefono y talle de todas las jugadoras antes de incorporar el equipo a una zona');
+    }
+    return { locality, players };
+  }
+
+  private async reconcileAdministrativeRegistration(manager: EntityManager, registration: PairRegistration, locality: Locality, players: Player[]) {
+    registration.localityId = locality.id;
+    registration.representingText = locality.name;
+    Object.assign(registration, registrationRoster(players));
+    await manager.getRepository(PairRegistration).save(registration);
+    const grantRegistrations = await manager.getRepository(PairRegistration).count({ where: { accessGrantId: registration.accessGrantId } });
+    if (grantRegistrations === 1) {
+      await manager.getRepository(RegistrationAccessGrant).update(registration.accessGrantId, {
+        localityId: locality.id,
+        categoryId: registration.categoryId,
+        contactName: players[0].fullName.trim(),
+        contactPhone: players[0].phone!.trim(),
+      });
+    }
   }
 
   private async syncZoneDirectParticipants(manager: EntityManager, zoneId: number) {
@@ -263,15 +349,17 @@ export class TournamentsService {
     const registrations = (await this.r.find({ where: { categoryId: category.categoryId, status: RegistrationStatus.CONFIRMED }, relations: { locality: true }, order: { id: 'ASC' } }))
       .sort((left, right) => left.locality.name.localeCompare(right.locality.name, 'es') || left.id - right.id);
     const count = category.zoneCount ?? Math.max(1, Math.ceil(registrations.length / category.zoneSize));
-    if (registrations.length > count * category.zoneSize) throw new BadRequestException(`Hay ${registrations.length} parejas confirmadas y solo ${count * category.zoneSize} lugares configurados. Aumentá la cantidad de zonas antes de dividir.`);
+    const capacities = category.zoneCapacities?.length ? category.zoneCapacities : Array.from({ length: count }, () => category.zoneSize);
+    const places = capacities.reduce((sum, capacity) => sum + capacity, 0);
+    if (registrations.length > places) throw new BadRequestException(`Hay ${registrations.length} parejas confirmadas y solo ${places} lugares configurados. Aumentá la cantidad de zonas antes de dividir.`);
     const venues = await this.venues.find({ where: { active: true }, order: { name: 'ASC' } });
     if (!venues.length) throw new BadRequestException('Debes habilitar al menos una sede antes de dividir las zonas.');
     if (existing.length) await this.z.remove(existing);
-    const zones = await this.z.save(Array.from({ length: count }, (_, index) => this.z.create({ tournamentCategoryId, venueId: venues[index % venues.length].id, name: `Zona ${String.fromCharCode(65 + index)}`, capacity: category.zoneSize })));
+    const zones = await this.z.save(capacities.map((capacity, index) => this.z.create({ tournamentCategoryId, venueId: venues[index % venues.length].id, name: `Zona ${String.fromCharCode(65 + index)}`, capacity })));
     const assignments = zones.map((zone) => ({ zone, entries: [] as PairRegistration[] }));
     for (const registration of registrations) {
-      const eligible = assignments.filter((item) => item.entries.length < category.zoneSize && !item.entries.some((entry) => entry.localityId === registration.localityId));
-      const target = (eligible.length ? eligible : assignments.filter((item) => item.entries.length < category.zoneSize)).sort((a, b) => a.entries.length - b.entries.length)[0];
+      const eligible = assignments.filter((item) => item.entries.length < item.zone.capacity && !item.entries.some((entry) => entry.localityId === registration.localityId));
+      const target = (eligible.length ? eligible : assignments.filter((item) => item.entries.length < item.zone.capacity)).sort((a, b) => a.entries.length / a.zone.capacity - b.entries.length / b.zone.capacity)[0];
       target.entries.push(registration);
       await this.e.save(this.e.create({ zoneId: target.zone.id, registrationId: registration.id, seed: target.entries.length }));
     }
@@ -299,6 +387,32 @@ export class TournamentsService {
     }));
     await this.t.manager.getRepository(TournamentZoneVenuePlan).upsert(assignments, { conflictPaths: ['tournamentCategoryId', 'zoneIndex'] });
     return this.distributionPreview(tournamentId);
+  }
+
+  async setDistributionLayout(tournamentId: number, dto: { tournamentCategoryId: number; capacities: number[] | null }) {
+    return this.t.manager.transaction(async (manager) => {
+      const tournament = await manager.getRepository(Tournament).findOne({ where: { id: tournamentId }, lock: { mode: 'pessimistic_write' } });
+      if (!tournament) throw new NotFoundException('Torneo no encontrado');
+      const current = await this.distributionPreviewInManager(manager, tournamentId);
+      if (current.hasResults) throw new BadRequestException('No se puede cambiar la cantidad de zonas porque el torneo ya tiene resultados.');
+      const category = await manager.getRepository(TournamentCategory).findOneBy({ id: dto.tournamentCategoryId, tournamentId });
+      if (!category) throw new NotFoundException('Categoria de torneo no encontrada');
+      if (dto.capacities !== null) {
+        if (dto.capacities.length < 1 || dto.capacities.length > 4) throw new BadRequestException('Configura entre una y cuatro zonas.');
+        if (dto.capacities.some((capacity) => capacity !== 3 && capacity !== 4)) throw new BadRequestException('Cada zona debe tener capacidad para 3 o 4 parejas.');
+        const registrationCount = current.plans.find((plan) => plan.tournamentCategoryId === category.id)?.registrationCount ?? 0;
+        const places = dto.capacities.reduce((sum, capacity) => sum + capacity, 0);
+        if (places < registrationCount) throw new BadRequestException(`Hay ${registrationCount} parejas presentes y la configuracion solo tiene ${places} lugares.`);
+      }
+      category.zoneCapacities = dto.capacities ? [...dto.capacities] : null;
+      category.zoneCount = dto.capacities?.length ?? null;
+      if (dto.capacities?.length && dto.capacities.every((capacity) => capacity === dto.capacities![0])) category.zoneSize = dto.capacities[0];
+      await manager.getRepository(TournamentCategory).save(category);
+      if (dto.capacities) await manager.getRepository(TournamentZoneVenuePlan).delete({
+        tournamentCategoryId: category.id, zoneIndex: MoreThanOrEqual(dto.capacities.length),
+      });
+      return this.distributionPreviewInManager(manager, tournamentId);
+    });
   }
 
   private distributionRegistration(registration: PairRegistration): DistributionRegistration {
@@ -348,16 +462,16 @@ export class TournamentsService {
     const rules = [
       'El armado usa únicamente inscripciones confirmadas; los tokens emitidos todavía no confirmados no se incluyen.',
       'Dirección debe asignar cada zona a una sede antes de generar los partidos; no hay autoasignación de sedes.',
-      'El cuadro usa hasta cuatro zonas, siempre completas, de 3 o 4 parejas.',
-      'De 12 a 16 parejas se mantienen cuatro zonas: 12 es 3+3+3+3 y 16 es 4+4+4+4.',
-      'Si falta una de 16, el formato pasa automaticamente a 4+4+4+3.',
+      'Dirección puede configurar entre una y cuatro zonas, con capacidad de 3 o 4 parejas cada una.',
+      'Si no hay una configuración manual, el sistema calcula automáticamente zonas completas de 3 o 4 parejas.',
+      'Una configuración puede dejar lugares libres para incorporar nuevas parejas confirmadas sin empezar de cero.',
       'Las parejas de una misma localidad comparten sede, pero se ubican en zonas diferentes.',
       'Entre categorias distintas se intenta conservar la misma sede para una localidad.',
       'Los partidos generados son los mismos que se consultan y editan desde Programa - Mapa.',
     ];
     const snapshot = {
       tournament: { id: tournament.id, updatedAt: (tournament as Tournament & { updatedAt?: Date }).updatedAt },
-      categories: categories.map((category) => ({ id: category.id, categoryId: category.categoryId, name: category.category.name })),
+      categories: categories.map((category) => ({ id: category.id, categoryId: category.categoryId, name: category.category.name, zoneCapacities: category.zoneCapacities })),
       registrations: registrations.map((registration) => ({ id: registration.id, categoryId: registration.categoryId, localityId: registration.localityId, updatedAt: registration.updatedAt })),
       attendance: attendanceRows.map((row) => ({ registrationId: row.registrationId, present: row.present, updatedAt: row.updatedAt })),
       venues: venues.map((venue) => ({ id: venue.id, name: venue.name, active: venue.active })),
@@ -378,6 +492,7 @@ export class TournamentsService {
     const planned = planTournamentDistribution(categories.map((category) => ({
       id: category.id,
       name: category.category.name,
+      capacities: category.zoneCapacities,
       registrations: eligibleRegistrations.filter((registration) => registration.categoryId === category.categoryId).map((registration) => this.distributionRegistration(registration)),
     })), venues.map((venue) => ({ id: venue.id, name: venue.name })), new Map(venuePlans.map((plan) => [`${plan.tournamentCategoryId}:${plan.zoneIndex}`, plan.venueId])), existingAssignments);
     const currentSignature = JSON.stringify(categories.map((category) => zones.filter((zone) => zone.tournamentCategoryId === category.id).map((zone) => ({
@@ -399,6 +514,7 @@ export class TournamentsService {
           registrationCount: categoryZones.reduce((sum, zone) => sum + entries.filter((entry) => entry.zoneId === zone.id).length, 0),
           newRegistrationCount: 0,
           capacities: categoryZones.map((zone) => zone.capacity),
+           layoutMode: category.zoneCapacities?.length ? 'MANUAL' as const : 'AUTOMATIC' as const,
           venue: venueIds.size === 1 ? categoryZones[0]?.venue ?? null : null,
           zones: categoryZones.map((zone) => ({
             id: zone.id, name: zone.name, capacity: zone.capacity, venue: zone.venue, venueAssignment: 'APPLIED' as const,
@@ -898,4 +1014,37 @@ export class TournamentsService {
       await repository.save(match);
     }
   }
+}
+
+function sameRegistrationRoster(registration: PairRegistration, players: Player[]) {
+  const registrationDnis = [registration.playerOneDni, registration.playerTwoDni, registration.playerThreeDni]
+    .map((dni) => dni?.trim())
+    .filter((dni): dni is string => Boolean(dni))
+    .sort();
+  const playerDnis = players.map((player) => player.dni.trim()).sort();
+  return registrationDnis.length === playerDnis.length && registrationDnis.every((dni, index) => dni === playerDnis[index]);
+}
+
+function registrationRoster(players: Player[]) {
+  const [one, two, three] = players;
+  return {
+    playerOneName: one.fullName.trim(),
+    playerOneDni: one.dni.trim(),
+    playerOneBirthDate: one.birthDate!,
+    playerOnePhone: one.phone!.trim(),
+    playerOneInstagram: one.instagram,
+    playerOneShirtSize: one.shirtSize!,
+    playerTwoName: two.fullName.trim(),
+    playerTwoDni: two.dni.trim(),
+    playerTwoBirthDate: two.birthDate!,
+    playerTwoPhone: two.phone!.trim(),
+    playerTwoInstagram: two.instagram,
+    playerTwoShirtSize: two.shirtSize!,
+    playerThreeName: three?.fullName.trim() ?? null,
+    playerThreeDni: three?.dni.trim() ?? null,
+    playerThreeBirthDate: three?.birthDate ?? null,
+    playerThreePhone: three?.phone?.trim() ?? null,
+    playerThreeInstagram: three?.instagram ?? null,
+    playerThreeShirtSize: three?.shirtSize ?? null,
+  };
 }

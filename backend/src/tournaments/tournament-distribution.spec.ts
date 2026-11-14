@@ -22,6 +22,19 @@ describe('calculateZoneCapacities', () => {
 });
 
 describe('planTournamentDistribution', () => {
+  it('honors a manual four-by-three layout with one place reserved for the twelfth pair', () => {
+    const registrations = Array.from({ length: 11 }, (_, index) => ({ id: index + 1, localityId: index + 1, localityName: `Equipo ${index + 1}`, label: `Pareja ${index + 1}` }));
+    const venuePlans = new Map(Array.from({ length: 4 }, (_, index) => [`3:${index}`, 1] as const));
+    const [plan] = planTournamentDistribution([{ id: 3, name: 'Damas A', capacities: [3, 3, 3, 3], registrations }], [{ id: 1, name: 'Sede' }], venuePlans);
+
+    expect(plan.layoutMode).toBe('MANUAL');
+    expect(plan.capacities).toEqual([3, 3, 3, 3]);
+    expect(plan.zones).toHaveLength(4);
+    expect(plan.zones.flatMap((zone) => zone.registrations)).toHaveLength(11);
+    expect(plan.zones.map((zone) => zone.registrations.length).sort()).toEqual([2, 3, 3, 3]);
+    expect(plan.warnings).toContain('Queda 1 lugar disponible para próximas parejas confirmadas.');
+  });
+
   it('keeps a locality in one venue and separates its pairs into different zones', () => {
     const registrations = Array.from({ length: 8 }, (_, index) => ({
       id: index + 1,

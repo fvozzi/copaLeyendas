@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, Param, ParseIntPipe, Patch, Post, Res, StreamableFile, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
-import { IsBoolean, IsDateString, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsDateString, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import type { Response } from 'express';
@@ -14,9 +14,10 @@ import { TournamentVenuePdfService } from './tournament-venue-pdf.service';
 
 class ScheduleMatchDto { @IsDateString() scheduledAt: string; }
 class ResultDto { @IsInt() homeScore: number; @IsInt() awayScore: number; }
-class AssignPlaceDto { @IsInt() @Min(1) registrationId: number; }
+class AssignPlaceDto { @IsOptional() @IsInt() @Min(1) registrationId?: number; @IsOptional() @IsInt() @Min(1) localityId?: number; }
 class ApplyDistributionDto { @IsString() baseVersion: string; @IsOptional() @IsBoolean() resetProgram?: boolean; }
 class DistributionVenueDto { @IsInt() @Min(1) tournamentCategoryId: number; @IsInt() @Min(0) zoneIndex: number; @IsInt() @Min(1) venueId: number; }
+class DistributionLayoutDto { @IsInt() @Min(1) tournamentCategoryId: number; @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(4) @IsInt({ each: true }) @Min(3, { each: true }) @Max(4, { each: true }) capacities: number[] | null; }
 class AttendanceDto { @IsBoolean() present: boolean; }
 
 @Controller('tournaments')
@@ -32,6 +33,7 @@ export class TournamentsController {
   @Get(':id') detail(@Param('id', ParseIntPipe) id: number) { return this.q.detail(id); }
   @Get(':id/distribution') distribution(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { this.assertDirector(user); return this.s.distributionPreview(id); }
   @Patch(':id/distribution/venue') distributionVenue(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: DistributionVenueDto) { this.assertDirector(user); return this.s.setDistributionVenue(id, dto); }
+  @Patch(':id/distribution/layout') distributionLayout(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: DistributionLayoutDto) { this.assertDirector(user); return this.s.setDistributionLayout(id, dto); }
   @Post(':id/distribution/apply') applyDistribution(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: ApplyDistributionDto) { this.assertDirector(user); return this.s.applyDistribution(id, dto.baseVersion, dto.resetProgram ?? false); }
   @Patch(':id/attendance/:registrationId') attendance(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Param('registrationId', ParseIntPipe) registrationId: number, @Body() dto: AttendanceDto) { this.assertDirector(user); return this.s.setAttendance(id, registrationId, dto.present); }
   @Get(':id/schedule-grid') scheduleGrid(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { this.assertDirector(user); return this.s.scheduleGrid(id); }
@@ -58,7 +60,7 @@ export class TournamentsController {
   @Patch('schedule-slots/:id') scheduleSlot(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: { scheduledAt?: string | null; courtId?: number | null }) { this.assertDirector(user); return this.s.updateScheduleSlot(id, dto); }
   @Post('zones/:id/entries') entry(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: { registrationId: number }) { this.assertDirector(user); return this.s.addEntry(id, dto.registrationId); }
   @Post('zones/:id/fixture') fixture(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { this.assertDirector(user); return this.s.fixture(id); }
-  @Patch('zones/:id/places/:seed') place(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Param('seed', ParseIntPipe) seed: number, @Body() dto: AssignPlaceDto) { this.assertDirector(user); return this.s.assignPlace(id, dto.registrationId, seed); }
+  @Patch('zones/:id/places/:seed') place(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Param('seed', ParseIntPipe) seed: number, @Body() dto: AssignPlaceDto) { this.assertDirector(user); return this.s.assignPlace(id, dto.registrationId, seed, dto.localityId); }
   @Patch('matches/:id/schedule') schedule(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: ScheduleMatchDto) { return this.s.schedule(id, dto.scheduledAt, user); }
   @Post('matches/:id/result')
   @UseInterceptors(FileInterceptor('photo', { storage: memoryStorage(), limits: { fileSize: 8 * 1024 * 1024, files: 1 } }))

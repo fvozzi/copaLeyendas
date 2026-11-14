@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Tournament } from './tournament.entity';
 import { TournamentCategory } from './tournament-category.entity';
 import { Zone } from './zone.entity';
@@ -14,24 +14,66 @@ import { programRelations } from './program-view';
 import { TournamentScheduleSlot } from './tournament-schedule-slot.entity';
 import { publicCourt, publicPair, publicProgramView, publicVenue } from './public-program-view';
 import { standings } from './zone-standings';
+import { Locality } from '../localities/locality.entity';
+import { Player } from '../players/player.entity';
 
 @Injectable()
 export class TournamentQueryService {
-  constructor(@InjectRepository(Tournament) private readonly tournaments: Repository<Tournament>, @InjectRepository(TournamentCategory) private readonly categories: Repository<TournamentCategory>, @InjectRepository(Zone) private readonly zones: Repository<Zone>, @InjectRepository(ZoneEntry) private readonly entries: Repository<ZoneEntry>, @InjectRepository(PairRegistration) private readonly registrations: Repository<PairRegistration>, @InjectRepository(TournamentMatch) private readonly matches: Repository<TournamentMatch>, @InjectRepository(Court) private readonly courts: Repository<Court>) {}
+  constructor(@InjectRepository(Tournament) private readonly tournaments: Repository<Tournament>, @InjectRepository(TournamentCategory) private readonly categories: Repository<TournamentCategory>, @InjectRepository(Zone) private readonly zones: Repository<Zone>, @InjectRepository(ZoneEntry) private readonly entries: Repository<ZoneEntry>, @InjectRepository(PairRegistration) private readonly registrations: Repository<PairRegistration>, @InjectRepository(TournamentMatch) private readonly matches: Repository<TournamentMatch>, @InjectRepository(Court) private readonly courts: Repository<Court>, @InjectRepository(Locality) private readonly localities: Repository<Locality>, @InjectRepository(Player) private readonly players: Repository<Player>) {}
   async detail(id: number) { const tournament = await this.tournaments.findOneBy({ id }); if (!tournament) throw new NotFoundException('Torneo no encontrado'); return { ...tournament, categories: await this.categories.find({ where: { tournamentId: id }, relations: { category: true } }), zones: await this.zones.find({ where: { tournamentCategory: { tournamentId: id } }, relations: { venue: true, tournamentCategory: { category: true } } }) }; }
   async zone(id: number) { const zone = await this.zones.findOne({ where: { id }, relations: { venue: true, tournamentCategory: { category: true } } }); if (!zone) throw new NotFoundException('Zona no encontrada'); return { ...zone, entries: await this.entries.find({ where: { zoneId: id }, relations: { registration: { locality: true } }, order: { seed: 'ASC', id: 'ASC' } }) }; }
   async availableRegistrations(tournamentCategoryId: number) { const category = await this.categories.findOne({ where: { id: tournamentCategoryId } }); if (!category) throw new NotFoundException('Categoria de torneo no encontrada'); const assigned = await this.entries.createQueryBuilder('entry').innerJoin('entry.zone', 'zone').where('zone.tournamentCategoryId = :id', { id: tournamentCategoryId }).select('entry.registrationId', 'id').getRawMany<{ id: number }>(); return this.registrations.createQueryBuilder('registration').leftJoinAndSelect('registration.category', 'category').leftJoinAndSelect('registration.locality', 'locality').where('registration.categoryId = :categoryId', { categoryId: category.categoryId }).andWhere('registration.status = :status', { status: RegistrationStatus.CONFIRMED }).andWhere(assigned.length ? 'registration.id NOT IN (:...ids)' : '1=1', { ids: assigned.map((item) => item.id) }).orderBy('locality.name', 'ASC').getMany(); }
   async registrationPlacements(tournamentCategoryId: number) {
     const category = await this.categories.findOne({ where: { id: tournamentCategoryId } });
     if (!category) throw new NotFoundException('Categoria de torneo no encontrada');
-    const [registrations, entries] = await Promise.all([
+    const [registrations, entries, localities] = await Promise.all([
       this.registrations.createQueryBuilder('registration').leftJoinAndSelect('registration.category', 'category').leftJoinAndSelect('registration.locality', 'locality').where('registration.categoryId = :categoryId', { categoryId: category.categoryId }).andWhere('registration.status = :status', { status: RegistrationStatus.CONFIRMED }).orderBy('locality.name', 'ASC').addOrderBy('registration.id', 'ASC').getMany(),
       this.entries.find({ where: { zone: { tournamentCategoryId } }, relations: { zone: true } }),
+      this.localities.find({ where: { categoryId: category.categoryId, active: true }, order: { name: 'ASC', id: 'ASC' } }),
     ]);
-    return registrations.map((registration) => {
-      const entry = entries.find((item) => item.registrationId === registration.id);
-      return { registration, zoneId: entry?.zoneId ?? null, zoneName: entry?.zone.name ?? null, seed: entry?.seed ?? null };
+    const rosters = localities.length
+      ? await this.players.find({ where: { localityId: In(localities.map((locality) => locality.id)) }, order: { id: 'ASC' } })
+      : [];
+    const playersByLocality = new Map<number, Player[]>();
+    for (const player of rosters) playersByLocality.set(player.localityId!, [...(playersByLocality.get(player.localityId!) ?? []), player]);
+    const registrationsByLocality = new Map<number, PairRegistration[]>();
+    for (const registration of registrations) registrationsByLocality.set(registration.localityId, [...(registrationsByLocality.get(registration.localityId) ?? []), registration]);
+
+    const claimedRegistrations = new Set<number>();
+    const candidates = localities.flatMap((locality) => {
+      const players = playersByLocality.get(locality.id) ?? [];
+      if (players.length < 2 || players.length > 3) return [];
+      const direct = registrationsByLocality.get(locality.id) ?? [];
+      const rosterDnis = new Set(players.map((player) => player.dni.trim()));
+      const matching = direct.length ? direct : registrations.filter((registration) => sameRoster(registration, rosterDnis));
+      if (!matching.length) return [this.registrationPlacement(null, locality, players, entries)];
+      matching.forEach((registration) => claimedRegistrations.add(registration.id));
+      return matching.map((registration) => this.registrationPlacement(registration, locality, players, entries));
     });
+
+    // Keep confirmed registrations whose locality is no longer active or whose
+    // roster is incomplete available as well: Direction must always be able to
+    // move every participant already present in this category.
+    for (const registration of registrations) {
+      if (claimedRegistrations.has(registration.id)) continue;
+      candidates.push(this.registrationPlacement(registration, registration.locality, [], entries));
+    }
+    return candidates.sort((left, right) => left.locality.name.localeCompare(right.locality.name, 'es'));
+  }
+  private registrationPlacement(registration: PairRegistration | null, locality: Locality, players: Player[], entries: ZoneEntry[]) {
+    const entry = registration ? entries.find((item) => item.registrationId === registration.id) : undefined;
+    return {
+      registration,
+      registrationId: registration?.id ?? null,
+      localityId: locality.id,
+      locality,
+      playerOneName: players[0]?.fullName ?? registration?.playerOneName ?? '',
+      playerTwoName: players[1]?.fullName ?? registration?.playerTwoName ?? '',
+      playerThreeName: players[2]?.fullName ?? registration?.playerThreeName ?? null,
+      zoneId: entry?.zoneId ?? null,
+      zoneName: entry?.zone.name ?? null,
+      seed: entry?.seed ?? null,
+    };
   }
   async currentPublic() {
     const tournament = await this.tournaments.findOne({ where: { status: TournamentStatus.ACTIVE }, order: { startsAt: 'ASC', id: 'ASC' } });
@@ -74,4 +116,11 @@ export class TournamentQueryService {
     ]);
     return publicProgramView(detail, slots);
   }
+}
+
+function sameRoster(registration: PairRegistration, rosterDnis: Set<string>) {
+  const registrationDnis = [registration.playerOneDni, registration.playerTwoDni, registration.playerThreeDni]
+    .map((dni) => dni?.trim())
+    .filter((dni): dni is string => Boolean(dni));
+  return registrationDnis.length === rosterDnis.size && registrationDnis.every((dni) => rosterDnis.has(dni));
 }
