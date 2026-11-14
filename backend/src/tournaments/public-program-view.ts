@@ -46,7 +46,10 @@ export function publicProgramView(detail: Awaited<ReturnType<TournamentQueryServ
         homeSource: slot.match.homeSource, awaySource: slot.match.awaySource,
         homeSourceMatchId: slot.match.homeSourceMatchId, awaySourceMatchId: slot.match.awaySourceMatchId,
         homeRegistration: publicPair(slot.match.homeRegistration), awayRegistration: publicPair(slot.match.awayRegistration),
-        homeScore: slot.match.homeScore, awayScore: slot.match.awayScore, scheduledAt: slot.scheduledAt,
+        homeScore: slot.match.homeScore, awayScore: slot.match.awayScore, scheduledAt: slot.scheduledAt, sequence: slot.sequence,
+        startedAt: slot.match.startedAt, resultSubmittedAt: slot.match.resultSubmittedAt,
+        resultPhotoAvailable: Boolean(slot.match.resultPhotoStoredName),
+        photoUrl: slot.match.resultPhotoStoredName ? `/api/public/tournaments/matches/${slot.match.id}/photo?v=${encodeURIComponent((slot.match.resultSubmittedAt ?? slot.match.startedAt ?? new Date(0)).toISOString())}` : null,
       } : null,
     })),
   };

@@ -16,6 +16,7 @@ import { publicCourt, publicPair, publicProgramView, publicVenue } from './publi
 import { standings } from './zone-standings';
 import { Locality } from '../localities/locality.entity';
 import { Player } from '../players/player.entity';
+import { readMatchResultPhoto } from './match-result-photo-storage';
 
 @Injectable()
 export class TournamentQueryService {
@@ -115,6 +116,15 @@ export class TournamentQueryService {
       }),
     ]);
     return publicProgramView(detail, slots);
+  }
+  async publicMatchPhoto(id: number) {
+    const match = await this.matches.findOne({ where: { id }, relations: { scheduleSlot: { tournament: true } } });
+    if (!match?.resultPhotoStoredName || !match.resultPhotoMimeType || match.scheduleSlot?.tournament?.status !== TournamentStatus.ACTIVE) throw new NotFoundException('Foto no encontrada');
+    try {
+      return { content: await readMatchResultPhoto(match.resultPhotoStoredName), contentType: match.resultPhotoMimeType };
+    } catch {
+      throw new NotFoundException('Foto no encontrada');
+    }
   }
 }
 

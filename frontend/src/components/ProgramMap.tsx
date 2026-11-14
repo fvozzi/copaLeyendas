@@ -56,7 +56,7 @@ export function ProgramMap(props: Props) {
     {!boards.length && <div className="inline-state">No hay zonas ni partidos para estos filtros.<button className="inline-link" onClick={() => { setCategoryId(0); setVenueId(0); }}>Ver todo el torneo</button></div>}
     {boards.map((board) => <section className="map-category" key={board.category.id} aria-label={`Mapa de ${board.category.category.name}`}>
       <div className="map-category-title"><h2>{board.category.category.name}</h2><span>{board.graph.nodes.filter((node) => node.zone).length} zonas · {board.games.length} partidos</span></div>
-      <MapBoard {...board} zoom={zoom} busy={busy} readOnly={readOnly} onZone={setEditingZone} onMatch={(slot) => onMatch(slot, slot.match?.status === 'PLAYED' ? 'result' : 'schedule')} />
+      <MapBoard {...board} zoom={zoom} busy={busy} readOnly={readOnly} onZone={setEditingZone} onMatch={(slot) => onMatch(slot, ['IN_PROGRESS', 'PLAYED'].includes(slot.match?.status ?? '') ? 'result' : 'schedule')} />
     </section>)}
     {!readOnly && editingZone && <ProgramZoneEditor key={editingZone.id} zone={editingZone} venues={allVenues} slots={slots.filter((slot) => slot.match?.zoneId === editingZone.id)} onClose={() => setEditingZone(null)} onChanged={refresh} onMatch={(slot, kind) => { setEditingZone(null); onMatch(slot, kind); }} />}
   </div>;
@@ -104,7 +104,7 @@ function MapBoard({ graph, full, zones, games, zoom, busy, readOnly, onZone, onM
           const label = registration ? `${registration.playerOneName} / ${registration.playerTwoName}` : `Pareja ${seed}`;
           return <span className="map-zone-pair" key={seed} title={label}><span className="map-pair-seed">{seed}</span><span className="map-pair-name">{label}</span></span>;
         })}</span>{!readOnly && <span className="map-node-action">Editar zona y parejas ↗</span>}</> : slot && <>
-        <span className="map-match-heading"><strong>P{slot.sequence}</strong><span>{slot.match?.status === 'PLAYED' ? `${slot.match.homeScore}–${slot.match.awayScore}` : slot.match?.status === 'READY' ? 'Listo' : 'A definir'}</span></span>
+        <span className="map-match-heading"><strong>P{slot.sequence}</strong><span>{slot.match?.status === 'PLAYED' ? `${slot.match.homeScore}–${slot.match.awayScore}` : slot.match?.status === 'IN_PROGRESS' ? 'En juego' : slot.match?.status === 'READY' ? 'Listo' : 'A definir'}</span></span>
         <span className="map-participant" title={mapParticipant(slot, 'home', zones, games)}>{mapParticipant(slot, 'home', zones, games)}</span>
         <span className="map-participant" title={mapParticipant(slot, 'away', zones, games)}>{mapParticipant(slot, 'away', zones, games)}</span>
         <span className="map-node-venue" title={`${slot.court?.venue?.name ?? 'Sede a definir'} · ${slot.court?.name ?? 'Sin cancha'}`}>{slot.court ? `${slot.court.venue?.name ?? ''} · ${slot.court.name}` : 'Cancha a definir'}</span>

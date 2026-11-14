@@ -22,7 +22,6 @@ export function AdminZonePage() {
   const [resultMatch, setResultMatch] = useState<TournamentMatch | null>(null);
   const [scheduleMatch, setScheduleMatch] = useState<TournamentMatch | null>(null);
   const [score, setScore] = useState({ home: 25, away: 0 });
-  const [resultPhoto, setResultPhoto] = useState<File | null>(null);
   const [scheduledAt, setScheduledAt] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -41,8 +40,8 @@ export function AdminZonePage() {
     finally { setBusy(false); }
   };
   const result = async (event: React.FormEvent) => {
-    event.preventDefault(); if (!resultMatch || !resultPhoto) return;
-    await run(async () => { await saveMatchResult(resultMatch.id, score.home, score.away, resultPhoto); setResultMatch(null); setResultPhoto(null); }, 'No se pudo guardar el resultado.');
+    event.preventDefault(); if (!resultMatch) return;
+    await run(async () => { await saveMatchResult(resultMatch.id, score.home, score.away); setResultMatch(null); }, 'No se pudo guardar el resultado.');
   };
   const schedule = async (event: React.FormEvent) => {
     event.preventDefault(); if (!scheduleMatch || !scheduledAt) return;
@@ -92,10 +91,10 @@ export function AdminZonePage() {
         { label: 'Local', render: (match) => participant(match, 'home') },
         { label: 'Visitante', render: (match) => participant(match, 'away') },
         { label: 'Resultado', render: (match) => match.homeScore === null ? '-' : `${match.homeScore} - ${match.awayScore}` },
-        { label: 'Estado', render: (match) => ({ PENDING: 'Pendiente', READY: 'Listo', PLAYED: 'Jugado' }[match.status] ?? match.status) },
-      ]} renderActions={(match) => <>{director && match.status !== 'PLAYED' && <button className="inline-link" disabled={busy} onClick={() => { setScheduleMatch(match); setScheduledAt(dateTimeValue(match.scheduledAt)); }}>Horario</button>}{match.status === 'READY' && <button className="inline-link" disabled={busy} onClick={() => { setResultMatch(match); setScore({ home: 25, away: 0 }); setResultPhoto(null); }}>Resultado</button>}</>} />
+        { label: 'Estado', render: (match) => ({ PENDING: 'Pendiente', READY: 'Listo', IN_PROGRESS: 'En juego', PLAYED: 'Jugado' }[match.status] ?? match.status) },
+      ]} renderActions={(match) => <>{director && !['IN_PROGRESS', 'PLAYED'].includes(match.status) && <button className="inline-link" disabled={busy} onClick={() => { setScheduleMatch(match); setScheduledAt(dateTimeValue(match.scheduledAt)); }}>Horario</button>}{match.status === 'READY' && <Link className="inline-link" to="/app/resultados">Iniciar desde Resultados</Link>}{match.status === 'IN_PROGRESS' && <button className="inline-link" disabled={busy} onClick={() => { setResultMatch(match); setScore({ home: 25, away: 0 }); }}>Resultado</button>}</>} />
     </section>
-    {resultMatch && <AdminDialog title={`Resultado P${resultMatch.sequence ?? resultMatch.matchOrder}`} onClose={() => setResultMatch(null)}><form className="editor-form" onSubmit={result}><label>Local<input type="number" min="0" max={zone.tournamentCategory.pointsPerSet} value={score.home} onChange={(event) => setScore({ ...score, home: Number(event.target.value) })} /></label><label>Visitante<input type="number" min="0" max={zone.tournamentCategory.pointsPerSet} value={score.away} onChange={(event) => setScore({ ...score, away: Number(event.target.value) })} /></label><label className="span-2">Foto del resultado<input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="environment" onChange={(event) => setResultPhoto(event.target.files?.[0] ?? null)} required /></label><div className="span-2 form-actions"><button className="primary-button" disabled={busy || !resultPhoto}>Guardar resultado</button></div></form></AdminDialog>}
+    {resultMatch && <AdminDialog title={`Resultado P${resultMatch.sequence ?? resultMatch.matchOrder}`} onClose={() => setResultMatch(null)}><form className="editor-form" onSubmit={result}><label>Local<input type="number" min="0" max={zone.tournamentCategory.pointsPerSet} value={score.home} onChange={(event) => setScore({ ...score, home: Number(event.target.value) })} /></label><label>Visitante<input type="number" min="0" max={zone.tournamentCategory.pointsPerSet} value={score.away} onChange={(event) => setScore({ ...score, away: Number(event.target.value) })} /></label><p className="field-hint span-2">La placa final se genera usando la foto tomada al iniciar el partido.</p><div className="span-2 form-actions"><button className="primary-button" disabled={busy}>Guardar resultado</button></div></form></AdminDialog>}
     {scheduleMatch && <AdminDialog title={`Horario P${scheduleMatch.sequence ?? scheduleMatch.matchOrder}`} onClose={() => setScheduleMatch(null)}><form className="editor-form" onSubmit={schedule}><label className="span-2">Fecha y hora<input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} required /></label><div className="span-2 form-actions"><button className="primary-button" disabled={busy}>Guardar horario</button></div></form></AdminDialog>}
   </div>;
 }

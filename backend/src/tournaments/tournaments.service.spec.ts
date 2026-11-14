@@ -32,6 +32,22 @@ vi.mock('../courts/venue.entity', () => ({ Venue: class Venue {} }));
 vi.mock('../courts/court-assistant-assignment.entity', () => ({ CourtAssistantAssignment: class CourtAssistantAssignment {} }));
 vi.mock('./tournament-zone-venue-plan.entity', () => ({ TournamentZoneVenuePlan: class TournamentZoneVenuePlan {} }));
 vi.mock('../auth/user.entity', () => ({ UserRole: { DIRECTOR: 'DIRECTOR', COURT_LEADER: 'COURT_LEADER', ASSISTANT: 'ASSISTANT' } }));
+vi.mock('./match-result-card', () => ({
+  normalizeMatchPhoto: vi.fn(async () => ({ data: Buffer.from('normalized'), info: { width: 800, height: 600 } })),
+  renderMatchResultCard: vi.fn(async () => Buffer.from('decorated')),
+}));
+vi.mock('./match-result-photo-storage', () => ({
+  storeMatchPhotoBuffer: vi.fn(async (_buffer: Buffer, extension = '.jpg') => extension === '.jpg' ? 'match.jpg' : `match${extension}`),
+  readMatchResultPhoto: vi.fn(async () => Buffer.from('normalized')),
+  removeMatchResultPhoto: vi.fn(async () => undefined),
+}));
+
+const director = { sub: 1, role: 'DIRECTOR' } as never;
+const testPhoto = { buffer: Buffer.from('photo'), originalname: 'inicio.jpg', mimetype: 'image/jpeg', size: 5 } as Express.Multer.File;
+
+async function startFixtureMatch(service: TournamentsService, id: number) {
+  await service.startMatch(id, director, testPhoto);
+}
 
 function removableZone() {
   const zone = { id: 2, name: 'C', tournamentCategoryId: 8 };
@@ -152,7 +168,8 @@ it('uses the same real games in Program and Zone, preserves scheduling, and refl
   const ids = program.map((slot) => slot.matchId);
   expect((await service.matches(1)).map((match) => match.id)).toEqual(ids);
   await service.assignPlace(1, 10, 1); await service.assignPlace(1, 20, 3);
-  await service.result(matches[0].id, 25, 10, { role: 'DIRECTOR' } as never);
+  await startFixtureMatch(service, matches[0].id);
+  await service.result(matches[0].id, 25, 10, director);
   await service.updateScheduleSlot(program[0].id, { courtId: 2, scheduledAt: '2026-11-22T14:00:00Z' });
   const zone = await service.matches(1);
   expect(zone[0].scheduledAt?.toISOString()).toBe('2026-11-22T14:00:00.000Z');
@@ -300,6 +317,8 @@ function setup(capacity = 4, methodology = ZoneMethodology.PROVINCE) {
   const entries: any[] = [];
   const matches: any[] = [];
   const registration = { id: 10, categoryId: 3, status: RegistrationStatus.CONFIRMED };
+  const hydratedRegistration = (id: number | null) => id ? { ...registration, id, playerOneName: `Jugadora ${id} A`, playerTwoName: `Jugadora ${id} B`, locality: { name: `Equipo ${id}` } } : null;
+  const hydrateMatch = (match: any) => match ? { ...match, homeRegistration: hydratedRegistration(match.homeRegistrationId), awayRegistration: hydratedRegistration(match.awayRegistrationId) } : null;
   const entryRepository = {
     find: vi.fn(async ({ where }: any = {}) => entries.filter((entry) => where?.zoneId === undefined || (entry.zoneId ?? 1) === where.zoneId).sort((a, b) => a.seed - b.seed || a.id - b.id)),
     findOne: vi.fn(async ({ where }: any) => entries.find((entry) => entry.registrationId === where.registrationId) ?? null),
@@ -313,7 +332,7 @@ function setup(capacity = 4, methodology = ZoneMethodology.PROVINCE) {
   };
   const matchRepository = {
     find: vi.fn(async ({ where }: any) => matches.filter((match) => (Array.isArray(where) ? where : [where]).some((condition) => Object.entries(condition).every(([key, value]) => match[key] === value)))),
-    findOne: vi.fn(async ({ where }: any) => matches.find((match) => match.id === where.id) ?? null),
+    findOne: vi.fn(async ({ where }: any) => hydrateMatch(matches.find((match) => match.id === where.id) ?? null)),
     findOneBy: vi.fn(async ({ id }: any) => matches.find((match) => match.id === id) ?? null),
     create: vi.fn((value) => ({ homeRegistrationId: null, awayRegistrationId: null, homeScore: null, awayScore: null, homeSource: ParticipantSource.DIRECT, awaySource: ParticipantSource.DIRECT, ...value })),
     save: vi.fn(async (value) => {
@@ -460,13 +479,29 @@ describe('fixtures with unassigned places', () => {
     expect(matches.find((match) => match.zoneId === 2)).toMatchObject({ id: 2, homeRegistrationId: 10, awayRegistrationId: 40, status: MatchStatus.READY });
   });
 
+  it('reorders pairs inside a zone and updates the fixture without recreating its matches', async () => {
+    const { service, entries, matches } = setup();
+    await service.fixture(1);
+    for (let seed = 1; seed <= 4; seed++) await service.assignPlace(1, seed * 10, seed);
+    const matchIds = matches.map((match) => match.id);
+
+    await service.assignPlace(1, 10, 4);
+
+    expect(entries.find((entry) => entry.seed === 1)?.registrationId).toBe(40);
+    expect(entries.find((entry) => entry.seed === 4)?.registrationId).toBe(10);
+    expect(matches.map((match) => match.id)).toEqual(matchIds);
+    expect(matches[0]).toMatchObject({ homeRegistrationId: 40, awayRegistrationId: 30, status: MatchStatus.READY });
+    expect(matches[1]).toMatchObject({ homeRegistrationId: 20, awayRegistrationId: 10, status: MatchStatus.READY });
+  });
+
   it('resolves winners and losers after filling the previously empty fixture', async () => {
     const { service, matches } = setup();
     await service.fixture(1);
     for (let seed = 1; seed <= 4; seed++) await service.assignPlace(1, seed * 10, seed);
-    const director = { role: 'DIRECTOR' } as never;
+    await startFixtureMatch(service, matches[0].id);
     await service.result(matches[0].id, 25, 10, director);
     expect(matches[2]).toMatchObject({ homeRegistrationId: 10, awayRegistrationId: null, status: MatchStatus.PENDING });
+    await startFixtureMatch(service, matches[1].id);
     await service.result(matches[1].id, 25, 10, director);
     expect(matches[2]).toMatchObject({ homeRegistrationId: 10, awayRegistrationId: 40, status: MatchStatus.READY });
     expect(matches[3]).toMatchObject({ homeRegistrationId: 20, awayRegistrationId: 30, status: MatchStatus.READY });
@@ -476,7 +511,6 @@ describe('fixtures with unassigned places', () => {
     const { service, matches } = setup();
     await service.fixture(1);
     await service.assignPlace(1, 10, 1); await service.assignPlace(1, 20, 3);
-    const director = { role: 'DIRECTOR' } as never;
     await expect(service.result(matches[0].id, 24, 10, director)).rejects.toThrow('exactamente un equipo con 25');
     await expect(service.result(matches[0].id, 25, 25, director)).rejects.toThrow('exactamente un equipo con 25');
     await expect(service.result(matches[0].id, 25, -1, director)).rejects.toThrow('exactamente un equipo con 25');
@@ -495,10 +529,9 @@ describe('fixtures with unassigned places', () => {
     expect(matches[0].homeScore).toBe(25);
   });
 
-  it('rejects moving within the same zone, wrong categories, unconfirmed pairs and invalid places', async () => {
+  it('rejects wrong categories, unconfirmed pairs and invalid places', async () => {
     const { service, registration } = setup();
     await service.assignPlace(1, 10, 1);
-    await expect(service.assignPlace(1, 10, 2)).rejects.toThrow('otro lugar de esta zona');
     await expect(service.assignPlace(1, 20, 5)).rejects.toThrow('lugar');
     registration.categoryId = 9;
     await expect(service.assignPlace(1, 20, 2)).rejects.toThrow('confirmada');

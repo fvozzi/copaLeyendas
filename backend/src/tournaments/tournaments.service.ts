@@ -24,12 +24,13 @@ import { standings } from './zone-standings';
 import { createHash, randomBytes } from 'node:crypto';
 import type { ProgramScenarioDto } from './program-scenario.dto';
 import { simulateProgram } from './program-scenario';
-import { readMatchResultPhoto, removeMatchResultPhoto, storeMatchResultPhoto } from './match-result-photo-storage';
+import { readMatchResultPhoto, removeMatchResultPhoto, storeMatchPhotoBuffer } from './match-result-photo-storage';
 import { planTournamentDistribution, type DistributionRegistration } from './tournament-distribution';
 import { TournamentRegistrationAttendance } from './tournament-registration-attendance.entity';
 import { TournamentZoneVenuePlan } from './tournament-zone-venue-plan.entity';
 import { preservedProgramAssignments } from './distribution-program';
 import { inferredKnockoutStage, zoneMatchDefinitions, ZoneMethodology, type ZoneParticipantDefinition } from './tournament-methodology';
+import { normalizeMatchPhoto, renderMatchResultCard } from './match-result-card';
 
 @Injectable()
 export class TournamentsService {
@@ -119,7 +120,7 @@ export class TournamentsService {
       await repository.createQueryBuilder('slot').where('slot.tournamentId = :tournamentId', { tournamentId: category!.tournamentId }).setLock('pessimistic_write').getMany();
       const slots = await repository.find({ where: { tournamentId: category!.tournamentId }, relations: { match: true } });
       const zoneSlots = slots.filter((slot) => slot.stage === 'ZONE' && (slot.match?.zoneId === zone.id || (!slot.matchId && slot.tournamentCategoryId === zone.tournamentCategoryId && slot.zoneName === originalName && slot.matchOrder <= zone.capacity)));
-      const pending = zoneSlots.filter((slot) => slot.match?.status !== MatchStatus.PLAYED);
+      const pending = zoneSlots.filter((slot) => ![MatchStatus.IN_PROGRESS, MatchStatus.PLAYED].includes(slot.match?.status as MatchStatus));
       if (dto.venueId !== undefined && pending.length) {
         const courts = await manager.getRepository(Court).find({ relations: { venue: true }, order: { id: 'ASC' } });
         // Stable match IDs also cover renamed zones and stale court assignments.
@@ -185,12 +186,11 @@ export class TournamentsService {
       if (!seed || !Number.isInteger(seed) || seed < 1 || seed > capacity) throw new BadRequestException('El lugar no esta disponible en esta zona');
       const targetEntry = entries.find((item) => item.seed === seed);
       const sourceEntry = await manager.getRepository(ZoneEntry).findOne({ where: { registrationId, zone: { tournamentCategoryId: zone.tournamentCategoryId } } });
-      if (sourceEntry?.zoneId === zoneId && sourceEntry.id !== targetEntry?.id) throw new BadRequestException('La pareja ya está asignada a otro lugar de esta zona');
       if (sourceEntry && sourceEntry.id === targetEntry?.id) return { entry: sourceEntry, swappedEntry: null };
 
       const affectedZoneIds = [...new Set([zoneId, ...(sourceEntry ? [sourceEntry.zoneId] : [])])];
       const affectedMatches = await manager.getRepository(TournamentMatch).find({ where: affectedZoneIds.map((affectedZoneId) => ({ zoneId: affectedZoneId })) });
-      if (affectedMatches.some((match) => match.status === MatchStatus.PLAYED)) throw new BadRequestException('No se pueden intercambiar parejas cuando alguna de las zonas ya tiene resultados cargados');
+      if (affectedMatches.some((match) => [MatchStatus.IN_PROGRESS, MatchStatus.PLAYED].includes(match.status))) throw new BadRequestException('No se pueden intercambiar parejas cuando alguna de las zonas tiene un partido iniciado o resultados cargados');
 
       const repository = manager.getRepository(ZoneEntry);
       let swappedEntry: ZoneEntry | null = null;
@@ -465,7 +465,7 @@ export class TournamentsService {
     const matchCount = Math.max(zoneMatchCount, slots.filter((slot) => slot.matchId).length);
     const slotMatchIds = slots.flatMap((slot) => slot.matchId ? [slot.matchId] : []);
     const slotMatches = slotMatchIds.length ? await manager.getRepository(TournamentMatch).find({ where: { id: In(slotMatchIds) } }) : [];
-    const hasResults = [...zoneMatches, ...slotMatches].some((match) => match.status === MatchStatus.PLAYED);
+    const hasResults = [...zoneMatches, ...slotMatches].some((match) => [MatchStatus.IN_PROGRESS, MatchStatus.PLAYED].includes(match.status));
     const rules = [
       'El armado usa únicamente inscripciones confirmadas; los tokens emitidos todavía no confirmados no se incluyen.',
       'Los equipos activos creados a mano, sin token pendiente y con su nómina completa, se incorporan como inscripciones administrativas.',
@@ -755,7 +755,7 @@ export class TournamentsService {
       const repository = manager.getRepository(TournamentScheduleSlot);
       const slots = (await repository.createQueryBuilder('slot').where('slot.tournamentId = :tournamentId', { tournamentId }).orderBy('slot.sequence', 'ASC').setLock('pessimistic_write').getMany()).filter((slot) => slot.matchId);
       if (!slots.length) throw new BadRequestException('No hay partidos programados para repartir.');
-      const played = await manager.getRepository(TournamentMatch).count({ where: { zone: { tournamentCategory: { tournamentId } }, status: MatchStatus.PLAYED } });
+      const played = await manager.getRepository(TournamentMatch).count({ where: { zone: { tournamentCategory: { tournamentId } }, status: In([MatchStatus.IN_PROGRESS, MatchStatus.PLAYED]) } });
       if (played) throw new BadRequestException('El torneo ya tiene resultados cargados. Cambiá las canchas de los partidos pendientes individualmente.');
       const zones = await manager.getRepository(Zone).find({ where: { tournamentCategory: { tournamentId } }, relations: { venue: true }, order: { tournamentCategoryId: 'ASC', name: 'ASC' } });
       const courts = await manager.getRepository(Court).find({ relations: { venue: true }, order: { id: 'ASC' } });
@@ -787,13 +787,13 @@ export class TournamentsService {
       const courts = await manager.getRepository(Court).find({ relations: { venue: true }, order: { id: 'ASC' } });
       await slotRepo.createQueryBuilder('slot').where('slot.tournamentId = :tournamentId', { tournamentId }).setLock('pessimistic_write').getMany();
       const before = await slotRepo.find({ where: { tournamentId }, relations: programRelations, order: { sequence: 'ASC' } });
-      if (before.some((slot) => slot.match?.status === MatchStatus.PLAYED)) throw new BadRequestException('El torneo ya tiene resultados cargados. Editá los partidos pendientes individualmente.');
+      if (before.some((slot) => [MatchStatus.IN_PROGRESS, MatchStatus.PLAYED].includes(slot.match?.status as MatchStatus))) throw new BadRequestException('El torneo tiene partidos iniciados o resultados cargados. Editá solamente los partidos pendientes.');
       const { baseVersion: _version, ...settings } = config;
       const baseVersion = createHash('sha256').update(JSON.stringify({ tournament, zones, courts, before, settings })).digest('hex');
       if (apply && config.baseVersion !== baseVersion) throw new BadRequestException('El programa o la configuración cambiaron desde la vista previa. Volvé a calcular el escenario.');
       await this.buildScheduleGrid(manager, tournamentId);
       const slots = (await slotRepo.find({ where: { tournamentId }, relations: programRelations, order: { sequence: 'ASC' } })).filter((slot) => slot.matchId);
-      if (slots.some((slot) => slot.match?.status === MatchStatus.PLAYED)) throw new BadRequestException('El torneo ya tiene resultados cargados. Editá los partidos pendientes individualmente.');
+      if (slots.some((slot) => [MatchStatus.IN_PROGRESS, MatchStatus.PLAYED].includes(slot.match?.status as MatchStatus))) throw new BadRequestException('El torneo tiene partidos iniciados o resultados cargados. Editá solamente los partidos pendientes.');
       const result = simulateProgram(slots, zones, courts, config);
       if (apply) {
         if (result.warnings.length) throw new BadRequestException('Hay partidos sin horario. Ajustá el escenario antes de aplicarlo.');
@@ -976,7 +976,43 @@ export class TournamentsService {
     return matchView(match, { ...slot, scheduledAt: new Date(scheduledAt) });
   }
 
-  async result(id: number, homeScore: number, awayScore: number, user: AuthenticatedUser, photo?: Express.Multer.File) {
+  async startMatch(id: number, user: AuthenticatedUser, photo: Express.Multer.File) {
+    const slot = await this.slots.findOneBy({ matchId: id });
+    if (!slot) throw new NotFoundException('Partido fuera del programa');
+    await this.assertMatchAccess(user, id, slot);
+    const initial = await this.matchWithZone(id);
+    if (initial.status === MatchStatus.IN_PROGRESS) throw new BadRequestException('El partido ya está en juego.');
+    if (initial.status !== MatchStatus.READY || !initial.homeRegistrationId || !initial.awayRegistrationId) throw new BadRequestException('El partido todavía no está listo para iniciar.');
+    let normalized: Awaited<ReturnType<typeof normalizeMatchPhoto>>;
+    try {
+      normalized = await normalizeMatchPhoto(photo.buffer);
+    } catch {
+      throw new BadRequestException('No se pudo procesar la foto. Probá con una imagen JPG, PNG o WebP.');
+    }
+    const storedName = await storeMatchPhotoBuffer(normalized.data, '.jpg');
+    try {
+      return await this.withLockedMatch(initial, async (manager) => {
+        const repository = manager.getRepository(TournamentMatch);
+        const match = await repository.findOneBy({ id });
+        if (!match) throw new NotFoundException('Partido no encontrado');
+        if (match.status !== MatchStatus.READY || !match.homeRegistrationId || !match.awayRegistrationId) throw new BadRequestException('El partido ya no está disponible para iniciar.');
+        match.status = MatchStatus.IN_PROGRESS;
+        match.startedById = user.sub;
+        match.startedAt = new Date();
+        match.resultPhotoStoredName = storedName;
+        match.resultPhotoOriginalName = `${photo.originalname.replace(/\.[^.]+$/, '') || `partido-${id}`}.jpg`;
+        match.resultPhotoMimeType = 'image/jpeg';
+        match.resultPhotoSize = normalized.data.length;
+        await repository.save(match);
+        return { ...match, resultPhotoStoredName: undefined, resultPhotoAvailable: true };
+      });
+    } catch (error) {
+      await removeMatchResultPhoto(storedName);
+      throw error;
+    }
+  }
+
+  async result(id: number, homeScore: number, awayScore: number, user: AuthenticatedUser) {
     const slot = await this.slots.findOneBy({ matchId: id });
     if (!slot) throw new NotFoundException('Partido fuera del programa');
     await this.assertMatchAccess(user, id, slot);
@@ -990,33 +1026,41 @@ export class TournamentsService {
       if (initial.homeScore === homeScore && initial.awayScore === awayScore) return initial;
       throw new BadRequestException('El partido ya tiene un resultado cargado.');
     }
-    const storedName = photo ? await storeMatchResultPhoto(photo) : null;
+    if (initial.status !== MatchStatus.IN_PROGRESS) throw new BadRequestException('Primero cargá la foto inicial para marcar el partido como en juego.');
+    if (!initial.resultPhotoStoredName || !initial.homeRegistration || !initial.awayRegistration) throw new BadRequestException('El partido no tiene la foto inicial o sus parejas completas.');
+    let decoratedName: string | null = null;
+    const originalName = initial.resultPhotoStoredName;
     try {
-      return await this.withLockedMatch(initial, async (manager) => {
+      const decorated = await renderMatchResultCard(await readMatchResultPhoto(originalName), {
+        home: { team: teamLabel(initial.homeRegistration), players: playerLabel(initial.homeRegistration), score: homeScore },
+        away: { team: teamLabel(initial.awayRegistration), players: playerLabel(initial.awayRegistration), score: awayScore },
+      });
+      decoratedName = await storeMatchPhotoBuffer(decorated, '.jpg');
+      const saved = await this.withLockedMatch(initial, async (manager) => {
         const repository = manager.getRepository(TournamentMatch);
         const match = await repository.findOneBy({ id });
         if (!match) throw new NotFoundException('Partido no encontrado');
         if (match.status === MatchStatus.PLAYED) throw new BadRequestException('El partido ya tiene un resultado cargado.');
-        if (!match.homeRegistrationId || !match.awayRegistrationId) throw new BadRequestException('El partido no esta listo');
+        if (match.status !== MatchStatus.IN_PROGRESS || !match.homeRegistrationId || !match.awayRegistrationId) throw new BadRequestException('El partido no está en juego.');
         match.homeScore = homeScore;
         match.awayScore = awayScore;
         match.winnerRegistrationId = homeScore > awayScore ? match.homeRegistrationId : match.awayRegistrationId;
         match.status = MatchStatus.PLAYED;
-        if (photo && storedName) {
-          match.resultPhotoStoredName = storedName;
-          match.resultPhotoOriginalName = photo.originalname;
-          match.resultPhotoMimeType = photo.mimetype;
-          match.resultPhotoSize = photo.size;
-        }
+        match.resultPhotoStoredName = decoratedName;
+        match.resultPhotoOriginalName = `resultado-p${id}.jpg`;
+        match.resultPhotoMimeType = 'image/jpeg';
+        match.resultPhotoSize = decorated.length;
         match.resultSubmittedById = user.sub;
         match.resultSubmittedAt = new Date();
         await repository.save(match);
         await this.resolveDependents(match, repository);
         if (match.zoneId) await this.resolveQualifiers(manager, match.zoneId);
-        return { ...match, resultPhotoStoredName: undefined, resultPhotoAvailable: Boolean(storedName) };
+        return { ...match, resultPhotoStoredName: undefined, resultPhotoAvailable: true };
       });
+      await removeMatchResultPhoto(originalName);
+      return saved;
     } catch (error) {
-      if (storedName) await removeMatchResultPhoto(storedName);
+      if (decoratedName) await removeMatchResultPhoto(decoratedName);
       throw error;
     }
   }
@@ -1028,7 +1072,7 @@ export class TournamentsService {
     try {
       return { content: await readMatchResultPhoto(match.resultPhotoStoredName), contentType: match.resultPhotoMimeType, filename: match.resultPhotoOriginalName ?? `resultado-${id}` };
     } catch {
-      throw new NotFoundException('No se encontro la foto del resultado.');
+      throw new NotFoundException('No se encontró la foto del partido.');
     }
   }
 
@@ -1058,7 +1102,7 @@ export class TournamentsService {
   }
 
   private async matchWithZone(id: number) {
-    const match = await this.m.findOne({ where: { id }, relations: { zone: true } });
+    const match = await this.m.findOne({ where: { id }, relations: { zone: true, homeRegistration: { locality: true }, awayRegistration: { locality: true } } });
     if (!match) throw new NotFoundException('Partido no encontrado');
     return match;
   }
@@ -1131,6 +1175,14 @@ function registrationRoster(players: Player[]) {
     playerThreeInstagram: three?.instagram ?? null,
     playerThreeShirtSize: three?.shirtSize ?? null,
   };
+}
+
+function teamLabel(registration: PairRegistration) {
+  return registration.representingText?.trim() || registration.locality?.name || 'Pareja';
+}
+
+function playerLabel(registration: PairRegistration) {
+  return [registration.playerOneName, registration.playerTwoName, registration.playerThreeName].filter(Boolean).join(' / ');
 }
 
 function directQualifierPairs(zones: Zone[], qualifiersPerZone: number) {

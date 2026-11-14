@@ -88,8 +88,8 @@ it('shows zone cards first and the category matches grouped underneath', async (
   expect([...games.querySelectorAll('th')].map((heading) => heading.textContent)).not.toContain('Zona / Etapa ↕');
 });
 
-it('shows actual pairs and submits results to the real fixture match, not the planning row', async () => {
-  const actual = { ...slot, matchId: 500, match: { id: 500, zoneId: 9, matchOrder: 1, status: 'READY', homeRegistration: { playerOneName: 'Ana', playerTwoName: 'Bea', locality: { name: 'Junin' } }, awayRegistration: { playerOneName: 'Carla', playerTwoName: 'Dora', locality: { name: 'Salta' } }, homeScore: null, awayScore: null } } as TournamentScheduleSlot;
+it('shows actual pairs and submits results to the real in-progress fixture match, not the planning row', async () => {
+  const actual = { ...slot, matchId: 500, match: { id: 500, zoneId: 9, matchOrder: 1, status: 'IN_PROGRESS', homeRegistration: { playerOneName: 'Ana', playerTwoName: 'Bea', locality: { name: 'Junin' } }, awayRegistration: { playerOneName: 'Carla', playerTwoName: 'Dora', locality: { name: 'Salta' } }, homeScore: null, awayScore: null } } as TournamentScheduleSlot;
   vi.mocked(redistributeTournamentCourts).mockResolvedValue([actual]);
   await click('Asignar canchas pendientes');
   expect(container.textContent).toContain('Ana / Bea (Junin) vs Carla / Dora (Salta)');
@@ -97,12 +97,9 @@ it('shows actual pairs and submits results to the real fixture match, not the pl
   vi.mocked(getTournamentScheduleGrid).mockResolvedValue([{ ...actual, match: { ...actual.match!, status: 'PLAYED', homeScore: 25, awayScore: 0 } }]);
   await click('Resultado');
   const form = document.querySelector('form')!;
-  const photo = new File(['resultado'], 'resultado.jpg', { type: 'image/jpeg' });
-  const input = form.querySelector<HTMLInputElement>('input[type="file"]')!;
-  Object.defineProperty(input, 'files', { value: [photo] });
-  await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
+  expect(form.querySelector('input[type="file"]')).toBeNull();
   await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
-  expect(saveMatchResult).toHaveBeenCalledWith(500, 25, 0, photo);
+  expect(saveMatchResult).toHaveBeenCalledWith(500, 25, 0);
   expect(container.textContent).toContain('25 - 0');
 });
 

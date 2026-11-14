@@ -33,7 +33,7 @@ export function ProgramZoneEditor({ zone, venues, slots, onClose, onChanged, onM
     catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo guardar el cambio.'); }
     finally { setBusy(false); }
   };
-  const played = slots.some((slot) => slot.match?.status === 'PLAYED');
+  const locked = slots.some((slot) => ['IN_PROGRESS', 'PLAYED'].includes(slot.match?.status ?? ''));
   const placementLabel = (placement: ZoneRegistrationPlacement) => `${placementPairLabel(placement)}${placement.zoneId ? ` — ${placement.zoneName}, Pareja ${placement.seed}` : ' — Sin zona'}`;
   return <AdminDialog title={`Zona ${zone.name.replace(/^zona\s+/i, '')} · ${zone.tournamentCategory.category.name}`} onClose={() => { if (!busy) onClose(); }}>
     {error && <div className="inline-state" role="alert">{error}</div>}
@@ -44,29 +44,33 @@ export function ProgramZoneEditor({ zone, venues, slots, onClose, onChanged, onM
       <div className="form-actions span-2"><button className="primary-button" disabled={busy || !venueId}>{busy ? 'Guardando…' : 'Guardar zona'}</button></div>
     </form>
     <h3>Parejas de la zona</h3>
-    {played && <p className="field-hint">Las parejas ya tienen resultados y no se pueden reemplazar.</p>}
-    {!played && <p className="field-hint">Podés elegir cualquier equipo activo de la categoría, esté en otra sede, otra zona o todavía sin zona. Si ambos lugares están ocupados, las parejas intercambian posiciones y los partidos pendientes se actualizan automáticamente.</p>}
+    {locked && <p className="field-hint">La zona tiene partidos iniciados o resultados cargados y ya no se puede cambiar el orden de sus parejas.</p>}
+    {!locked && <p className="field-hint">Para ordenar la zona, elegí en una posición una pareja que ya esté en otro lugar de esta misma zona: ambas intercambiarán posiciones. También podés elegir equipos de otras zonas o todavía sin zona. Los partidos y horarios se conservan; solo cambia qué pareja ocupa cada lugar del fixture.</p>}
     {!detail ? <p>Cargando parejas…</p> : <div className="map-zone-places">{Array.from({ length: zone.capacity }, (_, index) => {
       const seed = index + 1;
       const entry = detail.entries.find((item) => item.seed === seed);
       const currentKey = entry ? `${entry.registration.id}:${entry.registration.localityId}` : '0';
       const selectedPlacement = placements.find((placement) => placementKey(placement) === selected[seed]);
+      const fromSameZone = Boolean(selectedPlacement?.zoneId === zone.id && selectedPlacement.seed !== seed);
       const fromAnotherZone = Boolean(selectedPlacement?.zoneId && selectedPlacement.zoneId !== zone.id);
-      const exchange = fromAnotherZone && Boolean(entry);
-      return <div key={seed}><label>Pareja {seed}<select aria-label={`Pareja ${seed} de zona ${zone.name}`} disabled={busy || played} value={selected[seed] ?? currentKey} onChange={(event) => setSelected((current) => ({ ...current, [seed]: event.target.value }))}>
-        <option value="0">A definir</option>{entry && <option value={currentKey}>{registrationLabel(entry.registration)} — Actual</option>}{placements.filter((placement) => placementKey(placement) !== currentKey && (placement.zoneId !== zone.id || (placement.registrationId === entry?.registration.id && placement.localityId !== entry.registration.localityId))).map((placement) => <option key={placementKey(placement)} value={placementKey(placement)}>{placementLabel(placement)}</option>)}
-      </select></label><button className="secondary-button" disabled={busy || played || !selectedPlacement || selected[seed] === currentKey} onClick={() => {
+      const exchange = Boolean(entry && selectedPlacement?.zoneId);
+      return <div key={seed}><label>Pareja {seed}<select aria-label={`Pareja ${seed} de zona ${zone.name}`} disabled={busy || locked} value={selected[seed] ?? currentKey} onChange={(event) => setSelected((current) => ({ ...current, [seed]: event.target.value }))}>
+        <option value="0">A definir</option>{entry && <option value={currentKey}>{registrationLabel(entry.registration)} — Actual</option>}{placements.filter((placement) => placementKey(placement) !== currentKey).map((placement) => <option key={placementKey(placement)} value={placementKey(placement)}>{placementLabel(placement)}</option>)}
+      </select></label><button className="secondary-button" disabled={busy || locked || !selectedPlacement || selected[seed] === currentKey} onClick={() => {
+        if (fromSameZone && !window.confirm(entry
+          ? `¿Intercambiar ${placementPairLabel(selectedPlacement!)} (Pareja ${selectedPlacement!.seed}) con ${registrationLabel(entry.registration)} (Pareja ${seed}) dentro de ${zone.name}? Los partidos y horarios se conservarán.`
+          : `¿Mover ${placementPairLabel(selectedPlacement!)} desde Pareja ${selectedPlacement!.seed} al lugar libre Pareja ${seed} dentro de ${zone.name}? Los partidos y horarios se conservarán.`)) return;
         if (fromAnotherZone && !window.confirm(entry
           ? `¿Intercambiar ${placementPairLabel(selectedPlacement!)} (${selectedPlacement!.zoneName}, Pareja ${selectedPlacement!.seed}) con ${registrationLabel(entry.registration)} (${zone.name}, Pareja ${seed})? Los partidos pendientes de ambas zonas se actualizarán.`
           : `¿Mover ${placementPairLabel(selectedPlacement!)} desde ${selectedPlacement!.zoneName}, Pareja ${selectedPlacement!.seed}, al lugar libre ${zone.name}, Pareja ${seed}? Los partidos pendientes de ambas zonas se actualizarán.`)) return;
         if (!selectedPlacement) return;
         void run(() => assignZonePlace(zone.id, seed, { registrationId: selectedPlacement.registrationId, localityId: selectedPlacement.localityId }));
-      }}>{exchange ? 'Intercambiar' : fromAnotherZone ? 'Mover' : entry ? 'Reemplazar' : 'Asignar'}</button></div>;
+      }}>{exchange ? 'Intercambiar' : fromSameZone ? 'Reordenar' : fromAnotherZone ? 'Mover' : entry ? 'Reemplazar' : 'Asignar'}</button></div>;
     })}</div>}
     <h3>Partidos</h3>
     <div className="map-zone-games">{slots.map((slot) => <div key={slot.id}><strong>P{slot.sequence}</strong><span>{slot.court?.name ?? 'Sin cancha'} · {slot.scheduledAt ? new Date(slot.scheduledAt).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : 'Sin horario'}</span>
-      {slot.match?.status === 'PLAYED' ? <strong>{slot.match.homeScore}–{slot.match.awayScore}</strong> : <button className="inline-link" disabled={busy} onClick={() => onMatch(slot, 'schedule')}>Editar partido</button>}
-      {slot.match?.status === 'READY' && <button className="inline-link" disabled={busy} onClick={() => onMatch(slot, 'result')}>Resultado</button>}
+      {slot.match?.status === 'PLAYED' ? <strong>{slot.match.homeScore}–{slot.match.awayScore}</strong> : slot.match?.status !== 'IN_PROGRESS' && <button className="inline-link" disabled={busy} onClick={() => onMatch(slot, 'schedule')}>Editar partido</button>}
+      {slot.match?.status === 'IN_PROGRESS' && <button className="inline-link" disabled={busy} onClick={() => onMatch(slot, 'result')}>Resultado</button>}
     </div>)}</div>
   </AdminDialog>;
 }

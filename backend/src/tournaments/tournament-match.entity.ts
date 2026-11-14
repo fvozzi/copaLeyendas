@@ -29,6 +29,9 @@ export class TournamentMatch {
   @Column({ type: 'integer', nullable: true }) awayScore: number | null;
   @Column({ type: 'integer', nullable: true }) winnerRegistrationId: number | null;
   @Column({ type: 'timestamp with time zone', nullable: true }) scheduledAt: Date | null;
+  @Column({ type: 'integer', nullable: true }) startedById: number | null;
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' }) @JoinColumn({ name: 'startedById' }) startedBy: User | null;
+  @Column({ type: 'timestamp with time zone', nullable: true }) startedAt: Date | null;
   @Column({ type: 'varchar', nullable: true }) resultPhotoStoredName: string | null;
   @Column({ type: 'varchar', nullable: true }) resultPhotoOriginalName: string | null;
   @Column({ type: 'varchar', nullable: true }) resultPhotoMimeType: string | null;

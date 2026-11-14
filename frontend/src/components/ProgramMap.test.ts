@@ -95,6 +95,29 @@ it('swaps a pair from another zone and explains that both pending fixtures chang
   expect(assignZonePlace).toHaveBeenCalledWith(1, 1, { registrationId: 200, localityId: 20 });
 });
 
+it('reorders two pairs inside the same zone while preserving matches and schedules', async () => {
+  const first = { id: 100, localityId: 10, playerOneName: 'Carolina', playerTwoName: 'Cinthia', locality: { id: 10, name: 'Ciudad' } };
+  const fourth = { id: 400, localityId: 40, playerOneName: 'Tiziana', playerTwoName: 'Sol', locality: { id: 40, name: 'Comodoro' } };
+  vi.mocked(getZone).mockResolvedValue({ ...fixture.tournament.zones[0], entries: [
+    { id: 1, seed: 1, registration: first },
+    { id: 4, seed: 4, registration: fourth },
+  ] } as never);
+  vi.mocked(getZoneRegistrationPlacements).mockResolvedValue([
+    { registration: first, registrationId: 100, localityId: 10, locality: first.locality, playerOneName: 'Carolina', playerTwoName: 'Cinthia', playerThreeName: null, zoneId: 1, zoneName: 'Zona A', seed: 1 },
+    { registration: fourth, registrationId: 400, localityId: 40, locality: fourth.locality, playerOneName: 'Tiziana', playerTwoName: 'Sol', playerThreeName: null, zoneId: 1, zoneName: 'Zona A', seed: 4 },
+  ] as never);
+  vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+  await act(async () => (container.querySelector('[data-map-node="zone-1"]') as HTMLButtonElement).click());
+  await change('Pareja 4 de zona A', '100:10');
+  const reorder = [...document.querySelectorAll<HTMLButtonElement>('.map-zone-places button')]
+    .find((button) => button.textContent === 'Intercambiar')!;
+  await act(async () => reorder.click());
+
+  expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('Los partidos y horarios se conservarán'));
+  expect(assignZonePlace).toHaveBeenCalledWith(1, 4, { registrationId: 100, localityId: 10 });
+});
+
 it('keeps the zone editor open and the map unchanged when a venue move conflicts', async () => {
   vi.mocked(updateTournamentZone).mockRejectedValueOnce(new Error('La cancha ya tiene un partido en ese horario.'));
   await act(async () => (container.querySelector('[data-map-node="zone-1"]') as HTMLButtonElement).click());

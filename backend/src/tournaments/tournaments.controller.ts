@@ -63,13 +63,15 @@ export class TournamentsController {
   @Post('zones/:id/fixture') fixture(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { this.assertDirector(user); return this.s.fixture(id); }
   @Patch('zones/:id/places/:seed') place(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Param('seed', ParseIntPipe) seed: number, @Body() dto: AssignPlaceDto) { this.assertDirector(user); return this.s.assignPlace(id, dto.registrationId, seed, dto.localityId); }
   @Patch('matches/:id/schedule') schedule(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: ScheduleMatchDto) { return this.s.schedule(id, dto.scheduledAt, user); }
-  @Post('matches/:id/result')
+  @Post('matches/:id/start')
   @UseInterceptors(FileInterceptor('photo', { storage: memoryStorage(), limits: { fileSize: 8 * 1024 * 1024, files: 1 } }))
-  result(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: ResultDto, @UploadedFile() photo?: Express.Multer.File) {
-    if (!photo) throw new BadRequestException('La foto del resultado es obligatoria.');
+  startMatch(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @UploadedFile() photo?: Express.Multer.File) {
+    if (!photo) throw new BadRequestException('La foto inicial es obligatoria para comenzar el partido.');
     if (!['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'].includes(photo.mimetype)) throw new BadRequestException('La foto debe ser JPG, PNG, WebP, HEIC o HEIF.');
-    return this.s.result(id, dto.homeScore, dto.awayScore, user, photo);
+    return this.s.startMatch(id, user, photo);
   }
+  @Post('matches/:id/result')
+  result(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: ResultDto) { return this.s.result(id, dto.homeScore, dto.awayScore, user); }
   @Get('matches/:id/result-photo')
   async resultPhoto(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Res({ passthrough: true }) response: Response) {
     const file = await this.s.resultPhoto(id, user);

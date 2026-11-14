@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AdminDataGrid } from '../components/AdminDataGrid';
 import { AdminDialog } from '../components/AdminDialog';
-import { getTournamentOperations, openMatchResultPhoto, saveMatchResult } from '../lib/api';
+import { getTournamentOperations, openMatchResultPhoto, saveMatchResult, startMatch } from '../lib/api';
 import type { TournamentOperations, TournamentScheduleSlot } from '../types';
 
 const pairName = (slot: TournamentScheduleSlot, side: 'home' | 'away') => {
@@ -12,9 +12,10 @@ const pairName = (slot: TournamentScheduleSlot, side: 'home' | 'away') => {
 export function AdminResultsPage() {
   const [data, setData] = useState<TournamentOperations | null>(null);
   const [courtId, setCourtId] = useState(0);
+  const [starting, setStarting] = useState<TournamentScheduleSlot | null>(null);
   const [editing, setEditing] = useState<TournamentScheduleSlot | null>(null);
   const [scores, setScores] = useState({ home: 25, away: 0 });
-  const [photo, setPhoto] = useState<File | null>(null);
+  const [startPhoto, setStartPhoto] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,15 +32,28 @@ export function AdminResultsPage() {
 
   const begin = (slot: TournamentScheduleSlot) => {
     const target = slot.tournamentCategory.pointsPerSet;
-    setEditing(slot); setScores({ home: target, away: 0 }); setPhoto(null); setError(null);
+    setEditing(slot); setScores({ home: target, away: 0 }); setError(null);
+  };
+  const beginStart = (slot: TournamentScheduleSlot) => {
+    setStarting(slot); setStartPhoto(null); setError(null);
+  };
+  const start = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!starting?.matchId || !startPhoto) return;
+    setBusy(true); setError(null);
+    try {
+      await startMatch(starting.matchId, startPhoto);
+      setStarting(null); setStartPhoto(null); await load();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo iniciar el partido.'); }
+    finally { setBusy(false); }
   };
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!editing?.matchId || !photo) return;
+    if (!editing?.matchId) return;
     setBusy(true); setError(null);
     try {
-      await saveMatchResult(editing.matchId, scores.home, scores.away, photo);
-      setEditing(null); setPhoto(null); await load();
+      await saveMatchResult(editing.matchId, scores.home, scores.away);
+      setEditing(null); await load();
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo guardar el resultado.'); }
     finally { setBusy(false); }
   };
@@ -57,17 +71,24 @@ export function AdminResultsPage() {
         { label: 'Etapa', render: (slot) => slot.zoneName },
         { label: 'Local', render: (slot) => pairName(slot, 'home') },
         { label: 'Visitante', render: (slot) => pairName(slot, 'away') },
-        { label: 'Estado', render: (slot) => slot.match?.status === 'PLAYED' ? <strong>{slot.match.homeScore} - {slot.match.awayScore}</strong> : slot.match?.status === 'READY' ? 'Listo para jugar' : 'A definir' },
-      ]} renderActions={(slot) => <>{slot.match?.status === 'READY' && <button type="button" className="primary-button" disabled={busy} onClick={() => begin(slot)}>Cargar resultado</button>}{slot.match?.status === 'PLAYED' && slot.match.resultPhotoAvailable && <button type="button" className="inline-link" onClick={() => void openMatchResultPhoto(slot.matchId!)}>Ver foto</button>}</>} /></section>
+        { label: 'Estado', render: (slot) => slot.match?.status === 'PLAYED' ? <strong>{slot.match.homeScore} - {slot.match.awayScore}</strong> : slot.match?.status === 'IN_PROGRESS' ? <span className="status-chip status-live"><span className="live-dot" />En juego</span> : slot.match?.status === 'READY' ? 'Listo para jugar' : 'A definir' },
+      ]} renderActions={(slot) => <>{slot.match?.status === 'READY' && <button type="button" className="primary-button" disabled={busy} onClick={() => beginStart(slot)}>Iniciar partido</button>}{slot.match?.status === 'IN_PROGRESS' && <button type="button" className="primary-button" disabled={busy} onClick={() => begin(slot)}>Cargar resultado</button>}{slot.match?.resultPhotoAvailable && <button type="button" className="inline-link" onClick={() => void openMatchResultPhoto(slot.matchId!)}>Ver foto</button>}</>} /></section>
     </>}
+    {starting?.match && <AdminDialog title={`Iniciar P${starting.sequence}`} onClose={() => { if (!busy) setStarting(null); }}><form className="editor-form" onSubmit={start}>
+      {error && <div className="inline-state span-2" role="alert">{error}</div>}
+      <p className="field-hint span-2">Esta foto marca el inicio del partido y se publica inmediatamente como “En juego”.</p>
+      <div className="match-photo-orientation span-2"><div><span>Izquierda · Local</span><strong>{pairName(starting, 'home')}</strong></div><div><span>Derecha · Visitante</span><strong>{pairName(starting, 'away')}</strong></div></div>
+      <label className="span-2 result-photo-field">Foto inicial del partido<input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="environment" onChange={(event) => setStartPhoto(event.target.files?.[0] ?? null)} required /><small>Ubicá a la pareja local a la izquierda y a la visitante a la derecha. Al finalizar agregaremos automáticamente equipos, tantos y logo.</small></label>
+      <div className="span-2 form-actions"><button className="primary-button" disabled={busy || !startPhoto}>{busy ? 'Publicando...' : 'Publicar e iniciar partido'}</button></div>
+    </form></AdminDialog>}
     {editing?.match && <AdminDialog title={`Resultado P${editing.sequence}`} onClose={() => { if (!busy) setEditing(null); }}><form className="editor-form" onSubmit={save}>
       {error && <div className="inline-state span-2" role="alert">{error}</div>}
       <p className="field-hint span-2">{editing.tournamentCategory.category.name} · {editing.zoneName}</p>
       <label>{pairName(editing, 'home')}<input aria-label="Tantos local" type="number" min="0" max={editing.tournamentCategory.pointsPerSet} value={scores.home} onChange={(event) => setScores({ ...scores, home: Number(event.target.value) })} required /></label>
       <label>{pairName(editing, 'away')}<input aria-label="Tantos visitante" type="number" min="0" max={editing.tournamentCategory.pointsPerSet} value={scores.away} onChange={(event) => setScores({ ...scores, away: Number(event.target.value) })} required /></label>
       <p className="field-hint span-2">Uno de los dos equipos debe llegar a {editing.tournamentCategory.pointsPerSet} tantos.</p>
-      <label className="span-2 result-photo-field">Foto de la planilla o tablero<input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="environment" onChange={(event) => setPhoto(event.target.files?.[0] ?? null)} required /><small>Podés sacar la foto directamente con la cámara del teléfono.</small></label>
-      <div className="span-2 form-actions"><button className="primary-button" disabled={busy || !photo}>{busy ? 'Guardando...' : 'Confirmar resultado'}</button></div>
+      <p className="field-hint span-2">Al confirmar, el sistema editará la foto inicial con los equipos, los tantos y el logo de Copa Leyendas.</p>
+      <div className="span-2 form-actions"><button className="primary-button" disabled={busy}>{busy ? 'Generando placa...' : 'Confirmar resultado'}</button></div>
     </form></AdminDialog>}
   </div>;
 }

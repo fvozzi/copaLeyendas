@@ -15,3 +15,16 @@ it('publishes bracket references, names and scores without private registrations
   expect(result.slots[0].scheduledAt).toEqual(slot.scheduledAt);
   expect(result.detail.zones[0].venue.name).toBe('Ciudad');
 });
+
+it('publishes the initial photo and start time while a match is in progress', () => {
+  const category = { id: 2, categoryId: 3, category: { id: 3, name: 'Damas B' } };
+  const venue = { id: 4, name: 'Gure Echea' };
+  const startedAt = new Date('2026-11-21T15:03:00Z');
+  const detail = { id: 1, name: 'Copa', categories: [category], zones: [{ id: 10, venueId: 4, venue, tournamentCategory: category }] };
+  const slot = { id: 9, matchId: 8, stage: 'ZONE', sequence: 5, court: { id: 1, venue }, tournamentCategory: category, scheduledAt: new Date('2026-11-21T15:00:00Z'),
+    match: { id: 8, zoneId: 10, zone: { id: 10, name: 'Zona A' }, status: 'IN_PROGRESS', startedAt, resultSubmittedAt: null, resultPhotoStoredName: 'private-name.jpg', homeRegistration: null, awayRegistration: null } };
+  const result = publicProgramView(detail as never, [slot as never]);
+  expect(result.slots[0].match).toMatchObject({ status: 'IN_PROGRESS', startedAt, resultPhotoAvailable: true });
+  expect(result.slots[0].match?.photoUrl).toContain('/api/public/tournaments/matches/8/photo?v=');
+  expect(JSON.stringify(result)).not.toContain('private-name.jpg');
+});

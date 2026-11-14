@@ -39,7 +39,7 @@ export function AdminDashboardPage() {
   }, [user?.role]);
 
   if (user?.role !== 'DIRECTOR') {
-    return <div className="admin-panel"><div className="panel-header"><div><p className="eyebrow">Operación de cancha</p><h1>Partidos asignados</h1><p>Elegí tu cancha y cargá cada resultado junto con su foto.</p></div><Link className="primary-button" to="/app/resultados">Cargar resultados</Link></div></div>;
+    return <div className="admin-panel"><div className="panel-header"><div><p className="eyebrow">Operación de cancha</p><h1>Partidos asignados</h1><p>Elegí tu cancha, iniciá el partido con la foto y cargá el resultado al finalizar.</p></div><Link className="primary-button" to="/app/resultados">Cargar resultados</Link></div></div>;
   }
 
   if (error) {
