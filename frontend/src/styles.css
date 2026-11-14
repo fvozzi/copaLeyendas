@@ -1230,6 +1230,15 @@ img {
 .distribution-layout > header p { margin: 0.25rem 0 0; color: var(--ink-soft); font-size: 0.85rem; }
 .distribution-layout > header > span { flex: 0 0 auto; padding: 0.35rem 0.55rem; border-radius: 999px; background: rgba(20, 60, 53, 0.08); color: var(--ink-soft); font-size: 0.75rem; font-weight: 700; }
 .distribution-layout > header > span.is-manual { background: rgba(211, 99, 69, 0.13); color: #9b3f27; }
+.distribution-methodology { display: grid; grid-template-columns: minmax(12rem, 1.35fr) minmax(10rem, 0.9fr) minmax(11rem, 0.9fr); gap: 0.65rem; align-items: stretch; }
+.distribution-methodology > label { display: grid; gap: 0.35rem; color: var(--ink-soft); font-size: 0.78rem; font-weight: 700; }
+.distribution-methodology > label select { width: 100%; }
+.distribution-next-stage { display: grid; align-content: center; gap: 0.12rem; padding: 0.55rem 0.7rem; border: 1px solid rgba(20, 60, 53, 0.22); border-radius: 8px; background: rgba(20, 60, 53, 0.07); }
+.distribution-next-stage span, .distribution-next-stage small { color: var(--ink-soft); font-size: 0.72rem; }
+.distribution-next-stage strong { color: var(--brand-dark); }
+.distribution-next-stage.is-invalid { border-color: rgba(163, 41, 23, 0.35); background: rgba(211, 99, 69, 0.08); }
+.distribution-next-stage.is-invalid strong { color: #a32917; }
+.distribution-methodology-copy { margin: 0; padding: 0.7rem 0.8rem; border-left: 3px solid var(--brand); background: var(--white); color: var(--ink-soft); font-size: 0.84rem; line-height: 1.45; }
 .distribution-layout-zones { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 0.65rem; }
 .distribution-layout-zones > div { display: flex; align-items: end; gap: 0.45rem; padding: 0.65rem; border: 1px solid var(--line); border-radius: 8px; background: var(--white); }
 .distribution-layout-zones label { flex: 1; min-width: 0; display: grid; gap: 0.3rem; color: var(--ink-soft); font-size: 0.78rem; font-weight: 700; }
@@ -1266,6 +1275,7 @@ img {
   .distribution-category > header { display: grid; }
   .distribution-summary { justify-items: start; text-align: left; }
   .distribution-layout > header { display: grid; }
+  .distribution-methodology { grid-template-columns: 1fr; }
   .distribution-layout-footer > * { width: 100%; }
   .distribution-layout-footer > .list-actions { align-items: stretch; }
 }

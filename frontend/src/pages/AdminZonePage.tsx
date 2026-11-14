@@ -60,8 +60,11 @@ export function AdminZonePage() {
     const source = side === 'home' ? match.homeSource : match.awaySource;
     const sourceId = side === 'home' ? match.homeSourceMatchId : match.awaySourceMatchId;
     if (source === 'WINNER' || source === 'LOSER') { const previous = matches.find((item) => item.id === sourceId); return `${source === 'WINNER' ? 'Ganadora' : 'Perdedora'} P${previous?.sequence ?? previous?.matchOrder ?? '?'}`; }
-    const pairing = (capacity === 3 ? [[1, 2], [1, 3], [2, 3]] : [[1, 2], [3, 4]])[match.matchOrder - 1];
-    return pairing ? `Pareja ${pairing[side === 'home' ? 0 : 1]} · A definir` : 'Según resultado previo';
+    const directPairings = zone.tournamentCategory.methodology === 'ROUND_ROBIN'
+      ? Array.from({ length: capacity }, (_, home) => Array.from({ length: capacity - home - 1 }, (_, offset) => [home + 1, home + offset + 2] as const)).flat()
+      : capacity === 3 ? [[1, 2], [null, 3], [null, 3]] : [[1, 3], [2, 4], [null, null], [null, null]];
+    const seed = directPairings[match.matchOrder - 1]?.[side === 'home' ? 0 : 1];
+    return seed ? `Pareja ${seed} · A definir` : 'Según resultado previo';
   };
 
   return <div className="admin-panel">

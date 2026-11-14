@@ -15,6 +15,7 @@ import { TournamentZoneVenuePlan } from './tournament-zone-venue-plan.entity';
 import { RegistrationAccessGrant } from '../registrations/registration-access-grant.entity';
 import { Locality } from '../localities/locality.entity';
 import { Player } from '../players/player.entity';
+import { ZoneMethodology } from './tournament-methodology';
 
 vi.mock('./tournament.entity', () => ({ Tournament: class Tournament {} }));
 vi.mock('./tournament-category.entity', () => ({ TournamentCategory: class TournamentCategory {} }));
@@ -117,6 +118,7 @@ it('keeps existing zones if confirmed pairs exceed the configured capacity', asy
 it('adds two semifinals and a final for a category with two zones', async () => {
   const { service, planned, matches, repositories, venue } = setup();
   const zoneRepository = repositories.get(Zone);
+  (await repositories.get(TournamentCategory).findOneBy({ id: 8 })).qualifiersPerZone = 2;
   const zones = [
     { id: 1, capacity: 4, tournamentCategoryId: 8, name: 'A', venueId: 1, venue },
     { id: 2, capacity: 4, tournamentCategoryId: 8, name: 'B', venueId: 1, venue },
@@ -149,7 +151,7 @@ it('uses the same real games in Program and Zone, preserves scheduling, and refl
   ]);
   const ids = program.map((slot) => slot.matchId);
   expect((await service.matches(1)).map((match) => match.id)).toEqual(ids);
-  await service.assignPlace(1, 10, 1); await service.assignPlace(1, 20, 2);
+  await service.assignPlace(1, 10, 1); await service.assignPlace(1, 20, 3);
   await service.result(matches[0].id, 25, 10, { role: 'DIRECTOR' } as never);
   await service.updateScheduleSlot(program[0].id, { courtId: 2, scheduledAt: '2026-11-22T14:00:00Z' });
   const zone = await service.matches(1);
@@ -261,17 +263,40 @@ it('persists a manual zone layout with room for future confirmed pairs', async (
     .mockResolvedValueOnce({ hasResults: false, plans: [{ tournamentCategoryId: 8, registrationCount: 11 }] })
     .mockResolvedValueOnce({ hasResults: false, plans: [{ tournamentCategoryId: 8, registrationCount: 11, capacities: [3, 3, 3, 3] }] });
 
-  await service.setDistributionLayout(1, { tournamentCategoryId: 8, capacities: [3, 3, 3, 3] });
+  await service.setDistributionLayout(1, { tournamentCategoryId: 8, capacities: [3, 3, 3, 3], methodology: ZoneMethodology.ROUND_ROBIN, qualifiersPerZone: 2 });
 
-  expect(category).toMatchObject({ zoneCapacities: [3, 3, 3, 3], zoneCount: 4, zoneSize: 3 });
+  expect(category).toMatchObject({ zoneCapacities: [3, 3, 3, 3], zoneCount: 4, zoneSize: 3, methodology: ZoneMethodology.ROUND_ROBIN, qualifiersPerZone: 2 });
   expect(categoryRepository.save).toHaveBeenCalledWith(category);
   expect(venuePlans.delete).toHaveBeenCalledWith(expect.objectContaining({ tournamentCategoryId: 8 }));
 });
 
-function setup(capacity = 4) {
+it('incorporates complete manually created teams but keeps unused-token teams out of zones', async () => {
+  const localities = [
+    { id: 90, name: 'Comodoro Rivadavia', categoryId: 3, active: true },
+    { id: 91, name: 'Invitada sin confirmar', categoryId: 3, active: true },
+    { id: 92, name: 'Ya inscripta', categoryId: 3, active: true },
+  ];
+  const completePlayers = (localityId: number) => [1, 2].map((id) => ({ id: localityId * 10 + id, localityId, fullName: `Jugadora ${id}`, birthDate: '1990-01-01', phone: '5491111111111', shirtSize: 'M' }));
+  const repositories = new Map<any, any>([
+    [Locality, { find: vi.fn(async () => localities) }],
+    [PairRegistration, { find: vi.fn(async () => [{ id: 20, categoryId: 3, localityId: 92 }]) }],
+    [RegistrationAccessGrant, { find: vi.fn(async () => [{ id: 30, categoryId: 3, localityId: 91 }]) }],
+    [Player, { find: vi.fn(async () => localities.flatMap((locality) => completePlayers(locality.id))) }],
+  ]);
+  const manager = { getRepository: (entity: any) => repositories.get(entity) };
+  const service = new TournamentsService({} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never);
+  const resolve = vi.spyOn(service as any, 'resolveZoneRegistration').mockResolvedValue({ id: 77 });
+
+  await (service as any).materializeManualTeams(manager, [{ categoryId: 3 }]);
+
+  expect(resolve).toHaveBeenCalledTimes(1);
+  expect(resolve).toHaveBeenCalledWith(manager, 3, undefined, 90);
+});
+
+function setup(capacity = 4, methodology = ZoneMethodology.PROVINCE) {
   const venue = { id: 1, active: true, name: 'Club', startsAt: '10:00', matchDurationMinutes: 40, matchesPerDay: 16 };
-  const zone = { id: 1, capacity, tournamentCategoryId: 8, name: 'A', venueId: 1, venue };
-  const category = { id: 8, tournamentId: 1, categoryId: 3, category: { name: 'Damas A' } };
+  const category = { id: 8, tournamentId: 1, categoryId: 3, category: { name: 'Damas A' }, methodology, qualifiersPerZone: 1 };
+  const zone = { id: 1, capacity, tournamentCategoryId: 8, name: 'A', venueId: 1, venue, tournamentCategory: category };
   const entries: any[] = [];
   const matches: any[] = [];
   const registration = { id: 10, categoryId: 3, status: RegistrationStatus.CONFIRMED };
@@ -395,7 +420,7 @@ describe('fixtures with unassigned places', () => {
     const { service, matches, entries, schedule } = setup();
     await service.fixture(1);
     const ids = matches.map((match) => match.id);
-    await service.assignPlace(1, 20, 2);
+    await service.assignPlace(1, 20, 3);
     expect(matches[0]).toMatchObject({ homeRegistrationId: null, awayRegistrationId: 20, status: MatchStatus.PENDING });
     await service.assignPlace(1, 10, 1);
     expect(matches[0]).toMatchObject({ homeRegistrationId: 10, awayRegistrationId: 20, status: MatchStatus.READY });
@@ -407,7 +432,7 @@ describe('fixtures with unassigned places', () => {
   });
 
   it('updates all round-robin matches when a three-pair place is filled', async () => {
-    const { service, matches } = setup(3);
+    const { service, matches } = setup(3, ZoneMethodology.ROUND_ROBIN);
     await service.fixture(1);
     await service.assignPlace(1, 30, 3);
     expect(matches[1].awayRegistrationId).toBe(30);
@@ -418,9 +443,9 @@ describe('fixtures with unassigned places', () => {
     const { service, entries, matches } = setup();
     entries.push(
       { id: 1, zoneId: 1, seed: 1, registrationId: 10 },
-      { id: 2, zoneId: 1, seed: 2, registrationId: 30 },
+      { id: 2, zoneId: 1, seed: 3, registrationId: 30 },
       { id: 3, zoneId: 2, seed: 1, registrationId: 20 },
-      { id: 4, zoneId: 2, seed: 2, registrationId: 40 },
+      { id: 4, zoneId: 2, seed: 3, registrationId: 40 },
     );
     matches.push(
       { id: 1, zoneId: 1, matchOrder: 1, homeSource: ParticipantSource.DIRECT, awaySource: ParticipantSource.DIRECT, homeRegistrationId: 10, awayRegistrationId: 30, status: MatchStatus.READY },
@@ -444,13 +469,13 @@ describe('fixtures with unassigned places', () => {
     expect(matches[2]).toMatchObject({ homeRegistrationId: 10, awayRegistrationId: null, status: MatchStatus.PENDING });
     await service.result(matches[1].id, 25, 10, director);
     expect(matches[2]).toMatchObject({ homeRegistrationId: 10, awayRegistrationId: 40, status: MatchStatus.READY });
-    expect(matches[3]).toMatchObject({ homeRegistrationId: 30, awayRegistrationId: 20, status: MatchStatus.READY });
+    expect(matches[3]).toMatchObject({ homeRegistrationId: 20, awayRegistrationId: 30, status: MatchStatus.READY });
   });
 
   it('requires exactly one team to reach the configured 25 points', async () => {
     const { service, matches } = setup();
     await service.fixture(1);
-    await service.assignPlace(1, 10, 1); await service.assignPlace(1, 20, 2);
+    await service.assignPlace(1, 10, 1); await service.assignPlace(1, 20, 3);
     const director = { role: 'DIRECTOR' } as never;
     await expect(service.result(matches[0].id, 24, 10, director)).rejects.toThrow('exactamente un equipo con 25');
     await expect(service.result(matches[0].id, 25, 25, director)).rejects.toThrow('exactamente un equipo con 25');
@@ -484,9 +509,20 @@ describe('fixtures with unassigned places', () => {
 
   it('preserves the order of legacy seed-zero assignments', async () => {
     const { service, entries, matches } = setup();
-    entries.push({ id: 1, seed: 0, registrationId: 10 }, { id: 2, seed: 0, registrationId: 20 });
+    entries.push({ id: 1, seed: 0, registrationId: 10 }, { id: 2, seed: 0, registrationId: 20 }, { id: 3, seed: 0, registrationId: 30 });
     await service.fixture(1);
-    expect(matches[0]).toMatchObject({ homeRegistrationId: 10, awayRegistrationId: 20 });
-    expect(entries.map((entry) => entry.seed)).toEqual([1, 2]);
+    expect(matches[0]).toMatchObject({ homeRegistrationId: 10, awayRegistrationId: 30 });
+    expect(entries.map((entry) => entry.seed)).toEqual([1, 2, 3]);
+  });
+
+  it('generates every direct pairing with the all-against-all methodology', async () => {
+    const { service, matches } = setup(4, ZoneMethodology.ROUND_ROBIN);
+    await service.fixture(1);
+    for (let seed = 1; seed <= 4; seed++) await service.assignPlace(1, seed * 10, seed);
+    expect(matches).toHaveLength(6);
+    expect(matches.map((match) => [match.homeRegistrationId, match.awayRegistrationId])).toEqual([
+      [10, 20], [10, 30], [10, 40], [20, 30], [20, 40], [30, 40],
+    ]);
+    expect(matches.every((match) => match.status === MatchStatus.READY)).toBe(true);
   });
 });

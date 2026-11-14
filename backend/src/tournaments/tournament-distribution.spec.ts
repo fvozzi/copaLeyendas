@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { calculateZoneCapacities, planTournamentDistribution } from './tournament-distribution';
+import { ZoneMethodology } from './tournament-methodology';
 
 describe('calculateZoneCapacities', () => {
   it.each([
@@ -28,11 +29,27 @@ describe('planTournamentDistribution', () => {
     const [plan] = planTournamentDistribution([{ id: 3, name: 'Damas A', capacities: [3, 3, 3, 3], registrations }], [{ id: 1, name: 'Sede' }], venuePlans);
 
     expect(plan.layoutMode).toBe('MANUAL');
+    expect(plan.methodology).toBe(ZoneMethodology.PROVINCE);
+    expect(plan.qualifiersPerZone).toBe(2);
+    expect(plan.nextStage).toBe('QUARTERFINAL');
     expect(plan.capacities).toEqual([3, 3, 3, 3]);
     expect(plan.zones).toHaveLength(4);
     expect(plan.zones.flatMap((zone) => zone.registrations)).toHaveLength(11);
     expect(plan.zones.map((zone) => zone.registrations.length).sort()).toEqual([2, 3, 3, 3]);
     expect(plan.warnings).toContain('Queda 1 lugar disponible para próximas parejas confirmadas.');
+  });
+
+  it('exposes an incompatible qualifier total before the fixture is applied', () => {
+    const registrations = Array.from({ length: 9 }, (_, index) => ({ id: index + 1, localityId: index + 1, localityName: `Equipo ${index + 1}`, label: `Pareja ${index + 1}` }));
+    const [plan] = planTournamentDistribution(
+      [{ id: 3, name: 'Damas A', registrations, methodology: ZoneMethodology.ROUND_ROBIN, qualifiersPerZone: 2 }],
+      [{ id: 1, name: 'Sede' }],
+      new Map([['3:0', 1], ['3:1', 1], ['3:2', 1]]),
+    );
+
+    expect(plan.methodology).toBe(ZoneMethodology.ROUND_ROBIN);
+    expect(plan.nextStage).toBeNull();
+    expect(plan.warnings).toContain('6 parejas clasificadas no forman un cuadro directo. Configurá zonas y clasificadas para obtener 2, 4 u 8 equipos en la etapa siguiente.');
   });
 
   it('keeps a locality in one venue and separates its pairs into different zones', () => {

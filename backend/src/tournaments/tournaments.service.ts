@@ -29,6 +29,7 @@ import { planTournamentDistribution, type DistributionRegistration } from './tou
 import { TournamentRegistrationAttendance } from './tournament-registration-attendance.entity';
 import { TournamentZoneVenuePlan } from './tournament-zone-venue-plan.entity';
 import { preservedProgramAssignments } from './distribution-program';
+import { inferredKnockoutStage, zoneMatchDefinitions, ZoneMethodology, type ZoneParticipantDefinition } from './tournament-methodology';
 
 @Injectable()
 export class TournamentsService {
@@ -304,13 +305,14 @@ export class TournamentsService {
     const positions = new Map(entries.map((entry) => [entry.seed, entry.registrationId]));
     const repository = manager.getRepository(TournamentMatch);
     const matches = await repository.find({ where: { zoneId }, order: { matchOrder: 'ASC' } });
-    const pairings = matches.length === 3 ? [[1, 2], [1, 3], [2, 3]] : [[1, 2], [3, 4]];
+    const zone = await manager.getRepository(Zone).findOne({ where: { id: zoneId }, relations: { tournamentCategory: true } });
+    if (!zone) throw new NotFoundException('Zona no encontrada');
+    const definitions = zoneMatchDefinitions(zone.capacity, zone.tournamentCategory?.methodology ?? ZoneMethodology.PROVINCE);
     for (const match of matches) {
-      if (match.homeSource !== ParticipantSource.DIRECT || match.awaySource !== ParticipantSource.DIRECT) continue;
-      const pairing = pairings[match.matchOrder - 1];
-      if (!pairing) continue;
-      match.homeRegistrationId = positions.get(pairing[0]) ?? null;
-      match.awayRegistrationId = positions.get(pairing[1]) ?? null;
+      const definition = definitions.find((item) => item.order === match.matchOrder);
+      if (!definition) continue;
+      if (definition.home.source === 'DIRECT') match.homeRegistrationId = positions.get(definition.home.seed) ?? null;
+      if (definition.away.source === 'DIRECT') match.awayRegistrationId = positions.get(definition.away.seed) ?? null;
       match.status = match.homeRegistrationId && match.awayRegistrationId ? MatchStatus.READY : MatchStatus.PENDING;
       await repository.save(match);
     }
@@ -367,7 +369,7 @@ export class TournamentsService {
   }
 
   async distributionPreview(tournamentId: number) {
-    return this.distributionPreviewInManager(this.t.manager, tournamentId);
+    return this.t.manager.transaction((manager) => this.distributionPreviewInManager(manager, tournamentId));
   }
 
   async setDistributionVenue(tournamentId: number, dto: { tournamentCategoryId: number; zoneIndex: number; venueId: number }) {
@@ -389,7 +391,7 @@ export class TournamentsService {
     return this.distributionPreview(tournamentId);
   }
 
-  async setDistributionLayout(tournamentId: number, dto: { tournamentCategoryId: number; capacities: number[] | null }) {
+  async setDistributionLayout(tournamentId: number, dto: { tournamentCategoryId: number; capacities?: number[] | null; methodology?: ZoneMethodology; qualifiersPerZone?: number }) {
     return this.t.manager.transaction(async (manager) => {
       const tournament = await manager.getRepository(Tournament).findOne({ where: { id: tournamentId }, lock: { mode: 'pessimistic_write' } });
       if (!tournament) throw new NotFoundException('Torneo no encontrado');
@@ -397,16 +399,20 @@ export class TournamentsService {
       if (current.hasResults) throw new BadRequestException('No se puede cambiar la cantidad de zonas porque el torneo ya tiene resultados.');
       const category = await manager.getRepository(TournamentCategory).findOneBy({ id: dto.tournamentCategoryId, tournamentId });
       if (!category) throw new NotFoundException('Categoria de torneo no encontrada');
-      if (dto.capacities !== null) {
+      if (dto.capacities !== undefined && dto.capacities !== null) {
         if (dto.capacities.length < 1 || dto.capacities.length > 4) throw new BadRequestException('Configura entre una y cuatro zonas.');
         if (dto.capacities.some((capacity) => capacity !== 3 && capacity !== 4)) throw new BadRequestException('Cada zona debe tener capacidad para 3 o 4 parejas.');
         const registrationCount = current.plans.find((plan) => plan.tournamentCategoryId === category.id)?.registrationCount ?? 0;
         const places = dto.capacities.reduce((sum, capacity) => sum + capacity, 0);
         if (places < registrationCount) throw new BadRequestException(`Hay ${registrationCount} parejas presentes y la configuracion solo tiene ${places} lugares.`);
       }
-      category.zoneCapacities = dto.capacities ? [...dto.capacities] : null;
-      category.zoneCount = dto.capacities?.length ?? null;
-      if (dto.capacities?.length && dto.capacities.every((capacity) => capacity === dto.capacities![0])) category.zoneSize = dto.capacities[0];
+      if (dto.capacities !== undefined) {
+        category.zoneCapacities = dto.capacities ? [...dto.capacities] : null;
+        category.zoneCount = dto.capacities?.length ?? null;
+        if (dto.capacities?.length && dto.capacities.every((capacity) => capacity === dto.capacities![0])) category.zoneSize = dto.capacities[0];
+      }
+      if (dto.methodology !== undefined) category.methodology = dto.methodology;
+      if (dto.qualifiersPerZone !== undefined) category.qualifiersPerZone = dto.qualifiersPerZone;
       await manager.getRepository(TournamentCategory).save(category);
       if (dto.capacities) await manager.getRepository(TournamentZoneVenuePlan).delete({
         tournamentCategoryId: category.id, zoneIndex: MoreThanOrEqual(dto.capacities.length),
@@ -430,6 +436,7 @@ export class TournamentsService {
     const categories = await manager.getRepository(TournamentCategory).find({
       where: { tournamentId }, relations: { category: true }, order: { id: 'ASC' },
     });
+    await this.materializeManualTeams(manager, categories);
     const categoryIds = categories.map((category) => category.categoryId);
     const registrations = categoryIds.length ? await manager.getRepository(PairRegistration).find({
       where: { categoryId: In(categoryIds), status: RegistrationStatus.CONFIRMED }, relations: { locality: true }, order: { id: 'ASC' },
@@ -461,8 +468,11 @@ export class TournamentsService {
     const hasResults = [...zoneMatches, ...slotMatches].some((match) => match.status === MatchStatus.PLAYED);
     const rules = [
       'El armado usa únicamente inscripciones confirmadas; los tokens emitidos todavía no confirmados no se incluyen.',
+      'Los equipos activos creados a mano, sin token pendiente y con su nómina completa, se incorporan como inscripciones administrativas.',
       'Dirección debe asignar cada zona a una sede antes de generar los partidos; no hay autoasignación de sedes.',
       'Dirección puede configurar entre una y cuatro zonas, con capacidad de 3 o 4 parejas cada una.',
+      'Cada categoría usa Metodología Provincia o Todos contra todas; la elección se aplica a todas sus zonas y cambia su fixture real.',
+      'La primera etapa eliminatoria se infiere con las clasificadas: 8 juegan cuartos, 4 semifinales y 2 final.',
       'Si no hay una configuración manual, el sistema calcula automáticamente zonas completas de 3 o 4 parejas.',
       'Una configuración puede dejar lugares libres para incorporar nuevas parejas confirmadas sin empezar de cero.',
       'Las parejas de una misma localidad comparten sede, pero se ubican en zonas diferentes.',
@@ -471,7 +481,7 @@ export class TournamentsService {
     ];
     const snapshot = {
       tournament: { id: tournament.id, updatedAt: (tournament as Tournament & { updatedAt?: Date }).updatedAt },
-      categories: categories.map((category) => ({ id: category.id, categoryId: category.categoryId, name: category.category.name, zoneCapacities: category.zoneCapacities })),
+      categories: categories.map((category) => ({ id: category.id, categoryId: category.categoryId, name: category.category.name, zoneCapacities: category.zoneCapacities, methodology: category.methodology, qualifiersPerZone: category.qualifiersPerZone })),
       registrations: registrations.map((registration) => ({ id: registration.id, categoryId: registration.categoryId, localityId: registration.localityId, updatedAt: registration.updatedAt })),
       attendance: attendanceRows.map((row) => ({ registrationId: row.registrationId, present: row.present, updatedAt: row.updatedAt })),
       venues: venues.map((venue) => ({ id: venue.id, name: venue.name, active: venue.active })),
@@ -493,6 +503,8 @@ export class TournamentsService {
       id: category.id,
       name: category.category.name,
       capacities: category.zoneCapacities,
+      methodology: category.methodology,
+      qualifiersPerZone: category.qualifiersPerZone,
       registrations: eligibleRegistrations.filter((registration) => registration.categoryId === category.categoryId).map((registration) => this.distributionRegistration(registration)),
     })), venues.map((venue) => ({ id: venue.id, name: venue.name })), new Map(venuePlans.map((plan) => [`${plan.tournamentCategoryId}:${plan.zoneIndex}`, plan.venueId])), existingAssignments);
     const currentSignature = JSON.stringify(categories.map((category) => zones.filter((zone) => zone.tournamentCategoryId === category.id).map((zone) => ({
@@ -503,8 +515,43 @@ export class TournamentsService {
       name: zone.name, capacity: zone.capacity, venueId: zone.venue?.id ?? null,
       registrations: zone.registrations.map((registration) => registration.id).sort((left, right) => left - right),
     }))));
+    const slotMatchById = new Map(slotMatches.map((match) => [match.id, match]));
+    const fixturesMatchConfiguration = zones.every((zone) => {
+      const matches = zoneMatches.filter((match) => match.zoneId === zone.id).sort((left, right) => left.matchOrder - right.matchOrder);
+      const definitions = zoneMatchDefinitions(zone.capacity, zone.tournamentCategory.methodology ?? ZoneMethodology.PROVINCE);
+      if (matches.length !== definitions.length) return false;
+      const registrationBySeed = new Map(entries.filter((entry) => entry.zoneId === zone.id).map((entry) => [entry.seed, entry.registrationId]));
+      const matchByOrder = new Map(matches.map((match) => [match.matchOrder, match]));
+      const sideMatches = (match: TournamentMatch, side: 'home' | 'away', participant: ZoneParticipantDefinition) => {
+        const source = side === 'home' ? match.homeSource : match.awaySource;
+        const registrationId = side === 'home' ? match.homeRegistrationId : match.awayRegistrationId;
+        const sourceMatchId = side === 'home' ? match.homeSourceMatchId : match.awaySourceMatchId;
+        if (source !== participant.source) return false;
+        if (participant.source === 'DIRECT') return registrationId === (registrationBySeed.get(participant.seed) ?? null) && sourceMatchId === null;
+        return sourceMatchId === (matchByOrder.get(participant.matchOrder)?.id ?? null);
+      };
+      return definitions.every((definition, index) => sideMatches(matches[index], 'home', definition.home) && sideMatches(matches[index], 'away', definition.away));
+    }) && categories.every((category) => {
+      const categoryZones = zones.filter((zone) => zone.tournamentCategoryId === category.id).sort((left, right) => left.name.localeCompare(right.name, 'es', { numeric: true }));
+      if (!categoryZones.length) return true;
+      const firstStage = inferredKnockoutStage(categoryZones.length, category.qualifiersPerZone ?? 2);
+      if (!firstStage) return false;
+      const stages: Array<'QUARTERFINAL' | 'SEMIFINAL' | 'FINAL'> = firstStage === 'QUARTERFINAL' ? ['QUARTERFINAL', 'SEMIFINAL', 'FINAL'] : firstStage === 'SEMIFINAL' ? ['SEMIFINAL', 'FINAL'] : ['FINAL'];
+      const expectedCounts = { QUARTERFINAL: 4, SEMIFINAL: 2, FINAL: 1 } as const;
+      const categorySlots = slots.filter((slot) => slot.tournamentCategoryId === category.id && slot.stage !== 'ZONE');
+      if (categorySlots.some((slot) => !stages.includes(slot.stage as 'QUARTERFINAL' | 'SEMIFINAL' | 'FINAL'))) return false;
+      if (stages.some((stage) => categorySlots.filter((slot) => slot.stage === stage).length !== expectedCounts[stage])) return false;
+      const qualifierPairs = directQualifierPairs(categoryZones, category.qualifiersPerZone ?? 2);
+      return categorySlots.filter((slot) => slot.stage === firstStage).every((slot) => {
+        const match = slot.matchId ? slotMatchById.get(slot.matchId) : undefined;
+        const qualifiers = qualifierPairs[slot.matchOrder - 1];
+        return Boolean(match && qualifiers
+          && match.homeQualifierZoneId === qualifiers[0].zoneId && match.homeQualifierRank === qualifiers[0].rank
+          && match.awayQualifierZoneId === qualifiers[1].zoneId && match.awayQualifierRank === qualifiers[1].rank);
+      });
+    });
 
-    if (matchCount && (hasResults || currentSignature === plannedSignature)) {
+    if (matchCount && (hasResults || (currentSignature === plannedSignature && fixturesMatchConfiguration))) {
       const plans = categories.map((category) => {
         const categoryZones = zones.filter((zone) => zone.tournamentCategoryId === category.id);
         const venueIds = new Set(categoryZones.map((zone) => zone.venueId));
@@ -515,6 +562,9 @@ export class TournamentsService {
           newRegistrationCount: 0,
           capacities: categoryZones.map((zone) => zone.capacity),
            layoutMode: category.zoneCapacities?.length ? 'MANUAL' as const : 'AUTOMATIC' as const,
+           methodology: category.methodology ?? ZoneMethodology.PROVINCE,
+           qualifiersPerZone: category.qualifiersPerZone ?? 2,
+           nextStage: inferredKnockoutStage(categoryZones.length, category.qualifiersPerZone ?? 2),
           venue: venueIds.size === 1 ? categoryZones[0]?.venue ?? null : null,
           zones: categoryZones.map((zone) => ({
             id: zone.id, name: zone.name, capacity: zone.capacity, venue: zone.venue, venueAssignment: 'APPLIED' as const,
@@ -534,11 +584,36 @@ export class TournamentsService {
       }).length : 0,
     }));
     const populated = plans.filter((plan) => plan.registrationCount > 0);
-    const complete = populated.every((plan) => plan.capacities.length > 0 && plan.zones.reduce((sum, zone) => sum + zone.registrations.length, 0) === plan.registrationCount);
+    const complete = populated.every((plan) => plan.capacities.length > 0 && plan.nextStage !== null && plan.zones.reduce((sum, zone) => sum + zone.registrations.length, 0) === plan.registrationCount);
     return {
       tournament: { id: tournament.id, name: tournament.name }, mode: 'PREVIEW' as const,
       canApply: Boolean(!hasResults && venues.length && populated.length && complete), baseVersion, matchCount, hasResults, replacesPendingFixture: matchCount > 0, rules, plans, attendance, venues: venues.map(({ id, name }) => ({ id, name })),
     };
+  }
+
+  private async materializeManualTeams(manager: EntityManager, categories: TournamentCategory[]) {
+    const categoryIds = categories.map((category) => category.categoryId);
+    if (!categoryIds.length) return;
+    const localities = await manager.getRepository(Locality).find({
+      where: { active: true, categoryId: In(categoryIds) }, order: { id: 'ASC' },
+    });
+    if (!localities.length) return;
+    const localityIds = localities.map((locality) => locality.id);
+    const [registrations, grants, players] = await Promise.all([
+      manager.getRepository(PairRegistration).find({ where: { categoryId: In(categoryIds) } }),
+      manager.getRepository(RegistrationAccessGrant).find({ where: { categoryId: In(categoryIds), localityId: In(localityIds) } }),
+      manager.getRepository(Player).find({ where: { localityId: In(localityIds) }, order: { id: 'ASC' } }),
+    ]);
+    for (const locality of localities) {
+      if (!locality.categoryId) continue;
+      if (registrations.some((registration) => registration.categoryId === locality.categoryId && registration.localityId === locality.id)) continue;
+      // A grant without a registration is an unused invitation. It must remain
+      // outside the zones until the team confirms it through the normal form.
+      if (grants.some((grant) => grant.categoryId === locality.categoryId && grant.localityId === locality.id)) continue;
+      const roster = players.filter((player) => player.localityId === locality.id);
+      if (roster.length < 2 || roster.length > 3 || roster.some((player) => !player.birthDate || !player.phone?.trim() || !player.shirtSize)) continue;
+      await this.resolveZoneRegistration(manager, locality.categoryId, undefined, locality.id);
+    }
   }
 
   async applyDistribution(tournamentId: number, baseVersion: string, resetProgram = false) {
@@ -630,13 +705,16 @@ export class TournamentsService {
     const findExisting = (zone: Zone, order: number) => existingWithMatches.find((slot) => slot.stage === 'ZONE' && slot.matchOrder === order && (slot.match?.zoneId === zone.id || (!slot.matchId && slot.tournamentCategoryId === zone.tournamentCategoryId && slot.zoneName === zone.name)));
     let sequence = Math.max(0, ...existing.map((slot) => slot.sequence));
     {
-      const venueQueues = new Map<number, { zone: Zone; nextOrder: number }[]>();
-      for (const zone of zones) venueQueues.set(zone.venueId, [...(venueQueues.get(zone.venueId) ?? []), { zone, nextOrder: 1 }]);
+      const venueQueues = new Map<number, { zone: Zone; nextOrder: number; gameCount: number }[]>();
+      for (const zone of zones) {
+        const methodology = zone.tournamentCategory?.methodology ?? ZoneMethodology.PROVINCE;
+        venueQueues.set(zone.venueId, [...(venueQueues.get(zone.venueId) ?? []), { zone, nextOrder: 1, gameCount: zoneMatchDefinitions(zone.capacity, methodology).length }]);
+      }
       const venueIds = [...venueQueues.keys()].sort((left, right) => left - right);
-      while ([...venueQueues.values()].some((queue) => queue.some((item) => item.nextOrder <= item.zone.capacity))) {
+      while ([...venueQueues.values()].some((queue) => queue.some((item) => item.nextOrder <= item.gameCount))) {
         for (const venueId of venueIds) {
           const queue = venueQueues.get(venueId)!;
-          const next = queue.find((item) => item.nextOrder <= item.zone.capacity);
+          const next = queue.find((item) => item.nextOrder <= item.gameCount);
           if (!next) continue;
           if (!findExisting(next.zone, next.nextOrder)) {
             sequence += 1;
@@ -646,9 +724,12 @@ export class TournamentsService {
           queue.push(queue.shift()!);
         }
       }
-      const knockoutCategories = [...new Set(zones.map((zone) => zone.tournamentCategoryId))].map((categoryId) => ({ categoryId, zones: zones.filter((zone) => zone.tournamentCategoryId === categoryId) })).filter((item) => item.zones.length === 2 || item.zones.length >= 4);
+      const knockoutCategories = [...new Set(zones.map((zone) => zone.tournamentCategoryId))].map((categoryId) => {
+        const categoryZones = zones.filter((zone) => zone.tournamentCategoryId === categoryId);
+        return { categoryId, zones: categoryZones, firstStage: inferredKnockoutStage(categoryZones.length, categoryZones[0]?.tournamentCategory?.qualifiersPerZone ?? 2) };
+      }).filter((item) => item.firstStage !== null);
       const knockoutStages = [{ stage: 'QUARTERFINAL', label: 'Cuartos de final', matches: 4 }, { stage: 'SEMIFINAL', label: 'Semifinal', matches: 2 }, { stage: 'FINAL', label: 'Final', matches: 1 }] as const;
-      for (const knockoutStage of knockoutStages) for (const category of knockoutCategories.filter((item) => knockoutStage.stage !== 'QUARTERFINAL' || item.zones.length >= 4)) for (let matchOrder = 1; matchOrder <= knockoutStage.matches; matchOrder += 1) {
+      for (const knockoutStage of knockoutStages) for (const category of knockoutCategories.filter((item) => knockoutStages.findIndex((stage) => stage.stage === knockoutStage.stage) >= knockoutStages.findIndex((stage) => stage.stage === item.firstStage))) for (let matchOrder = 1; matchOrder <= knockoutStage.matches; matchOrder += 1) {
         if (existing.some((slot) => slot.tournamentCategoryId === category.categoryId && slot.stage === knockoutStage.stage && slot.matchOrder === matchOrder)) continue;
         sequence += 1;
         generated.push(slotsRepository.create({ tournamentId, tournamentCategoryId: category.categoryId, zoneName: knockoutStage.label, matchOrder, stage: knockoutStage.stage, sequence, courtId: null, scheduledAt: null }));
@@ -783,17 +864,20 @@ export class TournamentsService {
     for (const stage of stageOrder) for (const slot of slots.filter((item) => item.stage === stage)) {
       if (slot.matchId) continue;
       const categoryZones = zones.filter((zone) => zone.tournamentCategoryId === slot.tournamentCategoryId).sort((a, b) => a.name.localeCompare(b.name, 'es', { numeric: true }));
+      const category = categoryZones[0]?.tournamentCategory ?? await manager.getRepository(TournamentCategory).findOneBy({ id: slot.tournamentCategoryId });
+      if (!category) throw new NotFoundException('Categoria no encontrada');
       const sources = slots.filter((item) => item.tournamentCategoryId === slot.tournamentCategoryId && item.stage === (stage === 'SEMIFINAL' ? 'QUARTERFINAL' : 'SEMIFINAL')).sort((a, b) => a.matchOrder - b.matchOrder);
-      const directQualifiers = stage === 'QUARTERFINAL' || (stage === 'SEMIFINAL' && !sources.length && categoryZones.length === 2);
-      const homeZone = categoryZones[slot.matchOrder - 1];
-      const awayZone = categoryZones[(slot.matchOrder - 1) ^ 1];
+      const firstStage = inferredKnockoutStage(categoryZones.length, category.qualifiersPerZone ?? 2);
+      const directQualifiers = stage === firstStage;
+      const qualifierPairs = directQualifierPairs(categoryZones, category.qualifiersPerZone ?? 2);
+      const qualifiers = qualifierPairs[slot.matchOrder - 1];
       const match = await repository.save(repository.create({ zoneId: null, matchOrder: slot.matchOrder, status: MatchStatus.PENDING,
         scheduledAt: slot.scheduledAt, homeSource: directQualifiers ? ParticipantSource.DIRECT : ParticipantSource.WINNER,
         awaySource: directQualifiers ? ParticipantSource.DIRECT : ParticipantSource.WINNER,
         homeSourceMatchId: directQualifiers ? null : sources[(slot.matchOrder - 1) * 2]?.matchId,
         awaySourceMatchId: directQualifiers ? null : sources[(slot.matchOrder - 1) * 2 + 1]?.matchId,
-        homeQualifierZoneId: directQualifiers ? homeZone?.id : null, homeQualifierRank: directQualifiers ? 1 : null,
-        awayQualifierZoneId: directQualifiers ? awayZone?.id : null, awayQualifierRank: directQualifiers ? 2 : null,
+        homeQualifierZoneId: directQualifiers ? qualifiers?.[0].zoneId : null, homeQualifierRank: directQualifiers ? qualifiers?.[0].rank : null,
+        awayQualifierZoneId: directQualifiers ? qualifiers?.[1].zoneId : null, awayQualifierRank: directQualifiers ? qualifiers?.[1].rank : null,
       }));
       slot.matchId = match.id;
       await slotsRepository.update(slot.id, { matchId: match.id });
@@ -859,25 +943,25 @@ export class TournamentsService {
       // Repeated clicks must not erase scheduled games or results.
       if (existing.length) return this.linkZoneMatches(manager, zone, existing);
       if (![3, 4].includes(zone.capacity)) throw new BadRequestException('El cupo de la zona debe ser de 3 o 4 parejas');
+      const category = await manager.getRepository(TournamentCategory).findOneBy({ id: zone.tournamentCategoryId });
+      if (!category) throw new NotFoundException('Categoria no encontrada');
       const entries = await this.orderedEntries(manager, zoneId);
       const positions = new Map(entries.map((entry) => [entry.seed, entry.registrationId]));
       const planned = await manager.getRepository(TournamentScheduleSlot).find({ where: { tournamentCategoryId: zone.tournamentCategoryId, zoneName: zone.name, stage: 'ZONE' } });
       const scheduledAt = (order: number) => planned.find((item) => item.matchOrder === order)?.scheduledAt ?? null;
-      const direct = (home: number, away: number, order: number) => {
-        const homeRegistrationId = positions.get(home) ?? null;
-        const awayRegistrationId = positions.get(away) ?? null;
-        return repository.save(repository.create({ zoneId, matchOrder: order, homeRegistrationId, awayRegistrationId,
-          homeSource: ParticipantSource.DIRECT, awaySource: ParticipantSource.DIRECT,
-          scheduledAt: scheduledAt(order), status: homeRegistrationId && awayRegistrationId ? MatchStatus.READY : MatchStatus.PENDING }));
-      };
-      const p1 = await direct(1, 2, 1);
-      if (zone.capacity === 3) {
-        await direct(1, 3, 2);
-        await direct(2, 3, 3);
-      } else {
-        const p2 = await direct(3, 4, 2);
-        await repository.save(repository.create({ zoneId, matchOrder: 3, scheduledAt: scheduledAt(3), homeSource: ParticipantSource.WINNER, homeSourceMatchId: p1.id, awaySource: ParticipantSource.LOSER, awaySourceMatchId: p2.id, status: MatchStatus.PENDING }));
-        await repository.save(repository.create({ zoneId, matchOrder: 4, scheduledAt: scheduledAt(4), homeSource: ParticipantSource.WINNER, homeSourceMatchId: p2.id, awaySource: ParticipantSource.LOSER, awaySourceMatchId: p1.id, status: MatchStatus.PENDING }));
+      const created = new Map<number, TournamentMatch>();
+      const participant = (definition: ZoneParticipantDefinition) => definition.source === 'DIRECT'
+        ? { source: ParticipantSource.DIRECT, registrationId: positions.get(definition.seed) ?? null, sourceMatchId: null }
+        : { source: definition.source === 'WINNER' ? ParticipantSource.WINNER : ParticipantSource.LOSER, registrationId: null, sourceMatchId: created.get(definition.matchOrder)?.id ?? null };
+      for (const definition of zoneMatchDefinitions(zone.capacity, category.methodology ?? ZoneMethodology.PROVINCE)) {
+        const home = participant(definition.home), away = participant(definition.away);
+        const match = await repository.save(repository.create({
+          zoneId, matchOrder: definition.order, scheduledAt: scheduledAt(definition.order),
+          homeSource: home.source, homeRegistrationId: home.registrationId, homeSourceMatchId: home.sourceMatchId,
+          awaySource: away.source, awayRegistrationId: away.registrationId, awaySourceMatchId: away.sourceMatchId,
+          status: home.registrationId && away.registrationId ? MatchStatus.READY : MatchStatus.PENDING,
+        }));
+        created.set(definition.order, match);
       }
       return this.linkZoneMatches(manager, zone, await repository.find({ where: { zoneId }, relations: { homeRegistration: true, awayRegistration: true }, order: { matchOrder: 'ASC' } }));
   }
@@ -1047,4 +1131,18 @@ function registrationRoster(players: Player[]) {
     playerThreeInstagram: three?.instagram ?? null,
     playerThreeShirtSize: three?.shirtSize ?? null,
   };
+}
+
+function directQualifierPairs(zones: Zone[], qualifiersPerZone: number) {
+  const qualifiers: Array<{ zoneId: number; rank: number }> = [];
+  if (qualifiersPerZone === 1) zones.forEach((zone) => qualifiers.push({ zoneId: zone.id, rank: 1 }));
+  else for (let index = 0; index < zones.length; index += 2) {
+    const first = zones[index], second = zones[index + 1];
+    if (!second) break;
+    qualifiers.push(
+      { zoneId: first.id, rank: 1 }, { zoneId: second.id, rank: 2 },
+      { zoneId: second.id, rank: 1 }, { zoneId: first.id, rank: 2 },
+    );
+  }
+  return Array.from({ length: Math.floor(qualifiers.length / 2) }, (_, index) => [qualifiers[index * 2], qualifiers[index * 2 + 1]] as const);
 }

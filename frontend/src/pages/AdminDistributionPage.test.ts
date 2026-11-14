@@ -12,7 +12,7 @@ afterEach(() => { vi.restoreAllMocks(); vi.resetAllMocks(); document.body.innerH
 it('shows the assignment rules and applies the preview to the real tournament', async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   vi.mocked(getTournaments).mockResolvedValue([{ id: 1, name: 'Copa', status: 'ACTIVE' }] as never);
-  const preview = { tournament: { id: 1, name: 'Copa' }, mode: 'PREVIEW', canApply: true, baseVersion: 'version-1', matchCount: 0, hasResults: false, replacesPendingFixture: false, rules: ['Misma localidad: misma sede y distinta zona.', 'Los partidos son los mismos de Programa - Mapa.'], venues: [{ id: 2, name: 'Sede Norte' }, { id: 3, name: 'Sede Sur' }], attendance: [{ id: 10, localityId: 3, localityName: 'Rocha', label: 'Las Leyendas', tournamentCategoryId: 5, categoryName: 'Damas A', present: true }], plans: [{ tournamentCategoryId: 5, categoryName: 'Damas A', registrationCount: 8, newRegistrationCount: 0, capacities: [4, 4], venue: { id: 2, name: 'Sede Norte' }, warnings: [], zones: [{ name: 'Zona A', capacity: 4, venue: { id: 2, name: 'Sede Norte' }, venueAssignment: 'AUTOMATIC', registrations: [{ id: 10, localityId: 3, localityName: 'Rocha', label: 'Las Leyendas' }] }] }] } as const;
+  const preview = { tournament: { id: 1, name: 'Copa' }, mode: 'PREVIEW', canApply: true, baseVersion: 'version-1', matchCount: 0, hasResults: false, replacesPendingFixture: false, rules: ['Misma localidad: misma sede y distinta zona.', 'Los partidos son los mismos de Programa - Mapa.'], venues: [{ id: 2, name: 'Sede Norte' }, { id: 3, name: 'Sede Sur' }], attendance: [{ id: 10, localityId: 3, localityName: 'Rocha', label: 'Las Leyendas', tournamentCategoryId: 5, categoryName: 'Damas A', present: true }], plans: [{ tournamentCategoryId: 5, categoryName: 'Damas A', registrationCount: 8, newRegistrationCount: 0, capacities: [4, 4], layoutMode: 'MANUAL', methodology: 'PROVINCE', qualifiersPerZone: 2, nextStage: 'SEMIFINAL', venue: { id: 2, name: 'Sede Norte' }, warnings: [], zones: [{ name: 'Zona A', capacity: 4, venue: { id: 2, name: 'Sede Norte' }, venueAssignment: 'AUTOMATIC', registrations: [{ id: 10, localityId: 3, localityName: 'Rocha', label: 'Las Leyendas' }] }] }] } as const;
   vi.mocked(getTournamentDistribution).mockResolvedValue(preview as never);
   const absentPreview = { ...preview, baseVersion: 'version-2', matchCount: 11, replacesPendingFixture: true, attendance: preview.attendance.map((registration) => ({ ...registration, present: false })), plans: preview.plans.map((plan) => ({ ...plan, registrationCount: 7, capacities: [4, 3] })) } as const;
   vi.mocked(setTournamentAttendance).mockResolvedValue(absentPreview as never);
@@ -52,7 +52,7 @@ it('offers to add newly confirmed pairs without rebuilding the program from scra
   const preview = {
     tournament: { id: 1, name: 'Copa' }, mode: 'PREVIEW', canApply: true, baseVersion: 'version-9', matchCount: 8, hasResults: false, replacesPendingFixture: true,
     rules: [], venues: [{ id: 2, name: 'Sede' }], attendance: [],
-    plans: [{ tournamentCategoryId: 5, categoryName: 'Silvina Cimadamore', registrationCount: 9, newRegistrationCount: 1, capacities: [3, 3, 3], venue: { id: 2, name: 'Sede' }, warnings: [], zones: [] }],
+    plans: [{ tournamentCategoryId: 5, categoryName: 'Silvina Cimadamore', registrationCount: 9, newRegistrationCount: 1, capacities: [3, 3, 3], layoutMode: 'MANUAL', methodology: 'PROVINCE', qualifiersPerZone: 2, nextStage: null, venue: { id: 2, name: 'Sede' }, warnings: [], zones: [] }],
   } as const;
   vi.mocked(getTournamentDistribution).mockResolvedValue(preview as never);
   vi.mocked(applyTournamentDistribution).mockResolvedValue({ ...preview, mode: 'CURRENT', canApply: false, replacesPendingFixture: false } as never);
@@ -76,7 +76,7 @@ it('lets Direction configure four zones of three while only eleven pairs are con
   const preview = {
     tournament: { id: 1, name: 'Copa' }, mode: 'PREVIEW', canApply: true, baseVersion: 'version-11', matchCount: 0, hasResults: false, replacesPendingFixture: false,
     rules: [], venues: [{ id: 2, name: 'Sede' }], attendance: [],
-    plans: [{ tournamentCategoryId: 5, categoryName: 'Damas A', registrationCount: 11, newRegistrationCount: 0, capacities: [4, 4, 3], layoutMode: 'AUTOMATIC', venue: { id: 2, name: 'Sede' }, warnings: [], zones: [] }],
+    plans: [{ tournamentCategoryId: 5, categoryName: 'Damas A', registrationCount: 11, newRegistrationCount: 0, capacities: [4, 4, 3], layoutMode: 'AUTOMATIC', methodology: 'PROVINCE', qualifiersPerZone: 2, nextStage: null, venue: { id: 2, name: 'Sede' }, warnings: [], zones: [] }],
   } as const;
   const configured = { ...preview, baseVersion: 'version-12', plans: preview.plans.map((plan) => ({ ...plan, capacities: [3, 3, 3, 3], layoutMode: 'MANUAL' as const })) };
   vi.mocked(getTournamentDistribution).mockResolvedValue(preview as never);
@@ -91,11 +91,15 @@ it('lets Direction configure four zones of three while only eleven pairs are con
   await act(async () => { second.value = '3'; second.dispatchEvent(new Event('change', { bubbles: true })); });
   const add = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'Agregar zona')!;
   await act(async () => add.click());
+  const methodology = container.querySelector<HTMLSelectElement>('[aria-label="Metodología de Damas A"]')!;
+  await act(async () => { methodology.value = 'ROUND_ROBIN'; methodology.dispatchEvent(new Event('change', { bubbles: true })); });
   expect(container.querySelector('[aria-label="Configuración de zonas de Damas A"]')?.textContent).toContain('12 lugares para 11 confirmadas · 1 libre');
-  const save = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'Fijar este esquema')!;
+  expect(container.textContent).toContain('Cuartos de final');
+  expect(container.textContent).toContain('cada pareja enfrenta una vez');
+  const save = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'Fijar configuración')!;
   await act(async () => save.click());
 
-  expect(setTournamentDistributionLayout).toHaveBeenCalledWith(1, 5, [3, 3, 3, 3]);
+  expect(setTournamentDistributionLayout).toHaveBeenCalledWith(1, 5, [3, 3, 3, 3], 'ROUND_ROBIN', 2);
   expect(container.textContent).toContain('Definido por Dirección');
   expect(container.textContent).toContain('3 + 3 + 3 + 3');
   await act(async () => root.unmount());

@@ -1,3 +1,5 @@
+import { inferredKnockoutStage, ZoneMethodology } from './tournament-methodology';
+
 export interface DistributionRegistration {
   id: number;
   localityId: number;
@@ -10,6 +12,8 @@ export interface DistributionCategoryInput {
   name: string;
   registrations: DistributionRegistration[];
   capacities?: number[] | null;
+  methodology?: ZoneMethodology;
+  qualifiersPerZone?: number;
 }
 
 export interface DistributionVenueInput {
@@ -37,6 +41,9 @@ export interface DistributionCategoryPlan {
   registrationCount: number;
   capacities: number[];
   layoutMode: 'AUTOMATIC' | 'MANUAL';
+  methodology: ZoneMethodology;
+  qualifiersPerZone: number;
+  nextStage: 'QUARTERFINAL' | 'SEMIFINAL' | 'FINAL' | null;
   venue: DistributionVenueInput | null;
   zones: DistributionZonePlan[];
   warnings: string[];
@@ -75,6 +82,8 @@ export function planTournamentDistribution(
 
   for (const category of categories) {
     const warnings: string[] = [];
+    const methodology = category.methodology ?? ZoneMethodology.PROVINCE;
+    const qualifiersPerZone = category.qualifiersPerZone ?? 2;
     let capacities: number[] = [];
     try {
       capacities = category.capacities?.length
@@ -89,6 +98,8 @@ export function planTournamentDistribution(
       const pending = availablePlaces - category.registrations.length;
       warnings.push(`${pending === 1 ? 'Queda' : 'Quedan'} ${pending} ${pending === 1 ? 'lugar disponible' : 'lugares disponibles'} para próximas parejas confirmadas.`);
     }
+    const nextStage = inferredKnockoutStage(capacities.length, qualifiersPerZone);
+    if (capacities.length && !nextStage) warnings.push(`${capacities.length * qualifiersPerZone} parejas clasificadas no forman un cuadro directo. Configurá zonas y clasificadas para obtener 2, 4 u 8 equipos en la etapa siguiente.`);
     if (!category.registrations.length) warnings.push('No hay parejas confirmadas en esta categoria.');
     if (!venues.length) warnings.push('No hay sedes activas disponibles.');
 
@@ -109,7 +120,7 @@ export function planTournamentDistribution(
     });
     if (zones.some((zone) => !zone.venue)) {
       warnings.push('Dirección debe asignar una sede a cada zona antes de distribuir las parejas y generar los partidos.');
-      plans.push({ tournamentCategoryId: category.id, categoryName: category.name, registrationCount: category.registrations.length, capacities, layoutMode: category.capacities?.length ? 'MANUAL' : 'AUTOMATIC', venue: null, zones, warnings });
+      plans.push({ tournamentCategoryId: category.id, categoryName: category.name, registrationCount: category.registrations.length, capacities, layoutMode: category.capacities?.length ? 'MANUAL' : 'AUTOMATIC', methodology, qualifiersPerZone, nextStage, venue: null, zones, warnings });
       continue;
     }
     const preference = (registration: DistributionRegistration) => existingAssignments.get(`${category.id}:${registration.id}`);
@@ -158,7 +169,7 @@ export function planTournamentDistribution(
     }
     const assignedVenueIds = new Set(zones.flatMap((zone) => zone.venue ? [zone.venue.id] : []));
     const venue = assignedVenueIds.size === 1 ? zones[0]?.venue ?? null : null;
-    plans.push({ tournamentCategoryId: category.id, categoryName: category.name, registrationCount: category.registrations.length, capacities, layoutMode: category.capacities?.length ? 'MANUAL' : 'AUTOMATIC', venue, zones, warnings });
+    plans.push({ tournamentCategoryId: category.id, categoryName: category.name, registrationCount: category.registrations.length, capacities, layoutMode: category.capacities?.length ? 'MANUAL' : 'AUTOMATIC', methodology, qualifiersPerZone, nextStage, venue, zones, warnings });
   }
   return plans;
 }

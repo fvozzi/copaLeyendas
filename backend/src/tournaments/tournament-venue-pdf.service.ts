@@ -11,6 +11,7 @@ import { Zone } from './zone.entity';
 import { ZoneEntry } from './zone-entry.entity';
 import { programRelations } from './program-view';
 import { standings } from './zone-standings';
+import { zoneMatchDefinitions, ZoneMethodology } from './tournament-methodology';
 import { renderVenueWorksheetPdf, type VenueWorksheetCategory, type VenueWorksheetMatch } from './venue-worksheet-pdf';
 
 @Injectable()
@@ -59,9 +60,9 @@ export class TournamentVenuePdfService {
       if (sourceMatchId) return `${source === 'LOSER' ? 'Perdedora' : 'Ganadora'} P${sequenceByMatch.get(sourceMatchId) ?? '?'}`;
       if (slot.stage === 'ZONE') {
         const zone = match.zoneId ? zoneById.get(match.zoneId) : undefined;
-        const pairings = zone?.capacity === 3 ? [[1, 2], [1, 3], [2, 3]] : [[1, 2], [3, 4]];
-        const pairing = pairings[match.matchOrder - 1];
-        if (pairing) return `Pareja ${pairing[side === 'home' ? 0 : 1]}`;
+        const participant = zone ? zoneMatchDefinitions(zone.capacity, zone.tournamentCategory.methodology ?? ZoneMethodology.PROVINCE)
+          .find((definition) => definition.order === match.matchOrder)?.[side] : undefined;
+        if (participant?.source === 'DIRECT') return `Pareja ${participant.seed}`;
       }
       return 'A definir';
     };

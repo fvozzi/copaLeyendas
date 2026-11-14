@@ -25,7 +25,7 @@ import type {
   PublicTeamCuilRoster,
   Category, CategoryPayload, Court, CourtPayload, Venue, VenuePayload,
   Tournament, TournamentPayload, TournamentDetail, TournamentMatch, ZoneDetail, ZoneRegistrationPlacement, AdminUser, AdminUserPayload, CashExpense, CashExpensePayload, CashIncomePayload, CashSummary, TournamentScheduleSlot,
-  ActivityLogPage, TournamentOperations,
+  ActivityLogPage, TournamentOperations, ZoneMethodology,
 } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
@@ -353,7 +353,7 @@ export function deleteTournamentZone(id: number) { return request<{ success: boo
 export function divideTournamentZones(id: number) { return request(`/tournaments/categories/${id}/divide-zones`, { method: 'POST' }, true); }
 export function getTournamentDistribution(id: number) { return request<TournamentDistribution>(`/tournaments/${id}/distribution`, {}, true); }
 export function setTournamentDistributionVenue(id: number, tournamentCategoryId: number, zoneIndex: number, venueId: number) { return request<TournamentDistribution>(`/tournaments/${id}/distribution/venue`, { method: 'PATCH', body: JSON.stringify({ tournamentCategoryId, zoneIndex, venueId }) }, true); }
-export function setTournamentDistributionLayout(id: number, tournamentCategoryId: number, capacities: number[] | null) { return request<TournamentDistribution>(`/tournaments/${id}/distribution/layout`, { method: 'PATCH', body: JSON.stringify({ tournamentCategoryId, capacities }) }, true); }
+export function setTournamentDistributionLayout(id: number, tournamentCategoryId: number, capacities: number[] | null, methodology: ZoneMethodology, qualifiersPerZone: number) { return request<TournamentDistribution>(`/tournaments/${id}/distribution/layout`, { method: 'PATCH', body: JSON.stringify({ tournamentCategoryId, capacities, methodology, qualifiersPerZone }) }, true); }
 export function applyTournamentDistribution(id: number, baseVersion: string, resetProgram = false) { return request<TournamentDistribution>(`/tournaments/${id}/distribution/apply`, { method: 'POST', body: JSON.stringify({ baseVersion, resetProgram }) }, true); }
 export function setTournamentAttendance(id: number, registrationId: number, present: boolean) { return request<TournamentDistribution>(`/tournaments/${id}/attendance/${registrationId}`, { method: 'PATCH', body: JSON.stringify({ present }) }, true); }
 export function getTournamentScheduleGrid(id: number) { return request<TournamentScheduleSlot[]>(`/tournaments/${id}/schedule-grid`, {}, true); }

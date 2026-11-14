@@ -41,7 +41,7 @@ it('shows automatic zoning and saves only the match format for Cimadamore', asyn
   vi.mocked(updateTournamentCategory).mockResolvedValue(category as never);
   container = document.createElement('div'); document.body.append(container); root = createRoot(container);
   await act(async () => root.render(createElement(MemoryRouter, { initialEntries: ['/app/torneos/1'], future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(Routes, null, createElement(Route, { path: '/app/torneos/:id', element: createElement(AdminTournamentDetailPage) })))));
-  expect(container.textContent).toContain('Automática · zonas de 3 o 4');
+  expect(container.textContent).toContain('Metodología Provincia · clasifican 2');
   await act(async () => (container.querySelector('tbody button') as HTMLButtonElement).click());
   const form = document.querySelector('form')!;
   expect(form.textContent).toContain('se calculan automáticamente');

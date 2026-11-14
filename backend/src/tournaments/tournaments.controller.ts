@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, Param, ParseIntPipe, Patch, Post, Res, StreamableFile, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsDateString, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsDateString, IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import type { Response } from 'express';
@@ -11,13 +11,14 @@ import { TournamentStatus } from './tournament.enums';
 import { TournamentsService } from './tournaments.service';
 import { ProgramScenarioDto } from './program-scenario.dto';
 import { TournamentVenuePdfService } from './tournament-venue-pdf.service';
+import { ZoneMethodology } from './tournament-methodology';
 
 class ScheduleMatchDto { @IsDateString() scheduledAt: string; }
 class ResultDto { @IsInt() homeScore: number; @IsInt() awayScore: number; }
 class AssignPlaceDto { @IsOptional() @IsInt() @Min(1) registrationId?: number; @IsOptional() @IsInt() @Min(1) localityId?: number; }
 class ApplyDistributionDto { @IsString() baseVersion: string; @IsOptional() @IsBoolean() resetProgram?: boolean; }
 class DistributionVenueDto { @IsInt() @Min(1) tournamentCategoryId: number; @IsInt() @Min(0) zoneIndex: number; @IsInt() @Min(1) venueId: number; }
-class DistributionLayoutDto { @IsInt() @Min(1) tournamentCategoryId: number; @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(4) @IsInt({ each: true }) @Min(3, { each: true }) @Max(4, { each: true }) capacities: number[] | null; }
+class DistributionLayoutDto { @IsInt() @Min(1) tournamentCategoryId: number; @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(4) @IsInt({ each: true }) @Min(3, { each: true }) @Max(4, { each: true }) capacities?: number[] | null; @IsOptional() @IsEnum(ZoneMethodology) methodology?: ZoneMethodology; @IsOptional() @IsInt() @Min(1) @Max(2) qualifiersPerZone?: number; }
 class AttendanceDto { @IsBoolean() present: boolean; }
 
 @Controller('tournaments')
