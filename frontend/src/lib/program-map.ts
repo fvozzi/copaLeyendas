@@ -1,4 +1,5 @@
 import type { TournamentScheduleSlot, TournamentZone } from '../types';
+import { pairPlayerNames } from './pair-display';
 
 export const venueColors = ['#23776b', '#b65b30', '#536dc3', '#995789', '#98751c', '#258197', '#7455a6', '#7b664e'];
 export const venueColor = (id?: number | null) => id ? venueColors[(id - 1) % venueColors.length] : '#6b7679';
@@ -44,7 +45,7 @@ export function mapParticipant(slot: TournamentScheduleSlot, side: 'home' | 'awa
   const match = slot.match;
   if (!match) return 'A definir';
   const pair = side === 'home' ? match.homeRegistration : match.awayRegistration;
-  if (pair) return `${pair.locality.name} · ${pair.playerOneName} / ${pair.playerTwoName}`;
+  if (pair) return `${pair.locality.name} · ${pairPlayerNames(pair)}`;
   const qualifier = side === 'home' ? match.homeQualifierZoneId : match.awayQualifierZoneId;
   const rank = side === 'home' ? match.homeQualifierRank : match.awayQualifierRank;
   if (qualifier) return `${rank ?? '?'}.ª de ${zones.find((zone) => zone.id === qualifier)?.name ?? 'zona a definir'}`;

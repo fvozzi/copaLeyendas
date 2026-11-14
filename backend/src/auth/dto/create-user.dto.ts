@@ -13,6 +13,6 @@ export class CreateUserDto {
   @MinLength(8)
   password: string;
 
-  @IsIn([UserRole.DIRECTOR, UserRole.COURT_LEADER], { message: 'El rol debe ser Director o Lider de cancha.' })
+  @IsIn([UserRole.DIRECTOR, UserRole.COURT_LEADER], { message: 'El rol debe ser Director o Lider de sede.' })
   role: UserRole.DIRECTOR | UserRole.COURT_LEADER;
 }

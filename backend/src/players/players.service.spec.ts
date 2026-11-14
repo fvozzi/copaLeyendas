@@ -158,9 +158,9 @@ describe('registration player synchronization', () => {
   });
 
   it('keeps existing players linked to the locality referenced by their registration', async () => {
-    const players = { findOne: vi.fn().mockResolvedValue({ id: 1, dni: '123', localityId: 2 }), find: vi.fn().mockResolvedValue([]), save: vi.fn() };
+    const players = { findOne: vi.fn().mockResolvedValue({ id: 1, dni: '123', fullName: 'Nombre canónico', localityId: 2, birthDate: null, phone: null, instagram: null, shirtSize: null }), find: vi.fn().mockResolvedValue([]), save: vi.fn() };
     const localities = { findOne: vi.fn(), save: vi.fn() };
-    const registrations = { find: vi.fn().mockResolvedValue([]) };
+    const registrations = { find: vi.fn().mockResolvedValue([]), save: vi.fn(async (value) => value) };
     const service = new PlayersService(players as never, localities as never, registrations as never, {} as never, {} as never, {} as never, {} as never);
     await service.syncRegistrationPlayers({
       localityId: 9,
@@ -170,8 +170,21 @@ describe('registration player synchronization', () => {
     } as never);
     expect(players.findOne).toHaveBeenCalledTimes(2);
     expect(players.save).toHaveBeenCalledWith(expect.objectContaining({ dni: '123', localityId: 9 }));
+    expect(registrations.save).toHaveBeenCalledWith(expect.objectContaining({ playerOneName: 'Nombre canónico', playerOneDni: '123' }));
     expect(localities.findOne).not.toHaveBeenCalled();
     expect(localities.save).not.toHaveBeenCalled();
+  });
+
+  it('refreshes every registration snapshot by DNI even if its old locality link differs', async () => {
+    const player = { id: 4, dni: '12345678', fullName: 'Nombre anterior', localityId: 7, locality: { id: 7 }, birthDate: '1980-01-01', phone: '111', instagram: null, shirtSize: 'M', cuil: null };
+    const stale = { id: 12, localityId: 9, playerOneName: 'Nombre viejo', playerOneDni: player.dni, playerOneBirthDate: '1980-01-01', playerOnePhone: '111', playerOneInstagram: null, playerOneShirtSize: 'M' };
+    const players = { findOne: vi.fn(async () => player), save: vi.fn(async (value) => value), find: vi.fn().mockResolvedValue([]) };
+    const registrations = { find: vi.fn().mockResolvedValueOnce([stale]).mockResolvedValueOnce([]), save: vi.fn(async (value) => value) };
+    const service = new PlayersService(players as never, {} as never, registrations as never, {} as never, {} as never, {} as never, {} as never);
+
+    await service.update(player.id, { fullName: 'Nombre canónico' });
+
+    expect(registrations.save).toHaveBeenCalledWith(expect.objectContaining({ id: 12, playerOneName: 'Nombre canónico' }));
   });
 
   it('uses the current team roster to replace a stale registration player', async () => {

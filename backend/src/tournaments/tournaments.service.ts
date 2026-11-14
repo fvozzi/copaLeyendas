@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, In, MoreThanOrEqual, Repository } from 'typeorm';
 import { type AuthenticatedUser } from '../auth/current-user.decorator';
 import { UserRole } from '../auth/user.entity';
-import { CourtAssistantAssignment } from '../courts/court-assistant-assignment.entity';
+import { VenueLeaderAssignment } from '../courts/venue-leader-assignment.entity';
 import { Court } from '../courts/court.entity';
 import { Venue } from '../courts/venue.entity';
 import { PairRegistration } from '../registrations/pair-registration.entity';
@@ -43,7 +43,7 @@ export class TournamentsService {
     @InjectRepository(TournamentScheduleSlot) private slots: Repository<TournamentScheduleSlot>,
     @InjectRepository(Court) private c: Repository<Court>,
     @InjectRepository(Venue) private venues: Repository<Venue>,
-    @InjectRepository(CourtAssistantAssignment) private assignments: Repository<CourtAssistantAssignment>,
+    @InjectRepository(VenueLeaderAssignment) private assignments: Repository<VenueLeaderAssignment>,
     @InjectRepository(PairRegistration) private r: Repository<PairRegistration>,
   ) {}
 
@@ -52,12 +52,12 @@ export class TournamentsService {
     const tournament = await this.t.findOne({ where: { status: TournamentStatus.ACTIVE }, order: { startsAt: 'ASC', id: 'ASC' } });
     if (!tournament) return { tournament: null, courts: [], slots: [] };
     const allSlots = await this.slots.find({ where: { tournamentId: tournament.id }, relations: programRelations, order: { sequence: 'ASC' } });
-    const assignedIds = user.role === UserRole.DIRECTOR
-      ? [...new Set(allSlots.flatMap((slot) => slot.courtId ? [slot.courtId] : []))]
-      : (await this.assignments.find({ where: { userId: user.sub } })).map((assignment) => assignment.courtId);
+    const assignedVenueIds = user.role === UserRole.DIRECTOR
+      ? [...new Set(allSlots.flatMap((slot) => slot.court?.venueId ? [slot.court.venueId] : []))]
+      : (await this.assignments.find({ where: { userId: user.sub } })).map((assignment) => assignment.venueId);
     if (user.role !== UserRole.DIRECTOR && !this.isCourtLeader(user)) throw new ForbiddenException('Este perfil no puede operar canchas.');
-    const allowed = new Set(assignedIds);
-    const visibleSlots = allSlots.filter((slot) => slot.matchId && slot.courtId && allowed.has(slot.courtId));
+    const allowed = new Set(assignedVenueIds);
+    const visibleSlots = allSlots.filter((slot) => slot.matchId && slot.courtId && slot.court?.venueId && allowed.has(slot.court.venueId));
     const courtIds = [...new Set(visibleSlots.flatMap((slot) => slot.courtId ? [slot.courtId] : []))];
     const courts = courtIds.length ? await this.c.find({ where: { id: In(courtIds) }, relations: { venue: true }, order: { name: 'ASC' } }) : [];
     return {
@@ -426,7 +426,7 @@ export class TournamentsService {
       id: registration.id,
       localityId: registration.localityId,
       localityName: registration.locality.name,
-      label: registration.representingText?.trim() || `${registration.playerOneName} / ${registration.playerTwoName}`,
+      label: registration.representingText?.trim() || playerLabel(registration),
     };
   }
 
@@ -1083,10 +1083,11 @@ export class TournamentsService {
     if (!this.isCourtLeader(user)) throw new ForbiddenException('Este perfil no puede operar canchas.');
     const assigned = await this.slots.createQueryBuilder('slot')
       .innerJoin('slot.match', 'match')
-      .innerJoin(CourtAssistantAssignment, 'assignment', 'assignment.courtId = slot.courtId AND assignment.userId = :userId', { userId: user.sub })
+      .innerJoin('slot.court', 'court')
+      .innerJoin(VenueLeaderAssignment, 'assignment', 'assignment.venueId = court.venueId AND assignment.userId = :userId', { userId: user.sub })
       .where('match.zoneId = :zoneId', { zoneId })
       .getExists();
-    if (!assigned) throw new ForbiddenException('No estas asignado a una cancha de esta zona.');
+    if (!assigned) throw new ForbiddenException('No estas asignado a la sede de esta zona.');
   }
 
   matches(zoneId: number) { return this.fixture(zoneId); }
@@ -1120,8 +1121,9 @@ export class TournamentsService {
     if (user.role === UserRole.DIRECTOR) return;
     if (!this.isCourtLeader(user)) throw new ForbiddenException('Este perfil no puede cargar resultados.');
     const slot = knownSlot ?? await this.slots.findOneBy({ matchId });
-    if (!slot?.courtId || !(await this.assignments.existsBy({ courtId: slot.courtId, userId: user.sub }))) {
-      throw new ForbiddenException('No estas asignado a la cancha de este partido.');
+    const court = slot?.courtId ? await this.c.findOneBy({ id: slot.courtId }) : null;
+    if (!court || !(await this.assignments.existsBy({ venueId: court.venueId, userId: user.sub }))) {
+      throw new ForbiddenException('No estas asignado a la sede de este partido.');
     }
   }
 

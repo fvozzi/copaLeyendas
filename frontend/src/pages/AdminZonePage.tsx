@@ -4,11 +4,12 @@ import { AdminDataGrid } from '../components/AdminDataGrid';
 import { AdminDialog } from '../components/AdminDialog';
 import { useAuth } from '../lib/auth';
 import { assignZonePlace, getAvailableZoneRegistrations, getZone, getZoneMatches, saveMatchResult, updateMatchSchedule } from '../lib/api';
+import { pairPlayerNames } from '../lib/pair-display';
 import type { PairRegistration, TournamentMatch, ZoneDetail } from '../types';
 
 const dateTimeValue = (value: string | null) => value ? new Date(new Date(value).getTime() - new Date(value).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '';
 const formattedDateTime = (value: string | null) => value ? new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)) : 'Sin horario';
-const pairName = (pair: PairRegistration) => `${pair.playerOneName} / ${pair.playerTwoName} - ${pair.locality.name}`;
+const pairName = (pair: PairRegistration) => `${pairPlayerNames(pair)} - ${pair.locality.name}`;
 
 export function AdminZonePage() {
   const { user } = useAuth();

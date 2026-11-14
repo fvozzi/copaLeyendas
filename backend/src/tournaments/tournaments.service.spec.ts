@@ -29,7 +29,7 @@ vi.mock('../localities/locality.entity', () => ({ Locality: class Locality {} })
 vi.mock('../players/player.entity', () => ({ Player: class Player {} }));
 vi.mock('../courts/court.entity', () => ({ Court: class Court {} }));
 vi.mock('../courts/venue.entity', () => ({ Venue: class Venue {} }));
-vi.mock('../courts/court-assistant-assignment.entity', () => ({ CourtAssistantAssignment: class CourtAssistantAssignment {} }));
+vi.mock('../courts/venue-leader-assignment.entity', () => ({ VenueLeaderAssignment: class VenueLeaderAssignment {} }));
 vi.mock('./tournament-zone-venue-plan.entity', () => ({ TournamentZoneVenuePlan: class TournamentZoneVenuePlan {} }));
 vi.mock('../auth/user.entity', () => ({ UserRole: { DIRECTOR: 'DIRECTOR', COURT_LEADER: 'COURT_LEADER', ASSISTANT: 'ASSISTANT' } }));
 vi.mock('./match-result-card', () => ({
@@ -44,6 +44,29 @@ vi.mock('./match-result-photo-storage', () => ({
 
 const director = { sub: 1, role: 'DIRECTOR' } as never;
 const testPhoto = { buffer: Buffer.from('photo'), originalname: 'inicio.jpg', mimetype: 'image/jpeg', size: 5 } as Express.Multer.File;
+
+it('gives a venue leader access to matches on every court at the assigned venue', async () => {
+  const assignedVenue = { id: 10, name: 'Sede Centro', startsAt: '10:00', matchDurationMinutes: 40, matchesPerDay: 16 };
+  const otherVenue = { id: 20, name: 'Sede Norte', startsAt: '10:00', matchDurationMinutes: 40, matchesPerDay: 16 };
+  const slot = (id: number, courtId: number, venue: typeof assignedVenue) => ({
+    id, sequence: id, tournamentId: 1, tournamentCategoryId: 1, stage: 'ZONE', courtId, scheduledAt: null,
+    court: { id: courtId, name: `Cancha ${courtId}`, venueId: venue.id, venue },
+    matchId: id, match: { id, status: MatchStatus.READY, resultPhotoStoredName: null },
+  });
+  const allSlots = [slot(1, 101, assignedVenue), slot(2, 102, assignedVenue), slot(3, 201, otherVenue)];
+  const tournamentRepository = { findOne: vi.fn(async () => ({ id: 1, name: 'Copa', startsAt: null, endsAt: null })) };
+  const slotRepository = { find: vi.fn(async () => allSlots) };
+  const courtRepository = { find: vi.fn(async () => allSlots.slice(0, 2).map((item) => item.court)) };
+  const assignmentRepository = { find: vi.fn(async () => [{ venueId: assignedVenue.id, userId: 7 }]) };
+  const service = new TournamentsService(tournamentRepository as never, {} as never, {} as never, {} as never, {} as never,
+    slotRepository as never, courtRepository as never, {} as never, assignmentRepository as never, {} as never);
+
+  const result = await service.operations({ sub: 7, role: 'COURT_LEADER' } as never);
+
+  expect(result.slots.map((item) => item.id)).toEqual([1, 2]);
+  expect(result.courts.map((item) => item.id)).toEqual([101, 102]);
+  expect(assignmentRepository.find).toHaveBeenCalledWith({ where: { userId: 7 } });
+});
 
 async function startFixtureMatch(service: TournamentsService, id: number) {
   await service.startMatch(id, director, testPhoto);

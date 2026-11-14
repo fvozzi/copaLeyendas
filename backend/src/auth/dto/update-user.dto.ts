@@ -17,6 +17,6 @@ export class UpdateUserDto {
   password?: string;
 
   @IsOptional()
-  @IsIn([UserRole.DIRECTOR, UserRole.COURT_LEADER], { message: 'El rol debe ser Director o Lider de cancha.' })
+  @IsIn([UserRole.DIRECTOR, UserRole.COURT_LEADER], { message: 'El rol debe ser Director o Lider de sede.' })
   role?: UserRole.DIRECTOR | UserRole.COURT_LEADER;
 }

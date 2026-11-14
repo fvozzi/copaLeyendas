@@ -5,6 +5,7 @@ import { AdminDialog } from '../components/AdminDialog';
 import { ProgramMap } from '../components/ProgramMap';
 import { ProgramScenarioDialog } from '../components/ProgramScenarioDialog';
 import { downloadTournamentVenueWorksheet, getCourts, getVenues, getTournamentScheduleGrid, getTournaments, updateTournamentScheduleSlot, redistributeTournamentCourts, saveMatchResult } from '../lib/api';
+import { pairPlayerNames } from '../lib/pair-display';
 import type { Court, Venue, Tournament, TournamentScheduleSlot } from '../types';
 
 type ProgramTab = 'matches' | 'venues' | 'categories' | 'map';
@@ -14,7 +15,7 @@ const matchLabel = (slot: TournamentScheduleSlot, allSlots: TournamentScheduleSl
     const match = slot.match;
     const participant = (side: 'home' | 'away') => {
       const pair = side === 'home' ? match.homeRegistration : match.awayRegistration;
-      if (pair) return `${pair.playerOneName} / ${pair.playerTwoName} (${pair.locality.name})`;
+      if (pair) return `${pairPlayerNames(pair)} (${pair.locality.name})`;
       const sourceId = side === 'home' ? match.homeSourceMatchId : match.awaySourceMatchId;
       const source = side === 'home' ? match.homeSource : match.awaySource;
       if (sourceId) return `${source === 'LOSER' ? 'Perdedora' : 'Ganadora'} P${allSlots.find((item) => item.matchId === sourceId)?.sequence ?? '?'}`;
@@ -222,7 +223,7 @@ function CategoryZoneCard({ name, slots }: { name: string; slots: TournamentSche
   const teams = new Map<number, { locality: string; players: string }>();
   for (const slot of [...slots].sort((left, right) => left.matchOrder - right.matchOrder)) {
     for (const pair of [slot.match?.homeRegistration, slot.match?.awayRegistration]) {
-      if (pair && !teams.has(pair.id)) teams.set(pair.id, { locality: pair.locality.name, players: `${pair.playerOneName} / ${pair.playerTwoName}` });
+      if (pair && !teams.has(pair.id)) teams.set(pair.id, { locality: pair.locality.name, players: pairPlayerNames(pair) });
     }
   }
   const expected = slots[0]?.tournamentCategory.zoneSize ?? teams.size;

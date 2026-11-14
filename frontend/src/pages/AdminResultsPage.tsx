@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { AdminDataGrid } from '../components/AdminDataGrid';
 import { AdminDialog } from '../components/AdminDialog';
 import { getTournamentOperations, openMatchResultPhoto, saveMatchResult, startMatch } from '../lib/api';
+import { pairPlayerNames } from '../lib/pair-display';
 import type { TournamentOperations, TournamentScheduleSlot } from '../types';
 
 const pairName = (slot: TournamentScheduleSlot, side: 'home' | 'away') => {
   const pair = side === 'home' ? slot.match?.homeRegistration : slot.match?.awayRegistration;
-  return pair ? `${pair.locality.name} · ${pair.playerOneName} / ${pair.playerTwoName}` : 'A definir';
+  return pair ? `${pair.locality.name} · ${pairPlayerNames(pair)}` : 'A definir';
 };
 
 export function AdminResultsPage() {
@@ -63,7 +64,7 @@ export function AdminResultsPage() {
   return <div className="admin-panel court-results-page">
     <div className="panel-header"><div><p className="eyebrow">Operación de cancha</p><h1>Cargar resultados</h1><p>{data.tournament?.name ?? 'No hay un torneo activo.'}</p></div></div>
     {error && <div className="inline-state" role="alert">{error}</div>}
-    {!data.tournament ? <div className="inline-state">No hay un torneo activo.</div> : !data.courts.length ? <div className="inline-state">No tenés canchas con partidos asignados. Dirección debe asignarte desde Canchas.</div> : <>
+    {!data.tournament ? <div className="inline-state">No hay un torneo activo.</div> : !data.courts.length ? <div className="inline-state">No tenés partidos en las sedes asignadas. Dirección debe asignarte desde Sedes.</div> : <>
       <section className="data-card result-court-selector"><label>Cancha<select value={courtId} onChange={(event) => setCourtId(Number(event.target.value))}>{data.courts.map((item) => <option key={item.id} value={item.id}>{item.venue?.name ? `${item.venue.name} · ` : ''}{item.name}</option>)}</select></label><p className="field-hint">{court?.venue?.address ?? court?.address ?? 'Ubicación sin informar'} · {slots.length} partidos</p></section>
       <section className="data-card"><AdminDataGrid rows={slots} emptyMessage="No hay partidos programados en esta cancha." columns={[
         { label: 'Horario', render: (slot) => slot.scheduledAt ? new Intl.DateTimeFormat('es-AR', { timeStyle: 'short', dateStyle: 'short' }).format(new Date(slot.scheduledAt)) : 'A definir' },

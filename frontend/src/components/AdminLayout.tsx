@@ -12,7 +12,7 @@ export function AdminLayout() {
       <aside className={`admin-sidebar ${menuOpen ? 'is-open' : ''}`}>
         <div className="admin-sidebar-header">
           <div>
-          <p className="sidebar-kicker">{isDirector ? 'Dirección del Torneo' : 'Líder de cancha'}</p>
+          <p className="sidebar-kicker">{isDirector ? 'Dirección del Torneo' : 'Líder de sede'}</p>
           <h1>Copa Leyendas</h1>
           <p className="sidebar-user">{user?.name}</p>
           </div>

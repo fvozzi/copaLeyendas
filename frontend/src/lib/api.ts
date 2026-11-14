@@ -335,11 +335,11 @@ export function deleteCategory(id: number) { return request<{ success: boolean }
 export function getCourts(search?: string) { return request<Court[]>(`/courts${buildQuery({ search })}`, {}, true); }
 export function createCourt(payload: CourtPayload) { return request<Court>('/courts', { method: 'POST', body: JSON.stringify(payload) }, true); }
 export function updateCourt(id: number, payload: CourtPayload) { return request<Court>(`/courts/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true); }
-export function updateCourtAssistants(id: number, userIds: number[]) { return request<Court>(`/courts/${id}/assistants`, { method: 'PUT', body: JSON.stringify({ userIds }) }, true); }
 export function deleteCourt(id: number) { return request<{ success: boolean }>(`/courts/${id}`, { method: 'DELETE' }, true); }
 export function getVenues() { return request<Venue[]>('/courts/venues', {}, true); }
 export function createVenue(payload: VenuePayload) { return request<Venue>('/courts/venues', { method: 'POST', body: JSON.stringify(payload) }, true); }
 export function updateVenue(id: number, payload: VenuePayload) { return request<Venue>(`/courts/venues/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true); }
+export function updateVenueLeaders(id: number, userIds: number[]) { return request<Venue>(`/courts/venues/${id}/leaders`, { method: 'PUT', body: JSON.stringify({ userIds }) }, true); }
 export function deleteVenue(id: number) { return request<{ success: boolean }>(`/courts/venues/${id}`, { method: 'DELETE' }, true); }
 export function getTournaments() { return request<Tournament[]>('/tournaments', {}, true); }
 export function createTournament(payload: TournamentPayload) { return request<Tournament>('/tournaments', { method: 'POST', body: JSON.stringify(payload) }, true); }

@@ -211,6 +211,7 @@ export class PlayersService {
     if (correction) return this.correctRegistrationPlayers(registration, correction.previous, correction.manager);
     const candidates = [
       {
+        prefix: 'playerOne' as const,
         fullName: registration.playerOneName,
         dni: registration.playerOneDni,
         birthDate: registration.playerOneBirthDate,
@@ -219,6 +220,7 @@ export class PlayersService {
         shirtSize: registration.playerOneShirtSize,
       },
       {
+        prefix: 'playerTwo' as const,
         fullName: registration.playerTwoName,
         dni: registration.playerTwoDni,
         birthDate: registration.playerTwoBirthDate,
@@ -228,6 +230,7 @@ export class PlayersService {
       },
       registration.playerThreeName && registration.playerThreeDni
         ? {
+            prefix: 'playerThree' as const,
             fullName: registration.playerThreeName,
             dni: registration.playerThreeDni,
             birthDate: registration.playerThreeBirthDate,
@@ -238,11 +241,14 @@ export class PlayersService {
         : null,
     ];
 
+    let refreshedSnapshot = false;
     for (const candidate of candidates) {
       if (!candidate) continue;
       const dni = candidate.dni.trim();
       const exists = await this.playersRepository.findOne({ where: { dni } });
       if (exists) {
+        assignPlayerSnapshot(registration, candidate.prefix, exists);
+        refreshedSnapshot = true;
         if ((!authoritativeDnis || authoritativeDnis.has(dni)) && exists.localityId !== registration.localityId) {
           exists.localityId = registration.localityId;
           await this.playersRepository.save(exists);
@@ -262,6 +268,7 @@ export class PlayersService {
         }),
       );
     }
+    if (refreshedSnapshot) await this.registrationsRepository.save(registration);
     await this.synchronizeLocalityRoster(registration.localityId);
   }
 
@@ -304,7 +311,6 @@ export class PlayersService {
       ],
     });
     for (const registration of registrations) {
-      if (registration.localityId !== player.localityId) continue;
       let changed = false;
       for (const prefix of ['playerOne', 'playerTwo', 'playerThree'] as const) {
         if (registration[`${prefix}Dni`]?.trim() !== previousDni) continue;

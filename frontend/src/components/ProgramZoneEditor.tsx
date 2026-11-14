@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { AdminDialog } from './AdminDialog';
 import { assignZonePlace, getZone, getZoneRegistrationPlacements, updateTournamentZone } from '../lib/api';
+import { pairPlayerNames } from '../lib/pair-display';
 import type { PairRegistration, TournamentScheduleSlot, TournamentZone, Venue, ZoneDetail, ZoneRegistrationPlacement } from '../types';
 
-const registrationLabel = (pair: PairRegistration) => `${pair.locality.name} · ${pair.playerOneName} / ${pair.playerTwoName}`;
+const registrationLabel = (pair: PairRegistration) => `${pair.locality.name} · ${pairPlayerNames(pair)}`;
 const placementKey = (placement: Pick<ZoneRegistrationPlacement, 'registrationId' | 'localityId'>) => `${placement.registrationId ?? 'new'}:${placement.localityId}`;
-const placementPairLabel = (placement: ZoneRegistrationPlacement) => `${placement.locality.name} · ${placement.playerOneName} / ${placement.playerTwoName}`;
+const placementPairLabel = (placement: ZoneRegistrationPlacement) => `${placement.locality.name} · ${pairPlayerNames(placement)}`;
 
 export function ProgramZoneEditor({ zone, venues, slots, onClose, onChanged, onMatch }: {
   zone: TournamentZone; venues: Venue[]; slots: TournamentScheduleSlot[]; onClose: () => void; onChanged: () => Promise<void>;

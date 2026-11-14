@@ -15,5 +15,5 @@ it('accepts the court leader role when creating a user', async () => {
 
 it('rejects legacy roles with a readable message', async () => {
   const errors = await validate(validUser(UserRole.ASSISTANT));
-  expect(errors[0]?.constraints?.isIn).toBe('El rol debe ser Director o Lider de cancha.');
+  expect(errors[0]?.constraints?.isIn).toBe('El rol debe ser Director o Lider de sede.');
 });

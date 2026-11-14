@@ -66,7 +66,7 @@ it('summarizes each category and zone once for the entire venue, including its k
 });
 
 it('shows zone cards first and the category matches grouped underneath', async () => {
-  const pairA = { id: 101, playerOneName: 'Ana', playerTwoName: 'Bea', locality: { name: 'Beltran' } };
+  const pairA = { id: 101, playerOneName: 'Ana', playerTwoName: 'Bea', playerThreeName: 'Ceci', locality: { name: 'Beltran' } };
   const pairB = { id: 102, playerOneName: 'Carla', playerTwoName: 'Dora', locality: { name: 'Macachin' } };
   const zoneA = { ...slot, tournamentCategory: { ...slot.tournamentCategory, zoneSize: 4 }, matchId: 501, match: { id: 501, zoneId: 11, status: 'READY', homeRegistration: pairA, awayRegistration: pairB, homeScore: null, awayScore: null } } as TournamentScheduleSlot;
   const zoneB = { ...zoneA, id: 11, sequence: 2, zoneName: 'Zona B', matchId: 502, match: { ...zoneA.match!, id: 502, zoneId: 12 } } as TournamentScheduleSlot;
@@ -81,7 +81,7 @@ it('shows zone cards first and the category matches grouped underneath', async (
   expect(overview.compareDocumentPosition(games) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(overview.querySelectorAll('.program-category-zone-card')).toHaveLength(2);
   expect(overview.textContent).toContain('Beltran');
-  expect(overview.textContent).toContain('Ana / Bea');
+  expect(overview.textContent).toContain('Ana / Bea / Ceci');
   expect(overview.querySelector('a[href="/app/zonas/11"]')).toBeTruthy();
   expect([...games.querySelectorAll('.program-category-match-section h4')].map((heading) => heading.textContent)).toEqual(['Zona A', 'Zona B', 'Semifinales']);
   expect([...games.querySelectorAll('th')].map((heading) => heading.textContent)).not.toContain('Categoría ↕');

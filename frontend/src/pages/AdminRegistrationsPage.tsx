@@ -1,5 +1,6 @@
 import { WhatsAppDeliveryStatus } from "../components/WhatsAppDeliveryStatus";
 import { registrationPaymentLabel } from "../lib/registration-payment";
+import { pairPlayerNames } from "../lib/pair-display";
 import { useEffect, useRef, useState } from "react";
 import { getRegistrationLocalities } from "../lib/localities";
 import { formatRegistrationDate } from "../lib/registration-dates";
@@ -232,7 +233,7 @@ export function AdminRegistrationsPage() {
   const removeRegistration = async (item: PairRegistration) => {
     if (
       !window.confirm(
-        `Se eliminara el registro de ${item.playerOneName} y ${item.playerTwoName}. El token volvera a estar disponible.`,
+        `Se eliminará el registro de ${pairPlayerNames(item)}. El token volverá a estar disponible.`,
       )
     )
       return;
@@ -639,7 +640,7 @@ export function AdminRegistrationsPage() {
               label: "Jugadoras",
               render: (item) => (
                 <strong>
-                  {item.playerOneName} / {item.playerTwoName}
+                  {pairPlayerNames(item)}
                 </strong>
               ),
             },

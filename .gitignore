@@ -9,3 +9,5 @@ frontend/dist/
 backend/dist/
 *.log
 *.tsbuildinfo
+tmp/load-*.json
+tmp/resultados-concurrentes-*.json

@@ -7,7 +7,7 @@ import { CourtsService } from './courts.service';
 
 class CourtDto { @IsString() @MinLength(2) @MaxLength(120) name: string; @IsInt() venueId: number; @IsOptional() @IsBoolean() active?: boolean; }
 class VenueDto { @IsString() @MinLength(2) name: string; @IsOptional() @IsString() address?: string; @IsOptional() @IsString() city?: string; @IsOptional() @IsString() provinceName?: string; @IsOptional() @IsString() startsAt?: string; @IsOptional() @IsInt() matchDurationMinutes?: number; @IsOptional() @IsInt() matchesPerDay?: number; @IsOptional() @IsBoolean() active?: boolean; }
-class CourtAssistantsDto { @IsArray() @IsInt({ each: true }) userIds: number[]; }
+class VenueLeadersDto { @IsArray() @IsInt({ each: true }) userIds: number[]; }
 
 @Controller('courts')
 @UseGuards(JwtAuthGuard)
@@ -17,10 +17,10 @@ export class CourtsController {
   @Get('venues') venues() { return this.service.listVenues(); }
   @Post('venues') createVenue(@CurrentUser() user: AuthenticatedUser, @Body() dto: VenueDto) { this.assertDirector(user); return this.service.createVenue(dto); }
   @Patch('venues/:id') updateVenue(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: Partial<VenueDto>) { this.assertDirector(user); return this.service.updateVenue(id, dto); }
+  @Put('venues/:id/leaders') setVenueLeaders(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: VenueLeadersDto) { this.assertDirector(user); return this.service.setVenueLeaders(id, dto.userIds); }
   @Delete('venues/:id') removeVenue(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { this.assertDirector(user); return this.service.removeVenue(id); }
   @Post() create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CourtDto) { this.assertDirector(user); return this.service.create(dto); }
   @Patch(':id') update(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: Partial<CourtDto>) { this.assertDirector(user); return this.service.update(id, dto); }
-  @Put(':id/assistants') setAssistants(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: CourtAssistantsDto) { this.assertDirector(user); return this.service.setAssistants(id, dto.userIds); }
   @Delete(':id') remove(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) { this.assertDirector(user); return this.service.remove(id); }
   private assertDirector(user: AuthenticatedUser) { if (user.role !== UserRole.DIRECTOR) throw new ForbiddenException('Solo Direccion puede administrar canchas.'); }
 }

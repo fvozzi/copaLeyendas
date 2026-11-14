@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
 import { getTournament } from '../lib/api';
 import { categoryGraph, mapParticipant, mapZonePairs, roundNames, venueColor, type MapNode } from '../lib/program-map';
+import { pairPlayerNames } from '../lib/pair-display';
 import type { TournamentDetail, TournamentScheduleSlot, TournamentZone, Venue } from '../types';
 import { ProgramZoneEditor } from './ProgramZoneEditor';
 
@@ -101,7 +102,7 @@ function MapBoard({ graph, full, zones, games, zoom, busy, readOnly, onZone, onM
       style={{ ...colorStyle(venueId), ...(positioned ? { left: position.x, top: position.y, width: 224, height: nodeHeight(node) } : {}) }} onClick={readOnly ? undefined : () => zone ? onZone(zone) : slot && onMatch(slot)}>
       {zone ? <><span className="map-zone-heading"><span className="map-node-kicker">Zona</span><strong className="map-node-title">{zone.name.replace(/^zona\s+/i, '')}</strong></span><span className="map-node-venue" title={zone.venue.name}>{zone.venue.name}</span><span className="map-node-meta">{pairs.filter((pair) => pair.registration).length}/{zone.capacity} parejas · {zoneGames.length} partidos</span>
         <span className="map-zone-pairs">{pairs.map(({ seed, registration }) => {
-          const label = registration ? `${registration.playerOneName} / ${registration.playerTwoName}` : `Pareja ${seed}`;
+          const label = registration ? pairPlayerNames(registration) : `Pareja ${seed}`;
           return <span className="map-zone-pair" key={seed} title={label}><span className="map-pair-seed">{seed}</span><span className="map-pair-name">{label}</span></span>;
         })}</span>{!readOnly && <span className="map-node-action">Editar zona y parejas ↗</span>}</> : slot && <>
         <span className="map-match-heading"><strong>P{slot.sequence}</strong><span>{slot.match?.status === 'PLAYED' ? `${slot.match.homeScore}–${slot.match.awayScore}` : slot.match?.status === 'IN_PROGRESS' ? 'En juego' : slot.match?.status === 'READY' ? 'Listo' : 'A definir'}</span></span>

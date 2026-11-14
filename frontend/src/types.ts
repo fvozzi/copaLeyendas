@@ -330,10 +330,10 @@ export interface LocalityPayload {
 
 export interface Category { id: number; name: string; active: boolean; sortOrder: number; }
 export interface CategoryPayload { name: string; active?: boolean; sortOrder?: number; }
-export interface CourtAssistant { id: number; name: string; email: string; }
-export interface Venue { id: number; name: string; address: string | null; city: string | null; provinceName: string | null; startsAt: string; matchDurationMinutes: number; matchesPerDay: number; active: boolean; }
+export interface VenueLeader { id: number; name: string; email: string; }
+export interface Venue { id: number; name: string; address: string | null; city: string | null; provinceName: string | null; startsAt: string; matchDurationMinutes: number; matchesPerDay: number; active: boolean; leaderIds: number[]; leaders: VenueLeader[]; }
 export interface VenuePayload { name: string; address?: string; city?: string; provinceName?: string; startsAt?: string; matchDurationMinutes?: number; matchesPerDay?: number; active?: boolean; }
-export interface Court { id: number; name: string; venueId: number; venue?: Venue; address: string | null; city: string | null; provinceName: string | null; active: boolean; assistantIds: number[]; assistants: CourtAssistant[]; }
+export interface Court { id: number; name: string; venueId: number; venue?: Venue; address: string | null; city: string | null; provinceName: string | null; active: boolean; }
 export interface CourtPayload { name: string; venueId: number; active?: boolean; }
 
 export interface Tournament { id: number; name: string; feePerPlayer: number; startsAt: string | null; endsAt: string | null; playingDays: string[]; city: string | null; status: 'DRAFT' | 'ACTIVE' | 'COMPLETED'; }

@@ -45,7 +45,7 @@ export class TournamentVenuePdfService {
     const zoneById = new Map(venueZones.map((zone) => [zone.id, zone]));
     const teamName = (registration: PairRegistration | null | undefined) => {
       if (!registration) return '';
-      const players = `${registration.playerOneName} / ${registration.playerTwoName}`;
+      const players = playerNames(registration);
       const team = registration.representingText?.trim();
       return team && !players.toLocaleLowerCase('es').includes(team.toLocaleLowerCase('es')) ? `${team} · ${players}` : players;
     };
@@ -93,7 +93,7 @@ export class TournamentVenuePdfService {
           name: zone.name,
           teams: zoneEntries.map((entry) => {
             const row = rows.get(entry.registrationId);
-            return { seed: entry.seed, name: teamName(entry.registration), players: `${entry.registration.playerOneName} / ${entry.registration.playerTwoName}`, played: row?.played ?? 0, wins: row?.wins ?? 0, pointsFor: row?.pointsFor ?? 0, pointsAgainst: row?.pointsAgainst ?? 0 };
+            return { seed: entry.seed, name: teamName(entry.registration), players: playerNames(entry.registration), played: row?.played ?? 0, wins: row?.wins ?? 0, pointsFor: row?.pointsFor ?? 0, pointsAgainst: row?.pointsAgainst ?? 0 };
           }),
           matches: zoneSlots.map(worksheetMatch),
         };
@@ -133,4 +133,8 @@ export class TournamentVenuePdfService {
   private slug(value: string) {
     return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'torneo';
   }
+}
+
+function playerNames(registration: PairRegistration) {
+  return [registration.playerOneName, registration.playerTwoName, registration.playerThreeName].filter((name) => name?.trim()).join(' / ');
 }

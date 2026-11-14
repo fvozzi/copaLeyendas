@@ -1,4 +1,5 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { VenueLeaderAssignment } from './venue-leader-assignment.entity';
 
 @Entity('venues')
 export class Venue {
@@ -11,6 +12,7 @@ export class Venue {
   @Column({ type: 'integer', default: 40 }) matchDurationMinutes: number;
   @Column({ type: 'integer', default: 16 }) matchesPerDay: number;
   @Column({ type: 'boolean', default: true }) active: boolean;
+  @OneToMany(() => VenueLeaderAssignment, (assignment) => assignment.venue) assignments: VenueLeaderAssignment[];
   @CreateDateColumn() createdAt: Date;
   @UpdateDateColumn() updatedAt: Date;
 }
