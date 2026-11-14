@@ -26,10 +26,14 @@ it('lets a court leader start with a photo and then submit a 25-point result', a
   const startButton = [...container.querySelectorAll('button')].find((item) => item.textContent === 'Iniciar partido')!;
   await act(async () => startButton.click());
   let form = document.querySelector('form')!;
+  expect(form.textContent).toContain('Sacar foto con la cámara');
   const photo = new File(['foto'], 'tablero.jpg', { type: 'image/jpeg' });
   const input = form.querySelector<HTMLInputElement>('input[type="file"]')!;
+  expect(input.accept).toBe('image/*');
+  expect(input.getAttribute('capture')).toBe('environment');
   Object.defineProperty(input, 'files', { value: [photo] });
   await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
+  expect(form.textContent).toContain('Foto lista para publicar');
   await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
   expect(startMatch).toHaveBeenCalledWith(80, photo);
   expect(container.textContent).toContain('En juego');

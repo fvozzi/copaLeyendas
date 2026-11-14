@@ -1343,7 +1343,15 @@ img {
 
 .result-court-selector { display: flex; align-items: end; justify-content: space-between; gap: 1rem; }
 .result-court-selector label { display: grid; gap: 0.4rem; min-width: min(100%, 320px); font-weight: 700; }
+.result-photo-field { display: grid; gap: 0.7rem; }
 .result-photo-field small { color: var(--ink-soft); font-weight: 400; }
+.camera-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+.camera-button { display: flex; align-items: center; justify-content: center; gap: 0.65rem; width: 100%; min-height: 64px; padding: 0.9rem 1rem; border: 2px solid var(--brand); border-radius: 10px; background: var(--brand); color: var(--white); font-size: 1.05rem; font-weight: 800; text-align: center; cursor: pointer; }
+.camera-button span { font-size: 1.45rem; line-height: 1; }
+.camera-button.has-photo { background: transparent; color: var(--brand); }
+.camera-input:focus-visible + .camera-button { outline: 3px solid rgba(215, 100, 67, 0.3); outline-offset: 3px; }
+.result-photo-preview { display: block; width: 100%; max-height: 360px; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); background: var(--white); }
+.camera-photo-ready { color: var(--brand); font-size: 0.9rem; font-weight: 800; text-align: center; }
 .match-photo-orientation { display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: rgba(20, 60, 53, 0.05); }
 .match-photo-orientation > div { display: grid; gap: 0.25rem; padding: 1rem; }
 .match-photo-orientation > div + div { border-left: 1px solid var(--line); text-align: right; }
@@ -1352,6 +1360,10 @@ img {
 @media (max-width: 620px) {
   .match-photo-orientation { grid-template-columns: 1fr; }
   .match-photo-orientation > div + div { border-top: 1px solid var(--line); border-left: 0; text-align: left; }
+  .result-start-dialog .match-photo-orientation { grid-template-columns: 1fr 1fr; }
+  .result-start-dialog .match-photo-orientation > div { padding: 0.7rem; }
+  .result-start-dialog .match-photo-orientation > div + div { border-top: 0; border-left: 1px solid var(--line); text-align: right; }
+  .result-start-dialog .match-photo-orientation strong { font-size: 0.88rem; }
 }
 .court-leader-field { display: grid; gap: 0.65rem; margin: 0; padding: 1rem; border: 1px solid var(--line); border-radius: 8px; }
 .court-leader-field legend { padding: 0 0.35rem; font-weight: 800; }
@@ -2546,6 +2558,18 @@ textarea {
     font-size: 1.75rem;
     overflow-wrap: anywhere;
   }
+
+  .result-court-selector { display: grid; align-items: stretch; }
+  .result-court-selector label { width: 100%; min-width: 0; }
+  .court-results-page .admin-grid-mobile-sort { display: none; }
+  .court-results-page .admin-data-grid-actions { display: grid; grid-template-columns: 1fr; }
+  .court-results-page .admin-data-grid-actions::before { display: none; }
+  .court-results-page .admin-data-grid-actions button { width: 100%; min-height: 52px; }
+  .admin-dialog.result-start-dialog { height: 100dvh; max-height: 100dvh; border-radius: 0; }
+  .result-start-dialog .admin-dialog-header { position: sticky; z-index: 2; top: -1rem; padding: 1rem 0 0.75rem; background: var(--mist); }
+  .result-start-form { padding: 0.85rem; }
+  .result-start-form .form-actions { position: sticky; bottom: -1rem; z-index: 2; margin: 0 -0.85rem -0.85rem; padding: 0.85rem; background: var(--mist); border-top: 1px solid var(--line); }
+  .result-start-form .form-actions button { min-height: 58px; font-size: 1rem; }
 
   .editor-form label.checkbox-row {
     grid-column: span 1;
