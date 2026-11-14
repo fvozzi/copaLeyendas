@@ -22,8 +22,9 @@ it('publishes the initial photo and start time while a match is in progress', ()
   const startedAt = new Date('2026-11-21T15:03:00Z');
   const detail = { id: 1, name: 'Copa', categories: [category], zones: [{ id: 10, venueId: 4, venue, tournamentCategory: category }] };
   const slot = { id: 9, matchId: 8, stage: 'ZONE', sequence: 5, court: { id: 1, venue }, tournamentCategory: category, scheduledAt: new Date('2026-11-21T15:00:00Z'),
-    match: { id: 8, zoneId: 10, zone: { id: 10, name: 'Zona A' }, status: 'IN_PROGRESS', startedAt, resultSubmittedAt: null, resultPhotoStoredName: 'private-name.jpg', homeRegistration: null, awayRegistration: null } };
+    match: { id: 8, zoneId: 10, zone: { id: 10, name: 'Zona A', capacity: 3 }, status: 'IN_PROGRESS', startedAt, resultSubmittedAt: null, resultPhotoStoredName: 'private-name.jpg', homeRegistration: null, awayRegistration: null } };
   const result = publicProgramView(detail as never, [slot as never]);
+  expect(result.slots[0].zoneCapacity).toBe(3);
   expect(result.slots[0].match).toMatchObject({ status: 'IN_PROGRESS', startedAt, resultPhotoAvailable: true });
   expect(result.slots[0].match?.photoUrl).toContain('/api/public/tournaments/matches/8/photo?v=');
   expect(JSON.stringify(result)).not.toContain('private-name.jpg');

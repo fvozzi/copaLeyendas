@@ -14,6 +14,7 @@ export function programView(slots: TournamentScheduleSlot[]) {
   // A legacy fourth planning row for a three-pair zone is not a real game.
   return slots.filter((slot) => slot.stage !== 'ZONE' || slot.matchId).map((slot) => ({
     ...slot, zoneName: slot.match?.zone?.name ?? slot.zoneName,
+    zoneCapacity: slot.match?.zone?.capacity ?? null,
     capacityWarning: capacity.get(slot.sequence) ?? null,
     match: slot.match ? matchView(slot.match, slot) : null,
   }));

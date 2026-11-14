@@ -36,7 +36,8 @@ export function publicProgramView(detail: Awaited<ReturnType<TournamentQueryServ
     },
     slots: slots.filter(slot => slot.stage !== 'ZONE' || slot.matchId).map(slot => ({
       id: slot.id, matchId: slot.matchId, tournamentId: slot.tournamentId, tournamentCategoryId: slot.tournamentCategoryId,
-      zoneName: slot.match?.zone?.name ?? slot.zoneName, matchOrder: slot.matchOrder, stage: slot.stage, sequence: slot.sequence,
+      zoneName: slot.match?.zone?.name ?? slot.zoneName, zoneCapacity: slot.match?.zone?.capacity ?? null,
+      matchOrder: slot.matchOrder, stage: slot.stage, sequence: slot.sequence,
       courtId: slot.courtId, court: publicCourt(slot.court), scheduledAt: slot.scheduledAt,
       tournamentCategory: publicCategory(slot.tournamentCategory),
       match: slot.match ? {

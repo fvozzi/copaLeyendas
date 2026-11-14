@@ -226,7 +226,7 @@ function CategoryZoneCard({ name, slots }: { name: string; slots: TournamentSche
       if (pair && !teams.has(pair.id)) teams.set(pair.id, { locality: pair.locality.name, players: pairPlayerNames(pair) });
     }
   }
-  const expected = slots[0]?.tournamentCategory.zoneSize ?? teams.size;
+  const expected = slots.find((slot) => slot.zoneCapacity != null)?.zoneCapacity ?? slots[0]?.tournamentCategory.zoneSize ?? teams.size;
   const teamRows = [...teams.values()];
   const venues = [...new Set(slots.flatMap((slot) => slot.court?.venue?.name ? [slot.court.venue.name] : []))];
   const zoneId = slots.find((slot) => slot.match?.zoneId)?.match?.zoneId;

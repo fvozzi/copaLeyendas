@@ -68,8 +68,8 @@ it('summarizes each category and zone once for the entire venue, including its k
 it('shows zone cards first and the category matches grouped underneath', async () => {
   const pairA = { id: 101, playerOneName: 'Ana', playerTwoName: 'Bea', playerThreeName: 'Ceci', locality: { name: 'Beltran' } };
   const pairB = { id: 102, playerOneName: 'Carla', playerTwoName: 'Dora', locality: { name: 'Macachin' } };
-  const zoneA = { ...slot, tournamentCategory: { ...slot.tournamentCategory, zoneSize: 4 }, matchId: 501, match: { id: 501, zoneId: 11, status: 'READY', homeRegistration: pairA, awayRegistration: pairB, homeScore: null, awayScore: null } } as TournamentScheduleSlot;
-  const zoneB = { ...zoneA, id: 11, sequence: 2, zoneName: 'Zona B', matchId: 502, match: { ...zoneA.match!, id: 502, zoneId: 12 } } as TournamentScheduleSlot;
+  const zoneA = { ...slot, tournamentCategory: { ...slot.tournamentCategory, zoneSize: 4 }, zoneCapacity: 4, matchId: 501, match: { id: 501, zoneId: 11, status: 'READY', homeRegistration: pairA, awayRegistration: pairB, homeScore: null, awayScore: null } } as TournamentScheduleSlot;
+  const zoneB = { ...zoneA, id: 11, sequence: 2, zoneName: 'Zona B', zoneCapacity: 3, matchId: 502, match: { ...zoneA.match!, id: 502, zoneId: 12 } } as TournamentScheduleSlot;
   const semifinal = { ...zoneA, id: 12, sequence: 3, stage: 'SEMIFINAL', zoneName: 'Semifinales', matchId: 503, match: { ...zoneA.match!, id: 503, zoneId: null } } as TournamentScheduleSlot;
   vi.mocked(redistributeTournamentCourts).mockResolvedValue([zoneA, zoneB, semifinal]);
 
@@ -80,6 +80,10 @@ it('shows zone cards first and the category matches grouped underneath', async (
   const games = container.querySelector('[aria-label="Partidos de Damas A"]')!;
   expect(overview.compareDocumentPosition(games) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(overview.querySelectorAll('.program-category-zone-card')).toHaveLength(2);
+  const zoneCards = [...overview.querySelectorAll('.program-category-zone-card')];
+  expect(zoneCards[0].textContent).toContain('Parejas2/4');
+  expect(zoneCards[1].textContent).toContain('Parejas2/3');
+  expect(zoneCards[1].querySelectorAll('ol li')).toHaveLength(3);
   expect(overview.textContent).toContain('Beltran');
   expect(overview.textContent).toContain('Ana / Bea / Ceci');
   expect(overview.querySelector('a[href="/app/zonas/11"]')).toBeTruthy();
