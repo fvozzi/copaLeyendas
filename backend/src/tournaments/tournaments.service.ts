@@ -1023,7 +1023,7 @@ export class TournamentsService {
     }
     const initial = await this.matchWithZone(id);
     if (initial.status === MatchStatus.PLAYED) {
-      if (initial.homeScore === homeScore && initial.awayScore === awayScore) return initial;
+      if (initial.homeScore === homeScore && initial.awayScore === awayScore && !replacementPhoto) return initial;
     }
     if (![MatchStatus.IN_PROGRESS, MatchStatus.PLAYED].includes(initial.status)) throw new BadRequestException('Primero cargá la foto inicial para marcar el partido como en juego.');
     if (!initial.resultPhotoStoredName || !initial.homeRegistration || !initial.awayRegistration) throw new BadRequestException('El partido no tiene la foto inicial o sus parejas completas.');

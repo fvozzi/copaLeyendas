@@ -559,6 +559,20 @@ describe('fixtures with unassigned places', () => {
     expect(matches[0]).toMatchObject({ homeScore: 12, awayScore: 25, resultSourcePhotoStoredName: 'match.jpg' });
   });
 
+  it('regenerates the plate when replacing the photo without changing the score', async () => {
+    const { service, matches, matchRepository } = setup();
+    await service.fixture(1);
+    for (let seed = 1; seed <= 4; seed++) await service.assignPlace(1, seed * 10, seed);
+    await startFixtureMatch(service, matches[0].id);
+    await service.result(matches[0].id, 25, 10, director);
+    matchRepository.save.mockClear();
+
+    await service.result(matches[0].id, 25, 10, director, testPhoto);
+
+    expect(matchRepository.save).toHaveBeenCalled();
+    expect(matches[0]).toMatchObject({ homeScore: 25, awayScore: 10, resultSourcePhotoStoredName: 'match.jpg' });
+  });
+
   it('requires exactly one team to reach the configured 25 points', async () => {
     const { service, matches } = setup();
     await service.fixture(1);
