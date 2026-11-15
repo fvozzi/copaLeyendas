@@ -10,7 +10,12 @@ const pairName = (slot: TournamentScheduleSlot, side: 'home' | 'away') => {
   return pair ? `${pair.locality.name} · ${pairPlayerNames(pair)}` : 'A definir';
 };
 const byOperationPriority = (left: TournamentScheduleSlot, right: TournamentScheduleSlot) => {
-  const priority = (slot: TournamentScheduleSlot) => slot.match?.status === 'READY' ? 0 : 1;
+  const priority = (slot: TournamentScheduleSlot) => {
+    if (slot.match?.status === 'IN_PROGRESS') return 0;
+    if (slot.match?.status === 'READY') return 1;
+    if (slot.match?.status === 'PLAYED') return 3;
+    return 2;
+  };
   return priority(left) - priority(right) || left.sequence - right.sequence;
 };
 
