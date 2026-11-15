@@ -9,6 +9,10 @@ const pairName = (slot: TournamentScheduleSlot, side: 'home' | 'away') => {
   const pair = side === 'home' ? slot.match?.homeRegistration : slot.match?.awayRegistration;
   return pair ? `${pair.locality.name} · ${pairPlayerNames(pair)}` : 'A definir';
 };
+const byCourtPriority = (left: TournamentScheduleSlot, right: TournamentScheduleSlot) => {
+  const priority = (slot: TournamentScheduleSlot) => slot.match?.status === 'READY' ? 0 : 1;
+  return priority(left) - priority(right) || left.sequence - right.sequence;
+};
 
 export function AdminResultsPage() {
   const [data, setData] = useState<TournamentOperations | null>(null);
@@ -37,7 +41,7 @@ export function AdminResultsPage() {
 
   const slots = useMemo(() => (data?.slots ?? [])
     .filter((slot) => slot.courtId === courtId)
-    .sort((left, right) => (left.scheduledAt ?? '9999').localeCompare(right.scheduledAt ?? '9999') || left.sequence - right.sequence), [data, courtId]);
+    .sort(byCourtPriority), [data, courtId]);
 
   const begin = (slot: TournamentScheduleSlot) => {
     const target = slot.tournamentCategory.pointsPerSet;

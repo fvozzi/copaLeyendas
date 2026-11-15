@@ -45,3 +45,22 @@ it('lets a court leader start with a photo and then submit a 25-point result', a
   expect(saveMatchResult).toHaveBeenCalledWith(80, 25, 0);
   expect(openMatchResultPhoto).not.toHaveBeenCalled();
 });
+
+it('shows startable matches first and orders each group by match number', async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  const court = { id: 3, name: 'Cancha 3', venue: { name: 'Club' } } as Court;
+  const base = { id: 8, matchId: 80, tournamentId: 1, tournamentCategoryId: 2, tournamentCategory: { pointsPerSet: 25, category: { name: 'Damas A' } }, stage: 'ZONE', zoneName: 'Zona A', matchOrder: 1, courtId: 3, court, scheduledAt: '2026-11-20T13:00:00Z' } as TournamentScheduleSlot;
+  const slots = [
+    { ...base, id: 81, matchId: 81, sequence: 8, match: { id: 81, status: 'PENDING' } },
+    { ...base, id: 82, matchId: 82, sequence: 4, match: { id: 82, status: 'READY' } },
+    { ...base, id: 83, matchId: 83, sequence: 2, match: { id: 83, status: 'READY' } },
+    { ...base, id: 84, matchId: 84, sequence: 1, match: { id: 84, status: 'IN_PROGRESS' } },
+  ] as TournamentScheduleSlot[];
+  vi.mocked(getTournamentOperations).mockResolvedValue({ tournament: { id: 1, name: 'Copa' }, courts: [court], slots } as TournamentOperations);
+  container = document.createElement('div'); document.body.append(container); root = createRoot(container);
+  await act(async () => root.render(createElement(AdminResultsPage)));
+
+  expect([...container.querySelectorAll('tbody tr')].map((row) => row.querySelector('[data-label="Partido"]')?.textContent)).toEqual([
+    'P2 · Damas A', 'P4 · Damas A', 'P1 · Damas A', 'P8 · Damas A',
+  ]);
+});
