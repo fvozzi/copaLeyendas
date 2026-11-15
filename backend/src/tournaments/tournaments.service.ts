@@ -65,8 +65,8 @@ export class TournamentsService {
       courts,
       slots: programView(visibleSlots).map((slot) => {
         if (!slot.match) return slot;
-        const { resultPhotoStoredName, resultPhotoOriginalName, resultPhotoMimeType, resultPhotoSize, ...match } = slot.match;
-        return { ...slot, match: { ...match, resultPhotoAvailable: Boolean(resultPhotoStoredName), resultPhotoOriginalName } };
+        const { resultSourcePhotoStoredName, resultPhotoStoredName, resultPhotoOriginalName, resultPhotoMimeType, resultPhotoSize, ...match } = slot.match;
+        return { ...slot, match: { ...match, resultSourcePhotoAvailable: Boolean(resultSourcePhotoStoredName), resultPhotoAvailable: Boolean(resultPhotoStoredName), resultPhotoOriginalName } };
       }),
     };
   }
@@ -897,7 +897,7 @@ export class TournamentsService {
       const home = target.homeQualifierZoneId === zoneId ? rows[(target.homeQualifierRank ?? 1) - 1]?.registrationId ?? null : target.homeRegistrationId;
       const away = target.awayQualifierZoneId === zoneId ? rows[(target.awayQualifierRank ?? 1) - 1]?.registrationId ?? null : target.awayRegistrationId;
       if (home === target.homeRegistrationId && away === target.awayRegistrationId) continue;
-      if (target.status === MatchStatus.PLAYED) throw new BadRequestException('No se puede cambiar la clasificación: el cruce siguiente ya tiene resultado.');
+      if ([MatchStatus.IN_PROGRESS, MatchStatus.PLAYED].includes(target.status)) throw new BadRequestException('No se puede cambiar la clasificación: el cruce siguiente ya fue iniciado.');
       target.homeRegistrationId = home; target.awayRegistrationId = away;
       target.status = home && away ? MatchStatus.READY : MatchStatus.PENDING;
       await repository.save(target);
@@ -1012,7 +1012,7 @@ export class TournamentsService {
     }
   }
 
-  async result(id: number, homeScore: number, awayScore: number, user: AuthenticatedUser) {
+  async result(id: number, homeScore: number, awayScore: number, user: AuthenticatedUser, replacementPhoto?: Express.Multer.File) {
     const slot = await this.slots.findOneBy({ matchId: id });
     if (!slot) throw new NotFoundException('Partido fuera del programa');
     await this.assertMatchAccess(user, id, slot);
@@ -1024,14 +1024,21 @@ export class TournamentsService {
     const initial = await this.matchWithZone(id);
     if (initial.status === MatchStatus.PLAYED) {
       if (initial.homeScore === homeScore && initial.awayScore === awayScore) return initial;
-      throw new BadRequestException('El partido ya tiene un resultado cargado.');
     }
-    if (initial.status !== MatchStatus.IN_PROGRESS) throw new BadRequestException('Primero cargá la foto inicial para marcar el partido como en juego.');
+    if (![MatchStatus.IN_PROGRESS, MatchStatus.PLAYED].includes(initial.status)) throw new BadRequestException('Primero cargá la foto inicial para marcar el partido como en juego.');
     if (!initial.resultPhotoStoredName || !initial.homeRegistration || !initial.awayRegistration) throw new BadRequestException('El partido no tiene la foto inicial o sus parejas completas.');
     let decoratedName: string | null = null;
-    const originalName = initial.resultPhotoStoredName;
+    let replacementSourceName: string | null = null;
+    const previousResultName = initial.resultPhotoStoredName;
+    const previousSourceName = initial.resultSourcePhotoStoredName;
     try {
-      const decorated = await renderMatchResultCard(await readMatchResultPhoto(originalName), {
+      if (replacementPhoto) {
+        const normalized = await normalizeMatchPhoto(replacementPhoto.buffer).catch(() => { throw new BadRequestException('No se pudo procesar la foto. Probá con una imagen JPG, PNG o WebP.'); });
+        replacementSourceName = await storeMatchPhotoBuffer(normalized.data, '.jpg');
+      }
+      const sourceName = replacementSourceName ?? initial.resultSourcePhotoStoredName ?? (initial.status === MatchStatus.IN_PROGRESS ? initial.resultPhotoStoredName : null);
+      if (!sourceName) throw new BadRequestException('Para corregir este resultado anterior, seleccioná nuevamente la foto original sin la placa.');
+      const decorated = await renderMatchResultCard(await readMatchResultPhoto(sourceName), {
         home: { team: teamLabel(initial.homeRegistration), players: playerLabel(initial.homeRegistration), score: homeScore },
         away: { team: teamLabel(initial.awayRegistration), players: playerLabel(initial.awayRegistration), score: awayScore },
       });
@@ -1040,12 +1047,12 @@ export class TournamentsService {
         const repository = manager.getRepository(TournamentMatch);
         const match = await repository.findOneBy({ id });
         if (!match) throw new NotFoundException('Partido no encontrado');
-        if (match.status === MatchStatus.PLAYED) throw new BadRequestException('El partido ya tiene un resultado cargado.');
-        if (match.status !== MatchStatus.IN_PROGRESS || !match.homeRegistrationId || !match.awayRegistrationId) throw new BadRequestException('El partido no está en juego.');
+        if (![MatchStatus.IN_PROGRESS, MatchStatus.PLAYED].includes(match.status) || !match.homeRegistrationId || !match.awayRegistrationId) throw new BadRequestException('El partido no está disponible para cargar o corregir el resultado.');
         match.homeScore = homeScore;
         match.awayScore = awayScore;
         match.winnerRegistrationId = homeScore > awayScore ? match.homeRegistrationId : match.awayRegistrationId;
         match.status = MatchStatus.PLAYED;
+        match.resultSourcePhotoStoredName = sourceName;
         match.resultPhotoStoredName = decoratedName;
         match.resultPhotoOriginalName = `resultado-p${id}.jpg`;
         match.resultPhotoMimeType = 'image/jpeg';
@@ -1057,10 +1064,12 @@ export class TournamentsService {
         if (match.zoneId) await this.resolveQualifiers(manager, match.zoneId);
         return { ...match, resultPhotoStoredName: undefined, resultPhotoAvailable: true };
       });
-      await removeMatchResultPhoto(originalName);
+      if (previousResultName !== sourceName && previousResultName !== decoratedName) await removeMatchResultPhoto(previousResultName);
+      if (replacementSourceName && previousSourceName && previousSourceName !== replacementSourceName) await removeMatchResultPhoto(previousSourceName);
       return saved;
     } catch (error) {
       if (decoratedName) await removeMatchResultPhoto(decoratedName);
+      if (replacementSourceName) await removeMatchResultPhoto(replacementSourceName);
       throw error;
     }
   }
@@ -1130,17 +1139,20 @@ export class TournamentsService {
   private async resolveDependents(source: TournamentMatch, repository = this.m) {
     const matches = await repository.find({ where: [{ homeSourceMatchId: source.id }, { awaySourceMatchId: source.id }] });
     for (const match of matches) {
-      const fill = async (side: 'home' | 'away') => {
+      const participant = (side: 'home' | 'away') => {
         const sourceId = side === 'home' ? match.homeSourceMatchId : match.awaySourceMatchId;
-        if (sourceId !== source.id) return;
+        if (sourceId !== source.id) return side === 'home' ? match.homeRegistrationId : match.awayRegistrationId;
         const sourceType = side === 'home' ? match.homeSource : match.awaySource;
         const loser = source.homeRegistrationId === source.winnerRegistrationId ? source.awayRegistrationId : source.homeRegistrationId;
-        if (side === 'home') match.homeRegistrationId = sourceType === ParticipantSource.WINNER ? source.winnerRegistrationId : loser;
-        else match.awayRegistrationId = sourceType === ParticipantSource.WINNER ? source.winnerRegistrationId : loser;
+        return sourceType === ParticipantSource.WINNER ? source.winnerRegistrationId : loser;
       };
-      await fill('home');
-      await fill('away');
-      if (match.homeRegistrationId && match.awayRegistrationId) match.status = MatchStatus.READY;
+      const home = participant('home');
+      const away = participant('away');
+      if (home === match.homeRegistrationId && away === match.awayRegistrationId) continue;
+      if ([MatchStatus.IN_PROGRESS, MatchStatus.PLAYED].includes(match.status)) throw new BadRequestException('No se puede cambiar el ganador: el partido siguiente ya fue iniciado.');
+      match.homeRegistrationId = home;
+      match.awayRegistrationId = away;
+      match.status = home && away ? MatchStatus.READY : MatchStatus.PENDING;
       await repository.save(match);
     }
   }

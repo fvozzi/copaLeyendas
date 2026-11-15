@@ -17,8 +17,9 @@ it('lets a court leader start with a photo and then submit a 25-point result', a
   const slot = { id: 8, matchId: 80, tournamentId: 1, tournamentCategoryId: 2, tournamentCategory: { pointsPerSet: 25, category: { name: 'Damas A' } }, stage: 'ZONE', zoneName: 'Zona A', matchOrder: 1, sequence: 4, courtId: 3, court, scheduledAt: '2026-11-20T13:00:00Z', match: { id: 80, matchOrder: 1, status: 'READY', homeRegistration: { playerOneName: 'Ana', playerTwoName: 'Bea', locality: { name: 'Junín' } }, awayRegistration: { playerOneName: 'Cata', playerTwoName: 'Dora', locality: { name: 'Salta' } }, homeScore: null, awayScore: null, scheduledAt: null } } as TournamentScheduleSlot;
   const operations = (current: TournamentScheduleSlot) => ({ tournament: { id: 1, name: 'Copa', startsAt: '2026-11-20', endsAt: '2026-11-21' }, courts: [court], slots: [current] } as TournamentOperations);
   const inProgress = { ...slot, match: { ...slot.match!, status: 'IN_PROGRESS', resultPhotoAvailable: true } } as TournamentScheduleSlot;
-  const played = { ...slot, match: { ...slot.match!, status: 'PLAYED', homeScore: 25, awayScore: 12, resultPhotoAvailable: true } } as TournamentScheduleSlot;
-  vi.mocked(getTournamentOperations).mockResolvedValueOnce(operations(slot)).mockResolvedValueOnce(operations(inProgress)).mockResolvedValueOnce(operations(played));
+  const played = { ...slot, match: { ...slot.match!, status: 'PLAYED', homeScore: 25, awayScore: 12, resultSourcePhotoAvailable: true, resultPhotoAvailable: true } } as TournamentScheduleSlot;
+  const corrected = { ...played, match: { ...played.match!, awayScore: 10 } } as TournamentScheduleSlot;
+  vi.mocked(getTournamentOperations).mockResolvedValueOnce(operations(slot)).mockResolvedValueOnce(operations(inProgress)).mockResolvedValueOnce(operations(played)).mockResolvedValueOnce(operations(corrected));
   container = document.createElement('div'); document.body.append(container); root = createRoot(container);
   await act(async () => root.render(createElement(AdminResultsPage)));
   expect(container.textContent).toContain('Club · Cancha 3');
@@ -52,7 +53,15 @@ it('lets a court leader start with a photo and then submit a 25-point result', a
   await act(async () => setValue(homeScore, '25'));
   await act(async () => setValue(awayScore, '12'));
   await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
-  expect(saveMatchResult).toHaveBeenCalledWith(80, 25, 12);
+  expect(saveMatchResult).toHaveBeenCalledWith(80, 25, 12, undefined);
+  const editButton = [...container.querySelectorAll('button')].find((item) => item.textContent === 'Editar resultado')!;
+  await act(async () => editButton.click());
+  form = document.querySelector('form')!;
+  const correctionInputs = [...form.querySelectorAll<HTMLInputElement>('input[type="number"]')];
+  expect(correctionInputs.map((input) => input.value)).toEqual(['25', '12']);
+  await act(async () => setValue(correctionInputs[1], '10'));
+  await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+  expect(saveMatchResult).toHaveBeenLastCalledWith(80, 25, 10, undefined);
   expect(openMatchResultPhoto).not.toHaveBeenCalled();
 });
 
@@ -77,4 +86,30 @@ it('shows in-progress matches first, then startable matches, ordered by match nu
   expect([...container.querySelectorAll('tbody tr')].map((row) => row.querySelector('[data-label="Partido"]')?.textContent)).toEqual([
     'P1 · Damas A', 'P2 · Damas A', 'P4 · Damas A', 'P8 · Damas A',
   ]);
+});
+
+it('asks for the original photo when correcting a legacy result', async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  const court = { id: 3, name: 'Cancha 3', venue: { name: 'Club' } } as Court;
+  const slot = { id: 8, matchId: 80, tournamentId: 1, tournamentCategoryId: 2, tournamentCategory: { pointsPerSet: 25, category: { name: 'Damas A' } }, stage: 'ZONE', zoneName: 'Zona A', matchOrder: 1, sequence: 3, courtId: 3, court, scheduledAt: '2026-11-20T13:00:00Z', match: { id: 80, matchOrder: 1, status: 'PLAYED', homeRegistration: { playerOneName: 'Ana', playerTwoName: 'Bea', locality: { name: 'Junín' } }, awayRegistration: { playerOneName: 'Cata', playerTwoName: 'Dora', locality: { name: 'Salta' } }, homeScore: 25, awayScore: 12, resultPhotoAvailable: true, resultSourcePhotoAvailable: false } } as TournamentScheduleSlot;
+  const operations = { tournament: { id: 1, name: 'Copa' }, courts: [court], slots: [slot] } as TournamentOperations;
+  vi.mocked(getTournamentOperations).mockResolvedValue(operations);
+  container = document.createElement('div'); document.body.append(container); root = createRoot(container);
+  await act(async () => root.render(createElement(AdminResultsPage)));
+
+  const editButton = [...container.querySelectorAll('button')].find((item) => item.textContent === 'Editar resultado')!;
+  await act(async () => editButton.click());
+  const form = document.querySelector('form')!;
+  const photoInput = form.querySelector<HTMLInputElement>('input[type="file"]')!;
+  const submit = form.querySelector<HTMLButtonElement>('button[type="submit"], button:not([type])')!;
+  expect(photoInput.required).toBe(true);
+  expect(form.textContent).toContain('Seleccionala nuevamente');
+  expect(submit.disabled).toBe(true);
+
+  const original = new File(['foto limpia'], 'original.jpg', { type: 'image/jpeg' });
+  Object.defineProperty(photoInput, 'files', { value: [original] });
+  await act(async () => photoInput.dispatchEvent(new Event('change', { bubbles: true })));
+  expect(submit.disabled).toBe(false);
+  await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+  expect(saveMatchResult).toHaveBeenCalledWith(80, 25, 12, original);
 });

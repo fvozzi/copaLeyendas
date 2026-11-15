@@ -24,11 +24,13 @@ export function AdminResultsPage() {
   const [starting, setStarting] = useState<TournamentScheduleSlot | null>(null);
   const [editing, setEditing] = useState<TournamentScheduleSlot | null>(null);
   const [scores, setScores] = useState({ home: '', away: '' });
+  const [correctionPhoto, setCorrectionPhoto] = useState<File | null>(null);
   const [startPhoto, setStartPhoto] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [startPhotoPreview, setStartPhotoPreview] = useState<string | null>(null);
   const startPhotoId = useId();
+  const correctionPhotoId = useId();
 
   const load = async () => {
     const result = await getTournamentOperations();
@@ -45,7 +47,8 @@ export function AdminResultsPage() {
   const slots = useMemo(() => [...(data?.slots ?? [])].sort(byOperationPriority), [data]);
 
   const begin = (slot: TournamentScheduleSlot) => {
-    setEditing(slot); setScores({ home: '', away: '' }); setError(null);
+    const played = slot.match?.status === 'PLAYED';
+    setEditing(slot); setScores({ home: played ? String(slot.match?.homeScore ?? '') : '', away: played ? String(slot.match?.awayScore ?? '') : '' }); setCorrectionPhoto(null); setError(null);
   };
   const beginStart = (slot: TournamentScheduleSlot) => {
     setStarting(slot); setStartPhoto(null); setError(null);
@@ -62,11 +65,11 @@ export function AdminResultsPage() {
   };
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!editing?.matchId || scores.home === '' || scores.away === '') return;
+    if (!editing?.matchId || scores.home === '' || scores.away === '' || (editing.match?.status === 'PLAYED' && !editing.match.resultSourcePhotoAvailable && !correctionPhoto)) return;
     setBusy(true); setError(null);
     try {
-      await saveMatchResult(editing.matchId, Number(scores.home), Number(scores.away));
-      setEditing(null); await load();
+      await saveMatchResult(editing.matchId, Number(scores.home), Number(scores.away), correctionPhoto ?? undefined);
+      setEditing(null); setCorrectionPhoto(null); await load();
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo guardar el resultado.'); }
     finally { setBusy(false); }
   };
@@ -86,7 +89,7 @@ export function AdminResultsPage() {
         { label: 'Visitante', render: (slot) => pairName(slot, 'away') },
         { label: 'Cancha prevista', render: (slot) => slot.court ? `${slot.court.venue?.name ? `${slot.court.venue.name} · ` : ''}${slot.court.name}` : 'Sin asignar' },
         { label: 'Estado', render: (slot) => slot.match?.status === 'PLAYED' ? <strong>{slot.match.homeScore} - {slot.match.awayScore}</strong> : slot.match?.status === 'IN_PROGRESS' ? <span className="status-chip status-live"><span className="live-dot" />En juego</span> : slot.match?.status === 'READY' ? 'Listo para jugar' : 'A definir' },
-      ]} renderActions={(slot) => <>{slot.match?.status === 'READY' && <button type="button" className="primary-button" disabled={busy} onClick={() => beginStart(slot)}>Iniciar partido</button>}{slot.match?.status === 'IN_PROGRESS' && <button type="button" className="primary-button" disabled={busy} onClick={() => begin(slot)}>Cargar resultado</button>}{slot.match?.resultPhotoAvailable && <button type="button" className="inline-link" onClick={() => void openMatchResultPhoto(slot.matchId!)}>Ver foto</button>}</>} /></section>
+      ]} renderActions={(slot) => <>{slot.match?.status === 'READY' && <button type="button" className="primary-button" disabled={busy} onClick={() => beginStart(slot)}>Iniciar partido</button>}{slot.match?.status === 'IN_PROGRESS' && <button type="button" className="primary-button" disabled={busy} onClick={() => begin(slot)}>Cargar resultado</button>}{slot.match?.status === 'PLAYED' && <button type="button" className="inline-link" disabled={busy} onClick={() => begin(slot)}>Editar resultado</button>}{slot.match?.resultPhotoAvailable && <button type="button" className="inline-link" onClick={() => void openMatchResultPhoto(slot.matchId!)}>Ver foto</button>}</>} /></section>
     </>}
     {starting?.match && <AdminDialog title={`Iniciar P${starting.sequence}`} className="result-start-dialog" onClose={() => { if (!busy) { setStarting(null); setStartPhoto(null); } }}><form className="editor-form result-start-form" onSubmit={start}>
       {error && <div className="inline-state span-2" role="alert">{error}</div>}
@@ -102,14 +105,15 @@ export function AdminResultsPage() {
       </div>
       <div className="span-2 form-actions"><button className="primary-button" disabled={busy || !startPhoto}>{busy ? 'Publicando...' : 'Publicar e iniciar partido'}</button></div>
     </form></AdminDialog>}
-    {editing?.match && <AdminDialog title={`Resultado P${editing.sequence}`} onClose={() => { if (!busy) setEditing(null); }}><form className="editor-form" onSubmit={save}>
+    {editing?.match && <AdminDialog title={`${editing.match.status === 'PLAYED' ? 'Editar resultado' : 'Resultado'} P${editing.sequence}`} onClose={() => { if (!busy) { setEditing(null); setCorrectionPhoto(null); } }}><form className="editor-form" onSubmit={save}>
       {error && <div className="inline-state span-2" role="alert">{error}</div>}
       <p className="field-hint span-2">{editing.tournamentCategory.category.name} · {editing.zoneName}</p>
       <label>{pairName(editing, 'home')}<input aria-label="Tantos local" type="number" min="0" max={editing.tournamentCategory.pointsPerSet} value={scores.home} onChange={(event) => setScores({ ...scores, home: event.target.value })} required /></label>
       <label>{pairName(editing, 'away')}<input aria-label="Tantos visitante" type="number" min="0" max={editing.tournamentCategory.pointsPerSet} value={scores.away} onChange={(event) => setScores({ ...scores, away: event.target.value })} required /></label>
+      {editing.match.status === 'PLAYED' && <div className="span-2 result-photo-field"><strong>{editing.match.resultSourcePhotoAvailable ? 'Reemplazar foto original (opcional)' : 'Foto original sin la placa'}</strong><input id={correctionPhotoId} type="file" accept="image/*" onChange={(event) => setCorrectionPhoto(event.target.files?.[0] ?? null)} required={!editing.match.resultSourcePhotoAvailable} />{!editing.match.resultSourcePhotoAvailable && <small>Este resultado fue cargado antes de que el sistema conservara la foto inicial. Seleccionala nuevamente para poder regenerar la placa corregida.</small>}</div>}
       <p className="field-hint span-2">Uno de los dos equipos debe llegar a {editing.tournamentCategory.pointsPerSet} tantos.</p>
       <p className="field-hint span-2">Al confirmar, el sistema editará la foto inicial con los equipos, los tantos y el logo de Copa Leyendas.</p>
-      <div className="span-2 form-actions"><button className="primary-button" disabled={busy || scores.home === '' || scores.away === ''}>{busy ? 'Generando placa...' : 'Confirmar resultado'}</button></div>
+      <div className="span-2 form-actions"><button className="primary-button" disabled={busy || scores.home === '' || scores.away === '' || (editing.match.status === 'PLAYED' && !editing.match.resultSourcePhotoAvailable && !correctionPhoto)}>{busy ? 'Generando placa...' : editing.match.status === 'PLAYED' ? 'Guardar corrección' : 'Confirmar resultado'}</button></div>
     </form></AdminDialog>}
   </div>;
 }

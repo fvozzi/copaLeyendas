@@ -530,6 +530,35 @@ describe('fixtures with unassigned places', () => {
     expect(matches[3]).toMatchObject({ homeRegistrationId: 20, awayRegistrationId: 30, status: MatchStatus.READY });
   });
 
+  it('preserves the clean source photo and regenerates the plate when correcting a result', async () => {
+    const { service, matches } = setup();
+    await service.fixture(1);
+    for (let seed = 1; seed <= 4; seed++) await service.assignPlace(1, seed * 10, seed);
+    await startFixtureMatch(service, matches[0].id);
+    await service.result(matches[0].id, 25, 10, director);
+
+    expect(matches[0]).toMatchObject({ status: MatchStatus.PLAYED, homeScore: 25, awayScore: 10, resultSourcePhotoStoredName: 'match.jpg' });
+
+    await service.result(matches[0].id, 12, 25, director);
+
+    expect(matches[0]).toMatchObject({ status: MatchStatus.PLAYED, homeScore: 12, awayScore: 25, winnerRegistrationId: 30, resultSourcePhotoStoredName: 'match.jpg' });
+    expect(matches[2]).toMatchObject({ homeRegistrationId: 30, status: MatchStatus.PENDING });
+  });
+
+  it('requires a clean replacement photo to correct a legacy result', async () => {
+    const { service, matches } = setup();
+    await service.fixture(1);
+    for (let seed = 1; seed <= 4; seed++) await service.assignPlace(1, seed * 10, seed);
+    await startFixtureMatch(service, matches[0].id);
+    await service.result(matches[0].id, 25, 10, director);
+    matches[0].resultSourcePhotoStoredName = null;
+
+    await expect(service.result(matches[0].id, 12, 25, director)).rejects.toThrow('seleccioná nuevamente la foto original');
+    await service.result(matches[0].id, 12, 25, director, testPhoto);
+
+    expect(matches[0]).toMatchObject({ homeScore: 12, awayScore: 25, resultSourcePhotoStoredName: 'match.jpg' });
+  });
+
   it('requires exactly one team to reach the configured 25 points', async () => {
     const { service, matches } = setup();
     await service.fixture(1);

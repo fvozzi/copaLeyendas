@@ -364,6 +364,7 @@ export class RegistrationsService {
       const removedRegistrationIds = new Set(registrationIds);
       for (const match of data.matches.filter((item) => data.affectedMatchIds.has(item.id))) {
         if (match.resultPhotoStoredName) resultPhotos.add(match.resultPhotoStoredName);
+        if (match.resultSourcePhotoStoredName) resultPhotos.add(match.resultSourcePhotoStoredName);
         if (
           (match.homeRegistrationId && removedRegistrationIds.has(match.homeRegistrationId))
           || (match.homeSourceMatchId && data.affectedMatchIds.has(match.homeSourceMatchId))
@@ -377,6 +378,7 @@ export class RegistrationsService {
         match.homeScore = null;
         match.awayScore = null;
         match.winnerRegistrationId = null;
+        match.resultSourcePhotoStoredName = null;
         match.resultPhotoStoredName = null;
         match.resultPhotoOriginalName = null;
         match.resultPhotoMimeType = null;

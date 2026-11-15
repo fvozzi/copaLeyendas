@@ -218,7 +218,7 @@ describe('registration tracking', () => {
       id: 40, status: 'PLAYED', homeRegistrationId: registration.id, awayRegistrationId: 99,
       winnerRegistrationId: registration.id, homeQualifierZoneId: null, awayQualifierZoneId: null,
       homeSourceMatchId: null, awaySourceMatchId: null, homeScore: 25, awayScore: 10,
-      resultPhotoStoredName: 'resultado.jpg', resultPhotoOriginalName: 'foto.jpg',
+      resultSourcePhotoStoredName: 'original.jpg', resultPhotoStoredName: 'resultado.jpg', resultPhotoOriginalName: 'foto.jpg',
       resultPhotoMimeType: 'image/jpeg', resultPhotoSize: 100, resultSubmittedById: 1,
       resultSubmittedAt: new Date(),
     };
@@ -248,6 +248,7 @@ describe('registration tracking', () => {
     expect(manager.delete).toHaveBeenCalledWith(Player, expect.anything());
     expect(manager.delete).toHaveBeenCalledWith(Locality, { id: grant.localityId });
     expect(removeMatchResultPhoto).toHaveBeenCalledWith('resultado.jpg');
+    expect(removeMatchResultPhoto).toHaveBeenCalledWith('original.jpg');
   });
 
   it('marks an existing registration and its access grant as fee-waived', async () => {
