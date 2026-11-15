@@ -32,6 +32,12 @@ const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
 const TOKEN_KEY = 'copa_leyendas_token';
 const USER_KEY = 'copa_leyendas_user';
 
+export function resolveApiAssetUrl(path: string | null | undefined, apiUrl = API_URL) {
+  if (!path || /^(?:https?:)?\/\//i.test(path)) return path ?? null;
+  const relativePath = path.startsWith('/api/') ? path.slice('/api/'.length) : path.replace(/^\/+/, '');
+  return `${apiUrl.replace(/\/+$/, '')}/${relativePath}`;
+}
+
 export function getBackups() { return request<BackupOverview>('/backups', {}, true); }
 export function getActivity(params: { page?: number; pageSize?: number; level?: string; method?: string; search?: string }) { return request<ActivityLogPage>(`/activity${buildQuery(params)}`, {}, true); }
 export function updateBackupSettings(settings: BackupSettings) { return request<BackupOverview>('/backups/settings', { method: 'PATCH', body: JSON.stringify(settings) }, true); }

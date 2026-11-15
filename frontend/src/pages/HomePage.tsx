@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getPublicPosts } from '../lib/api';
 import { sectionMeta, tournamentHighlights, tournamentStory } from '../lib/content';
+import { tournamentEditions } from '../lib/tournament-editions';
 import type { ContentPost } from '../types';
 
 export function HomePage() {
@@ -15,6 +16,7 @@ export function HomePage() {
   }, []);
 
   const featuredPosts = posts.filter((post) => post.featured).slice(0, 3);
+  const currentEdition = tournamentEditions.find((edition) => edition.usesLiveTournament);
 
   return (
     <>
@@ -33,6 +35,9 @@ export function HomePage() {
             <span>{tournamentStory.place}</span>
           </div>
           <div className="hero-actions">
+            {currentEdition && <Link to={`/torneos/${currentEdition.slug}`} className="secondary-button">
+              Ver torneo
+            </Link>}
             <Link to="/inscripcion" className="primary-button">
               Registrar pareja
             </Link>
