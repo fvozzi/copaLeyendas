@@ -1,8 +1,9 @@
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { AdminDataGrid } from '../components/AdminDataGrid';
 import { AdminDialog } from '../components/AdminDialog';
 import { getTournamentOperations, openMatchResultPhoto, saveMatchResult, startMatch } from '../lib/api';
 import { pairPlayerNames } from '../lib/pair-display';
+import { clearMatchStartDraft, loadMatchStartDraft, saveMatchStartDraft } from '../lib/match-start-draft';
 import type { TournamentOperations, TournamentScheduleSlot } from '../types';
 
 const pairName = (slot: TournamentScheduleSlot, side: 'home' | 'away') => {
@@ -31,12 +32,27 @@ export function AdminResultsPage() {
   const [startPhotoPreview, setStartPhotoPreview] = useState<string | null>(null);
   const startPhotoId = useId();
   const correctionPhotoId = useId();
+  const draftRestored = useRef(false);
 
   const load = async () => {
     const result = await getTournamentOperations();
     setData(result);
   };
   useEffect(() => { void load().catch((reason: Error) => setError(reason.message)); }, []);
+  useEffect(() => {
+    if (!data || draftRestored.current) return;
+    draftRestored.current = true;
+    void loadMatchStartDraft().then((draft) => {
+      if (!draft) return;
+      const slot = data.slots.find((candidate) => candidate.matchId === draft.matchId && candidate.match?.status === 'READY');
+      if (!slot) {
+        void clearMatchStartDraft();
+        return;
+      }
+      setStarting(slot);
+      setStartPhoto(draft.photo);
+    });
+  }, [data]);
   useEffect(() => {
     if (!startPhoto || typeof URL.createObjectURL !== 'function') { setStartPhotoPreview(null); return; }
     const preview = URL.createObjectURL(startPhoto);
@@ -52,6 +68,16 @@ export function AdminResultsPage() {
   };
   const beginStart = (slot: TournamentScheduleSlot) => {
     setStarting(slot); setStartPhoto(null); setError(null);
+    if (slot.matchId) void saveMatchStartDraft(slot.matchId, null);
+  };
+  const selectStartPhoto = (photo: File | null) => {
+    setStartPhoto(photo);
+    if (starting?.matchId) void saveMatchStartDraft(starting.matchId, photo);
+  };
+  const closeStart = () => {
+    if (busy) return;
+    setStarting(null); setStartPhoto(null);
+    void clearMatchStartDraft();
   };
   const start = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -59,7 +85,7 @@ export function AdminResultsPage() {
     setBusy(true); setError(null);
     try {
       await startMatch(starting.matchId, startPhoto);
-      setStarting(null); setStartPhoto(null); await load();
+      setStarting(null); setStartPhoto(null); await clearMatchStartDraft(); await load();
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo iniciar el partido.'); }
     finally { setBusy(false); }
   };
@@ -91,13 +117,13 @@ export function AdminResultsPage() {
         { label: 'Estado', render: (slot) => slot.match?.status === 'PLAYED' ? <strong>{slot.match.homeScore} - {slot.match.awayScore}</strong> : slot.match?.status === 'IN_PROGRESS' ? <span className="status-chip status-live"><span className="live-dot" />En juego</span> : slot.match?.status === 'READY' ? 'Listo para jugar' : 'A definir' },
       ]} renderActions={(slot) => <>{slot.match?.status === 'READY' && <button type="button" className="primary-button" disabled={busy} onClick={() => beginStart(slot)}>Iniciar partido</button>}{slot.match?.status === 'IN_PROGRESS' && <button type="button" className="primary-button" disabled={busy} onClick={() => begin(slot)}>Cargar resultado</button>}{slot.match?.status === 'PLAYED' && <button type="button" className="inline-link" disabled={busy} onClick={() => begin(slot)}>Editar resultado</button>}{slot.match?.resultPhotoAvailable && <button type="button" className="inline-link" onClick={() => void openMatchResultPhoto(slot.matchId!)}>Ver foto</button>}</>} /></section>
     </>}
-    {starting?.match && <AdminDialog title={`Iniciar P${starting.sequence}`} className="result-start-dialog" onClose={() => { if (!busy) { setStarting(null); setStartPhoto(null); } }}><form className="editor-form result-start-form" onSubmit={start}>
+    {starting?.match && <AdminDialog title={`Iniciar P${starting.sequence}`} className="result-start-dialog" onClose={closeStart}><form className="editor-form result-start-form" onSubmit={start}>
       {error && <div className="inline-state span-2" role="alert">{error}</div>}
       <p className="field-hint span-2">Esta foto marca el inicio del partido y se publica inmediatamente como “En juego”.</p>
       <div className="match-photo-orientation span-2"><div><span>Izquierda · Local</span><strong>{pairName(starting, 'home')}</strong></div><div><span>Derecha · Visitante</span><strong>{pairName(starting, 'away')}</strong></div></div>
       <div className="span-2 result-photo-field">
         <strong>Foto inicial del partido</strong>
-        <input id={startPhotoId} className="camera-input" type="file" accept="image/*" capture="environment" onChange={(event) => setStartPhoto(event.target.files?.[0] ?? null)} required />
+        <input id={startPhotoId} className="camera-input" type="file" accept="image/*" capture="environment" onChange={(event) => selectStartPhoto(event.target.files?.[0] ?? null)} required />
         <label className={`camera-button${startPhoto ? ' has-photo' : ''}`} htmlFor={startPhotoId}><span aria-hidden="true">📷</span>{startPhoto ? 'Volver a sacar la foto' : 'Sacar foto con la cámara'}</label>
         {startPhotoPreview && <img className="result-photo-preview" src={startPhotoPreview} alt="Vista previa de la foto inicial" />}
         {startPhoto && <span className="camera-photo-ready" role="status">Foto lista para publicar</span>}
