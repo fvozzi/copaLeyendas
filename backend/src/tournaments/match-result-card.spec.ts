@@ -22,5 +22,10 @@ describe('match result card', () => {
     expect(metadata.width).toBe(1200);
     expect(metadata.height).toBe(800);
     expect(result.equals(source)).toBe(false);
+
+    const topPanel = await sharp(result).extract({ left: 30, top: 36, width: 400, height: 224 }).raw().toBuffer();
+    const clearBottom = await sharp(result).extract({ left: 30, top: 560, width: 400, height: 200 }).raw().toBuffer();
+    const mean = (buffer: Buffer) => [...buffer].reduce((sum, value) => sum + value, 0) / buffer.length;
+    expect(mean(topPanel)).toBeLessThan(mean(clearBottom) - 30);
   }, 15_000);
 });
