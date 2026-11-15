@@ -17,7 +17,7 @@ it('lets a court leader start with a photo and then submit a 25-point result', a
   const slot = { id: 8, matchId: 80, tournamentId: 1, tournamentCategoryId: 2, tournamentCategory: { pointsPerSet: 25, category: { name: 'Damas A' } }, stage: 'ZONE', zoneName: 'Zona A', matchOrder: 1, sequence: 4, courtId: 3, court, scheduledAt: '2026-11-20T13:00:00Z', match: { id: 80, matchOrder: 1, status: 'READY', homeRegistration: { playerOneName: 'Ana', playerTwoName: 'Bea', locality: { name: 'Junín' } }, awayRegistration: { playerOneName: 'Cata', playerTwoName: 'Dora', locality: { name: 'Salta' } }, homeScore: null, awayScore: null, scheduledAt: null } } as TournamentScheduleSlot;
   const operations = (current: TournamentScheduleSlot) => ({ tournament: { id: 1, name: 'Copa', startsAt: '2026-11-20', endsAt: '2026-11-21' }, courts: [court], slots: [current] } as TournamentOperations);
   const inProgress = { ...slot, match: { ...slot.match!, status: 'IN_PROGRESS', resultPhotoAvailable: true } } as TournamentScheduleSlot;
-  const played = { ...slot, match: { ...slot.match!, status: 'PLAYED', homeScore: 25, awayScore: 0, resultPhotoAvailable: true } } as TournamentScheduleSlot;
+  const played = { ...slot, match: { ...slot.match!, status: 'PLAYED', homeScore: 25, awayScore: 12, resultPhotoAvailable: true } } as TournamentScheduleSlot;
   vi.mocked(getTournamentOperations).mockResolvedValueOnce(operations(slot)).mockResolvedValueOnce(operations(inProgress)).mockResolvedValueOnce(operations(played));
   container = document.createElement('div'); document.body.append(container); root = createRoot(container);
   await act(async () => root.render(createElement(AdminResultsPage)));
@@ -41,8 +41,18 @@ it('lets a court leader start with a photo and then submit a 25-point result', a
   await act(async () => resultButton.click());
   form = document.querySelector('form')!;
   expect(form.querySelector('input[type="file"]')).toBeNull();
+  const [homeScore, awayScore] = [...form.querySelectorAll<HTMLInputElement>('input[type="number"]')];
+  expect([homeScore.value, awayScore.value]).toEqual(['', '']);
   await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
-  expect(saveMatchResult).toHaveBeenCalledWith(80, 25, 0);
+  expect(saveMatchResult).not.toHaveBeenCalled();
+  const setValue = (input: HTMLInputElement, value: string) => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  await act(async () => setValue(homeScore, '25'));
+  await act(async () => setValue(awayScore, '12'));
+  await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+  expect(saveMatchResult).toHaveBeenCalledWith(80, 25, 12);
   expect(openMatchResultPhoto).not.toHaveBeenCalled();
 });
 

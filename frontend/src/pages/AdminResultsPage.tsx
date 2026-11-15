@@ -23,7 +23,7 @@ export function AdminResultsPage() {
   const [data, setData] = useState<TournamentOperations | null>(null);
   const [starting, setStarting] = useState<TournamentScheduleSlot | null>(null);
   const [editing, setEditing] = useState<TournamentScheduleSlot | null>(null);
-  const [scores, setScores] = useState({ home: 25, away: 0 });
+  const [scores, setScores] = useState({ home: '', away: '' });
   const [startPhoto, setStartPhoto] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,8 +45,7 @@ export function AdminResultsPage() {
   const slots = useMemo(() => [...(data?.slots ?? [])].sort(byOperationPriority), [data]);
 
   const begin = (slot: TournamentScheduleSlot) => {
-    const target = slot.tournamentCategory.pointsPerSet;
-    setEditing(slot); setScores({ home: target, away: 0 }); setError(null);
+    setEditing(slot); setScores({ home: '', away: '' }); setError(null);
   };
   const beginStart = (slot: TournamentScheduleSlot) => {
     setStarting(slot); setStartPhoto(null); setError(null);
@@ -63,10 +62,10 @@ export function AdminResultsPage() {
   };
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!editing?.matchId) return;
+    if (!editing?.matchId || scores.home === '' || scores.away === '') return;
     setBusy(true); setError(null);
     try {
-      await saveMatchResult(editing.matchId, scores.home, scores.away);
+      await saveMatchResult(editing.matchId, Number(scores.home), Number(scores.away));
       setEditing(null); await load();
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo guardar el resultado.'); }
     finally { setBusy(false); }
@@ -106,11 +105,11 @@ export function AdminResultsPage() {
     {editing?.match && <AdminDialog title={`Resultado P${editing.sequence}`} onClose={() => { if (!busy) setEditing(null); }}><form className="editor-form" onSubmit={save}>
       {error && <div className="inline-state span-2" role="alert">{error}</div>}
       <p className="field-hint span-2">{editing.tournamentCategory.category.name} · {editing.zoneName}</p>
-      <label>{pairName(editing, 'home')}<input aria-label="Tantos local" type="number" min="0" max={editing.tournamentCategory.pointsPerSet} value={scores.home} onChange={(event) => setScores({ ...scores, home: Number(event.target.value) })} required /></label>
-      <label>{pairName(editing, 'away')}<input aria-label="Tantos visitante" type="number" min="0" max={editing.tournamentCategory.pointsPerSet} value={scores.away} onChange={(event) => setScores({ ...scores, away: Number(event.target.value) })} required /></label>
+      <label>{pairName(editing, 'home')}<input aria-label="Tantos local" type="number" min="0" max={editing.tournamentCategory.pointsPerSet} value={scores.home} onChange={(event) => setScores({ ...scores, home: event.target.value })} required /></label>
+      <label>{pairName(editing, 'away')}<input aria-label="Tantos visitante" type="number" min="0" max={editing.tournamentCategory.pointsPerSet} value={scores.away} onChange={(event) => setScores({ ...scores, away: event.target.value })} required /></label>
       <p className="field-hint span-2">Uno de los dos equipos debe llegar a {editing.tournamentCategory.pointsPerSet} tantos.</p>
       <p className="field-hint span-2">Al confirmar, el sistema editará la foto inicial con los equipos, los tantos y el logo de Copa Leyendas.</p>
-      <div className="span-2 form-actions"><button className="primary-button" disabled={busy}>{busy ? 'Generando placa...' : 'Confirmar resultado'}</button></div>
+      <div className="span-2 form-actions"><button className="primary-button" disabled={busy || scores.home === '' || scores.away === ''}>{busy ? 'Generando placa...' : 'Confirmar resultado'}</button></div>
     </form></AdminDialog>}
   </div>;
 }
