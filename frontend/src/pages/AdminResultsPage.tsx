@@ -123,7 +123,7 @@ export function AdminResultsPage() {
       <div className="match-photo-orientation span-2"><div><span>Izquierda · Local</span><strong>{pairName(starting, 'home')}</strong></div><div><span>Derecha · Visitante</span><strong>{pairName(starting, 'away')}</strong></div></div>
       <div className="span-2 result-photo-field">
         <strong>Foto inicial del partido</strong>
-        <input id={startPhotoId} className="camera-input" type="file" accept="image/*" capture="environment" onChange={(event) => selectStartPhoto(event.target.files?.[0] ?? null)} required />
+        <input id={startPhotoId} className="camera-input" type="file" accept="image/*" capture="environment" onChange={(event) => selectStartPhoto(event.target.files?.[0] ?? null)} />
         <label className={`camera-button${startPhoto ? ' has-photo' : ''}`} htmlFor={startPhotoId}><span aria-hidden="true">📷</span>{startPhoto ? 'Volver a sacar la foto' : 'Sacar foto con la cámara'}</label>
         {startPhotoPreview && <img className="result-photo-preview" src={startPhotoPreview} alt="Vista previa de la foto inicial" />}
         {startPhoto && <span className="camera-photo-ready" role="status">Foto lista para publicar</span>}

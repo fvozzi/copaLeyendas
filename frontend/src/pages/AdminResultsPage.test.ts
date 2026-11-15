@@ -32,6 +32,7 @@ it('lets a court leader start with a photo and then submit a 25-point result', a
   const input = form.querySelector<HTMLInputElement>('input[type="file"]')!;
   expect(input.accept).toBe('image/*');
   expect(input.getAttribute('capture')).toBe('environment');
+  expect(input.required).toBe(false);
   Object.defineProperty(input, 'files', { value: [photo] });
   await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
   expect(form.textContent).toContain('Foto lista para publicar');
