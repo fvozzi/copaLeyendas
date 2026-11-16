@@ -25,7 +25,7 @@ import type {
   PublicTeamCuilRoster,
   Category, CategoryPayload, Court, CourtPayload, Venue, VenuePayload,
   Tournament, TournamentPayload, TournamentDetail, TournamentMatch, ZoneDetail, ZoneRegistrationPlacement, AdminUser, AdminUserPayload, CashExpense, CashExpensePayload, CashIncomePayload, CashSummary, TournamentScheduleSlot,
-  ActivityLogPage, TournamentOperations, ZoneMethodology,
+  ActivityLogPage, TournamentOperations, VenuePlayerRosterItem, ZoneMethodology,
 } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
@@ -374,6 +374,17 @@ export async function downloadTournamentVenueWorksheet(tournamentId: number, ven
   document.body.append(link); link.click(); link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+export async function downloadTournamentVenuePlayers(tournamentId: number, venueId: number, venueName: string) {
+  const token = getToken();
+  const response = await fetch(`${API_URL}/tournaments/${tournamentId}/venues/${venueId}/players.xlsx`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!response.ok) throw new Error(await readError(response));
+  const url = URL.createObjectURL(await response.blob());
+  const safeVenue = venueName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'sede';
+  const link = document.createElement('a');
+  link.href = url; link.download = `jugadoras-${safeVenue}.xlsx`;
+  document.body.append(link); link.click(); link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 export function redistributeTournamentCourts(id: number) { return request<TournamentScheduleSlot[]>(`/tournaments/${id}/redistribute-courts`, { method: 'POST' }, true); }
 export function previewProgramScenario(id: number, payload: ProgramScenario) { return request<ProgramScenarioPreview>(`/tournaments/${id}/program-scenario/preview`, { method: 'POST', body: JSON.stringify(payload) }, true); }
 export function applyProgramScenario(id: number, payload: ProgramScenario) { return request<ProgramScenarioPreview>(`/tournaments/${id}/program-scenario/apply`, { method: 'POST', body: JSON.stringify(payload) }, true); }
@@ -381,6 +392,7 @@ export function updateTournamentScheduleSlot(id: number, payload: { scheduledAt?
 export function getZoneMatches(id: number) { return request<TournamentMatch[]>(`/tournaments/zones/${id}/matches`, {}, true); }
 export function generateZoneFixture(id: number) { return request<TournamentMatch[]>(`/tournaments/zones/${id}/fixture`, { method: 'POST' }, true); }
 export function getTournamentOperations() { return request<TournamentOperations>('/tournaments/operations', {}, true); }
+export function getTournamentOperationPlayers() { return request<VenuePlayerRosterItem[]>('/tournaments/operations/players', {}, true); }
 export function startMatch(id: number, photo: File) {
   const form = new FormData();
   form.set('photo', photo);

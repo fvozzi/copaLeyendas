@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 import { AdminDataGrid } from '../components/AdminDataGrid';
 import { AdminDialog } from '../components/AdminDialog';
-import { createVenue, deleteVenue, getUsers, getVenues, updateVenue, updateVenueLeaders } from '../lib/api';
-import type { AdminUser, Venue, VenuePayload } from '../types';
+import { createVenue, deleteVenue, downloadTournamentVenuePlayers, getTournaments, getUsers, getVenues, updateVenue, updateVenueLeaders } from '../lib/api';
+import type { AdminUser, Tournament, Venue, VenuePayload } from '../types';
 
 const initial: VenuePayload = { name: '', address: '', city: 'Ciudad de Buenos Aires', provinceName: 'Buenos Aires', startsAt: '10:00', matchDurationMinutes: 40, matchesPerDay: 16, active: true };
 
 export function AdminCourtsPage() {
   const [items, setItems] = useState<Venue[]>([]);
   const [leaders, setLeaders] = useState<AdminUser[]>([]);
+  const [activeTournament, setActiveTournament] = useState<Tournament | null>(null);
   const [leaderIds, setLeaderIds] = useState<number[]>([]);
   const [form, setForm] = useState<VenuePayload>(initial);
   const [editing, setEditing] = useState<Venue | null>(null);
@@ -16,11 +17,13 @@ export function AdminCourtsPage() {
   const [error, setError] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [downloadingVenueId, setDownloadingVenueId] = useState<number | null>(null);
   const load = () => getVenues().then(setItems).catch((reason: Error) => setError(reason.message));
 
   useEffect(() => {
     load();
     getUsers().then((users) => setLeaders(users.filter((user) => user.role === 'COURT_LEADER' || user.role === 'ASSISTANT'))).catch((reason: Error) => setError(reason.message));
+    getTournaments().then((tournaments) => setActiveTournament(tournaments.find((tournament) => tournament.status === 'ACTIVE') ?? null)).catch((reason: Error) => setError(reason.message));
   }, []);
 
   const close = (force = false) => {
@@ -49,10 +52,17 @@ export function AdminCourtsPage() {
     try { await deleteVenue(item.id); load(); }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo eliminar la sede.'); }
   };
+  const downloadPlayers = async (venue: Venue) => {
+    if (!activeTournament) { setError('No hay un torneo activo para generar el listado.'); return; }
+    setDownloadingVenueId(venue.id); setError(null);
+    try { await downloadTournamentVenuePlayers(activeTournament.id, venue.id, venue.name); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo descargar el listado de jugadoras.'); }
+    finally { setDownloadingVenueId(null); }
+  };
 
   return <div className="admin-panel">
     <div className="panel-header"><div><p className="eyebrow">ABM</p><h1>Sedes</h1></div><button className="primary-button" onClick={() => { setModalError(null); setForm(initial); setLeaderIds([]); setOpen(true); }}>Agregar sede</button></div>
-    <p className="field-hint">Cada sede puede tener uno o más líderes responsables de todas sus canchas y partidos.</p>
+    <p className="field-hint">Cada sede puede tener uno o más líderes responsables de todas sus canchas y partidos. Desde cada fila podés descargar el Excel de jugadoras del torneo activo.</p>
     {error && <div className="inline-state">{error}</div>}
     <section className="data-card"><AdminDataGrid rows={items} emptyMessage="No hay sedes cargadas." columns={[
       { label: 'Sede', render: (item) => <strong>{item.name}</strong> },
@@ -62,7 +72,7 @@ export function AdminCourtsPage() {
       { label: 'Partidos por cancha/día', render: (item) => item.matchesPerDay },
       { label: 'Ciudad', render: (item) => item.city ?? '-' },
       { label: 'Estado', render: (item) => <span className={`status-chip ${item.active ? 'status-live' : 'status-draft'}`}>{item.active ? 'Activa' : 'Inactiva'}</span> },
-    ]} renderActions={(item) => <><button className="inline-link" onClick={() => edit(item)}>Editar</button><button className="danger-link" onClick={() => remove(item)}>Eliminar</button></>} /></section>
+    ]} renderActions={(item) => <><button className="inline-link" disabled={!activeTournament || downloadingVenueId !== null} onClick={() => void downloadPlayers(item)}>{downloadingVenueId === item.id ? 'Descargando...' : 'Jugadoras Excel'}</button><button className="inline-link" onClick={() => edit(item)}>Editar</button><button className="danger-link" onClick={() => remove(item)}>Eliminar</button></>} /></section>
     {open && <AdminDialog title={editing ? 'Editar sede' : 'Nueva sede'} onClose={close}><form className="editor-form" onSubmit={save}>
       {modalError && <div className="inline-state span-2" role="alert">{modalError}</div>}
       <label>Nombre de la sede<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required /></label>

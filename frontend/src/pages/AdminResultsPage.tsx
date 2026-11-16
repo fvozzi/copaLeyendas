@@ -1,10 +1,10 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { AdminDataGrid } from '../components/AdminDataGrid';
 import { AdminDialog } from '../components/AdminDialog';
-import { getTournamentOperations, openMatchResultPhoto, saveMatchResult, startMatch } from '../lib/api';
+import { getTournamentOperationPlayers, getTournamentOperations, openMatchResultPhoto, saveMatchResult, startMatch } from '../lib/api';
 import { pairPlayerNames } from '../lib/pair-display';
 import { clearMatchStartDraft, loadMatchStartDraft, saveMatchStartDraft } from '../lib/match-start-draft';
-import type { TournamentOperations, TournamentScheduleSlot } from '../types';
+import type { TournamentOperations, TournamentScheduleSlot, VenuePlayerRosterItem } from '../types';
 
 const pairName = (slot: TournamentScheduleSlot, side: 'home' | 'away') => {
   const pair = side === 'home' ? slot.match?.homeRegistration : slot.match?.awayRegistration;
@@ -22,6 +22,9 @@ const byOperationPriority = (left: TournamentScheduleSlot, right: TournamentSche
 
 export function AdminResultsPage() {
   const [data, setData] = useState<TournamentOperations | null>(null);
+  const [venuePlayers, setVenuePlayers] = useState<VenuePlayerRosterItem[]>([]);
+  const [playerSearch, setPlayerSearch] = useState('');
+  const [rosterError, setRosterError] = useState<string | null>(null);
   const [starting, setStarting] = useState<TournamentScheduleSlot | null>(null);
   const [editing, setEditing] = useState<TournamentScheduleSlot | null>(null);
   const [scores, setScores] = useState({ home: '', away: '' });
@@ -41,6 +44,7 @@ export function AdminResultsPage() {
     setData(result);
   };
   useEffect(() => { void load().catch((reason: Error) => setError(reason.message)); }, []);
+  useEffect(() => { void getTournamentOperationPlayers().then(setVenuePlayers).catch((reason: Error) => setRosterError(reason.message)); }, []);
   useEffect(() => {
     if (!data || draftRestored.current) return;
     draftRestored.current = true;
@@ -63,6 +67,12 @@ export function AdminResultsPage() {
   }, [startPhoto]);
 
   const slots = useMemo(() => [...(data?.slots ?? [])].sort(byOperationPriority), [data]);
+  const visibleVenuePlayers = useMemo(() => {
+    const term = playerSearch.trim().toLocaleLowerCase('es');
+    if (!term) return venuePlayers;
+    return venuePlayers.filter((player) => [player.fullName, player.dni, player.phone, player.category, player.team, player.venueName]
+      .some((value) => value.toLocaleLowerCase('es').includes(term)));
+  }, [playerSearch, venuePlayers]);
 
   const begin = (slot: TournamentScheduleSlot) => {
     const played = slot.match?.status === 'PLAYED';
@@ -163,6 +173,17 @@ export function AdminResultsPage() {
         { label: 'Cancha prevista', render: (slot) => slot.court ? `${slot.court.venue?.name ? `${slot.court.venue.name} · ` : ''}${slot.court.name}` : 'Sin asignar' },
         { label: 'Estado', render: (slot) => slot.match?.status === 'PLAYED' ? <strong>{slot.match.homeScore} - {slot.match.awayScore}</strong> : slot.match?.status === 'IN_PROGRESS' ? <span className="status-chip status-live"><span className="live-dot" />En juego</span> : slot.match?.status === 'READY' ? 'Listo para jugar' : 'A definir' },
       ]} renderActions={(slot) => <>{slot.match?.status === 'READY' && <button type="button" className="primary-button" disabled={busy} onClick={() => beginStart(slot)}>Iniciar partido</button>}{slot.match?.status === 'IN_PROGRESS' && <button type="button" className="primary-button" disabled={busy} onClick={() => begin(slot)}>Cargar resultado</button>}{slot.match?.status === 'PLAYED' && <button type="button" className="inline-link" disabled={busy} onClick={() => begin(slot)}>Editar resultado</button>}{slot.match?.resultPhotoAvailable && <button type="button" className="inline-link" onClick={() => void openMatchResultPhoto(slot.matchId!)}>Ver foto</button>}</>} /></section>
+      <section className="data-card venue-player-roster">
+        <div className="section-heading"><div><p className="eyebrow">Consulta rápida</p><h2>Jugadoras de la sede</h2></div><span>{venuePlayers.length} {venuePlayers.length === 1 ? 'jugadora' : 'jugadoras'}</span></div>
+        <div className="toolbar"><input aria-label="Buscar jugadora de la sede" placeholder="Buscar por jugadora, equipo, DNI, teléfono o categoría" value={playerSearch} onChange={(event) => setPlayerSearch(event.target.value)} /></div>
+        {rosterError ? <div className="inline-state" role="alert">{rosterError}</div> : <AdminDataGrid rows={visibleVenuePlayers} emptyMessage={playerSearch ? 'No hay jugadoras que coincidan con la búsqueda.' : 'No hay jugadoras asignadas a esta sede.'} columns={[
+          { label: 'Jugadora', render: (player) => <strong>{player.fullName}</strong> },
+          { label: 'Equipo', render: (player) => player.team },
+          { label: 'Categoría', render: (player) => player.category },
+          { label: 'DNI', render: (player) => player.dni },
+          { label: 'Teléfono', render: (player) => player.phone ? <a href={`tel:${player.phone.replace(/[^\d+]/g, '')}`}>{player.phone}</a> : '-' },
+        ]} />}
+      </section>
     </>}
     {starting?.match && <AdminDialog title={`Iniciar P${starting.sequence}`} className="result-start-dialog" onClose={closeStart}><form className="editor-form result-start-form" onSubmit={start} aria-busy={busy}>
       {error && <div className="inline-state span-2" role="alert">{error}</div>}

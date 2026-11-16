@@ -373,6 +373,7 @@ export interface PublicTournamentZone { id: number; name: string; category: stri
 export interface PublicTournament extends Tournament { zones: PublicTournamentZone[]; knockout: TournamentScheduleSlot[]; }
 export interface PublicCurrentTournament { tournament: PublicTournament | null; courts: Court[]; }
 export interface TournamentOperations { tournament: Pick<Tournament, 'id' | 'name' | 'startsAt' | 'endsAt'> | null; courts: Court[]; slots: TournamentScheduleSlot[]; }
+export interface VenuePlayerRosterItem { id: number; venueId: number; venueName: string; playerId: number; fullName: string; dni: string; phone: string; category: string; team: string; }
 export interface PublicProgramMapData { detail: TournamentDetail | null; slots: TournamentScheduleSlot[]; }
 export interface TournamentScheduleSlot { capacityWarning?: string | null; zoneCapacity?: number | null; id: number; matchId?: number | null; match?: TournamentMatch | null; tournamentId: number; tournamentCategoryId: number; zoneName: string; matchOrder: number; stage: 'ZONE' | 'QUARTERFINAL' | 'SEMIFINAL' | 'FINAL'; sequence: number; courtId: number | null; court: Court | null; scheduledAt: string | null; tournamentCategory: TournamentCategory; }
 

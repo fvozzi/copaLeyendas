@@ -1,14 +1,15 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AdminResultsPage } from './AdminResultsPage';
-import { getTournamentOperations, openMatchResultPhoto, saveMatchResult, startMatch } from '../lib/api';
+import { getTournamentOperationPlayers, getTournamentOperations, openMatchResultPhoto, saveMatchResult, startMatch } from '../lib/api';
 import type { Court, TournamentOperations, TournamentScheduleSlot } from '../types';
 
-vi.mock('../lib/api', () => ({ getTournamentOperations: vi.fn(), openMatchResultPhoto: vi.fn(), saveMatchResult: vi.fn(), startMatch: vi.fn() }));
+vi.mock('../lib/api', () => ({ getTournamentOperationPlayers: vi.fn(), getTournamentOperations: vi.fn(), openMatchResultPhoto: vi.fn(), saveMatchResult: vi.fn(), startMatch: vi.fn() }));
 
 let root: Root;
 let container: HTMLDivElement;
+beforeEach(() => { vi.mocked(getTournamentOperationPlayers).mockResolvedValue([]); });
 afterEach(async () => { if (root) await act(async () => root.unmount()); container?.remove(); vi.resetAllMocks(); });
 
 it('lets a court leader start with a photo and then submit a 25-point result', async () => {
@@ -87,6 +88,27 @@ it('shows in-progress matches first, then startable matches, ordered by match nu
   expect([...container.querySelectorAll('tbody tr')].map((row) => row.querySelector('[data-label="Partido"]')?.textContent)).toEqual([
     'P1 · Damas A', 'P2 · Damas A', 'P4 · Damas A', 'P8 · Damas A',
   ]);
+});
+
+it('shows and filters the players from the leader assigned venue', async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  const court = { id: 3, name: 'Cancha 3', venue: { name: 'GEBA' } } as Court;
+  vi.mocked(getTournamentOperations).mockResolvedValue({ tournament: { id: 1, name: 'Copa', startsAt: '2026-11-20', endsAt: '2026-11-22' }, courts: [court], slots: [] });
+  vi.mocked(getTournamentOperationPlayers).mockResolvedValue([
+    { id: 1, venueId: 2, venueName: 'GEBA', playerId: 1, fullName: 'Ana Gómez', dni: '30111222', phone: '5491111111111', category: 'Damas A', team: 'Caseros' },
+    { id: 2, venueId: 2, venueName: 'GEBA', playerId: 2, fullName: 'Beatriz López', dni: '30222333', phone: '5491122222222', category: 'Damas B', team: 'Corrientes' },
+  ]);
+  container = document.createElement('div'); document.body.append(container); root = createRoot(container);
+  await act(async () => root.render(createElement(AdminResultsPage)));
+
+  expect(container.textContent).toContain('Jugadoras de la sede');
+  expect(container.textContent).toContain('Ana Gómez');
+  expect(container.textContent).toContain('Beatriz López');
+  const search = container.querySelector<HTMLInputElement>('input[aria-label="Buscar jugadora de la sede"]')!;
+  const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+  await act(async () => { setValue.call(search, '30111222'); search.dispatchEvent(new Event('input', { bubbles: true })); });
+  expect(container.textContent).toContain('Ana Gómez');
+  expect(container.textContent).not.toContain('Beatriz López');
 });
 
 it('closes the start form when the upload response is lost but the match did start', async () => {
