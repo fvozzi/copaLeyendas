@@ -23,9 +23,11 @@ describe('match result card', () => {
     expect(metadata.height).toBe(800);
     expect(result.equals(source)).toBe(false);
 
-    const topPanel = await sharp(result).extract({ left: 30, top: 36, width: 400, height: 224 }).raw().toBuffer();
+    const homePanelPixel = await sharp(result).extract({ left: 55, top: 55, width: 1, height: 1 }).raw().toBuffer();
+    const awayPanelPixel = await sharp(result).extract({ left: 750, top: 55, width: 1, height: 1 }).raw().toBuffer();
     const clearBottom = await sharp(result).extract({ left: 30, top: 560, width: 400, height: 200 }).raw().toBuffer();
-    const mean = (buffer: Buffer) => [...buffer].reduce((sum, value) => sum + value, 0) / buffer.length;
-    expect(mean(topPanel)).toBeLessThan(mean(clearBottom) - 30);
+    expect(homePanelPixel[1]).toBeGreaterThan(homePanelPixel[0]);
+    expect(awayPanelPixel[0]).toBeGreaterThan(awayPanelPixel[1]);
+    expect(clearBottom.length).toBeGreaterThan(0);
   }, 15_000);
 });

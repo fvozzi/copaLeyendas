@@ -981,7 +981,14 @@ export class TournamentsService {
     if (!slot) throw new NotFoundException('Partido fuera del programa');
     await this.assertMatchAccess(user, id, slot);
     const initial = await this.matchWithZone(id);
-    if (initial.status === MatchStatus.IN_PROGRESS) throw new BadRequestException('El partido ya está en juego.');
+    // Starting is idempotent because a mobile connection may lose the response
+    // after the photo and state were already committed. A retry confirms the
+    // existing start without replacing its original photo.
+    if (initial.status === MatchStatus.IN_PROGRESS) return {
+      ...initial,
+      resultPhotoStoredName: undefined,
+      resultPhotoAvailable: Boolean(initial.resultPhotoStoredName),
+    };
     if (initial.status !== MatchStatus.READY || !initial.homeRegistrationId || !initial.awayRegistrationId) throw new BadRequestException('El partido todavía no está listo para iniciar.');
     let normalized: Awaited<ReturnType<typeof normalizeMatchPhoto>>;
     try {

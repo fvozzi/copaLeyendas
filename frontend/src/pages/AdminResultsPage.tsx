@@ -29,10 +29,12 @@ export function AdminResultsPage() {
   const [startPhoto, setStartPhoto] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [startPhotoPreview, setStartPhotoPreview] = useState<string | null>(null);
   const startPhotoId = useId();
   const correctionPhotoId = useId();
   const draftRestored = useRef(false);
+  const startRequestInFlight = useRef(false);
 
   const load = async () => {
     const result = await getTournamentOperations();
@@ -64,10 +66,10 @@ export function AdminResultsPage() {
 
   const begin = (slot: TournamentScheduleSlot) => {
     const played = slot.match?.status === 'PLAYED';
-    setEditing(slot); setScores({ home: played ? String(slot.match?.homeScore ?? '') : '', away: played ? String(slot.match?.awayScore ?? '') : '' }); setCorrectionPhoto(null); setError(null);
+    setEditing(slot); setScores({ home: played ? String(slot.match?.homeScore ?? '') : '', away: played ? String(slot.match?.awayScore ?? '') : '' }); setCorrectionPhoto(null); setError(null); setNotice(null);
   };
   const beginStart = (slot: TournamentScheduleSlot) => {
-    setStarting(slot); setStartPhoto(null); setError(null);
+    setStarting(slot); setStartPhoto(null); setError(null); setNotice(null);
     if (slot.matchId) void saveMatchStartDraft(slot.matchId, null);
   };
   const selectStartPhoto = (photo: File | null) => {
@@ -79,15 +81,59 @@ export function AdminResultsPage() {
     setStarting(null); setStartPhoto(null);
     void clearMatchStartDraft();
   };
+  const finishStart = (matchId: number, sequence: number, refreshed?: TournamentOperations) => {
+    setData((current) => {
+      const source = refreshed ?? current;
+      if (!source) return source;
+      if (refreshed) return refreshed;
+      return {
+        ...source,
+        slots: source.slots.map((slot) => slot.matchId === matchId && slot.match ? {
+          ...slot,
+          match: { ...slot.match, status: 'IN_PROGRESS', startedAt: new Date().toISOString(), resultPhotoAvailable: true },
+        } : slot),
+      };
+    });
+    setStarting(null);
+    setStartPhoto(null);
+    setError(null);
+    setNotice(`P${sequence} iniciado correctamente. Ya está disponible para cargar el resultado.`);
+    void clearMatchStartDraft();
+  };
   const start = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!starting?.matchId || !startPhoto) return;
+    if (!starting?.matchId || !startPhoto || startRequestInFlight.current) return;
+    const matchId = starting.matchId;
+    const sequence = starting.sequence;
+    startRequestInFlight.current = true;
     setBusy(true); setError(null);
     try {
-      await startMatch(starting.matchId, startPhoto);
-      setStarting(null); setStartPhoto(null); await clearMatchStartDraft(); await load();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo iniciar el partido.'); }
-    finally { setBusy(false); }
+      await startMatch(matchId, startPhoto);
+      finishStart(matchId, sequence);
+      // The optimistic update closes the dialog immediately. Refreshing the
+      // complete operation board is secondary and must never undo that success.
+      void load().catch(() => undefined);
+    } catch (reason) {
+      // A mobile network can drop the response after the server has already
+      // committed the photo and start. Verify the authoritative state before
+      // asking the leader to retry an operation that may already be complete.
+      try {
+        const refreshed = await getTournamentOperations();
+        const match = refreshed.slots.find((slot) => slot.matchId === matchId)?.match;
+        if (match?.status === 'IN_PROGRESS' || match?.status === 'PLAYED') {
+          finishStart(matchId, sequence, refreshed);
+          return;
+        }
+        setData(refreshed);
+      } catch {
+        // Keep the original request error: it is the most useful message when
+        // the verification request also cannot reach the server.
+      }
+      setError(reason instanceof Error ? reason.message : 'No se pudo iniciar el partido.');
+    } finally {
+      startRequestInFlight.current = false;
+      setBusy(false);
+    }
   };
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -104,6 +150,7 @@ export function AdminResultsPage() {
   const venueNames = [...new Set(data.courts.flatMap((court) => court.venue?.name ? [court.venue.name] : []))];
   return <div className="admin-panel court-results-page">
     <div className="panel-header"><div><p className="eyebrow">Operación de cancha</p><h1>Cargar resultados</h1><p>{data.tournament?.name ?? 'No hay un torneo activo.'}</p></div></div>
+    {notice && <div className="inline-state status-success" role="status">{notice}</div>}
     {error && <div className="inline-state" role="alert">{error}</div>}
     {!data.tournament ? <div className="inline-state">No hay un torneo activo.</div> : !data.courts.length ? <div className="inline-state">No tenés partidos en las sedes asignadas. Dirección debe asignarte desde Sedes.</div> : <>
       <section className="data-card result-court-selector"><div><span className="eyebrow">Sede asignada</span><h2>{venueNames.join(' / ') || 'Sede sin informar'}</h2></div><p className="field-hint">Todos los partidos de la sede · {slots.length} {slots.length === 1 ? 'partido' : 'partidos'}. La cancha programada se muestra solo como referencia.</p></section>
@@ -117,7 +164,7 @@ export function AdminResultsPage() {
         { label: 'Estado', render: (slot) => slot.match?.status === 'PLAYED' ? <strong>{slot.match.homeScore} - {slot.match.awayScore}</strong> : slot.match?.status === 'IN_PROGRESS' ? <span className="status-chip status-live"><span className="live-dot" />En juego</span> : slot.match?.status === 'READY' ? 'Listo para jugar' : 'A definir' },
       ]} renderActions={(slot) => <>{slot.match?.status === 'READY' && <button type="button" className="primary-button" disabled={busy} onClick={() => beginStart(slot)}>Iniciar partido</button>}{slot.match?.status === 'IN_PROGRESS' && <button type="button" className="primary-button" disabled={busy} onClick={() => begin(slot)}>Cargar resultado</button>}{slot.match?.status === 'PLAYED' && <button type="button" className="inline-link" disabled={busy} onClick={() => begin(slot)}>Editar resultado</button>}{slot.match?.resultPhotoAvailable && <button type="button" className="inline-link" onClick={() => void openMatchResultPhoto(slot.matchId!)}>Ver foto</button>}</>} /></section>
     </>}
-    {starting?.match && <AdminDialog title={`Iniciar P${starting.sequence}`} className="result-start-dialog" onClose={closeStart}><form className="editor-form result-start-form" onSubmit={start}>
+    {starting?.match && <AdminDialog title={`Iniciar P${starting.sequence}`} className="result-start-dialog" onClose={closeStart}><form className="editor-form result-start-form" onSubmit={start} aria-busy={busy}>
       {error && <div className="inline-state span-2" role="alert">{error}</div>}
       <p className="field-hint span-2">Esta foto marca el inicio del partido y se publica inmediatamente como “En juego”.</p>
       <div className="match-photo-orientation span-2"><div><span>Izquierda · Local</span><strong>{pairName(starting, 'home')}</strong></div><div><span>Derecha · Visitante</span><strong>{pairName(starting, 'away')}</strong></div></div>
@@ -129,7 +176,7 @@ export function AdminResultsPage() {
         {startPhoto && <span className="camera-photo-ready" role="status">Foto lista para publicar</span>}
         <small>Ubicá a la pareja local a la izquierda y a la visitante a la derecha. Al finalizar agregaremos automáticamente equipos, tantos y logo.</small>
       </div>
-      <div className="span-2 form-actions"><button className="primary-button" disabled={busy || !startPhoto}>{busy ? 'Publicando...' : 'Publicar e iniciar partido'}</button></div>
+      <div className="span-2 form-actions"><button type="submit" className="primary-button" disabled={busy || !startPhoto}>{busy ? 'Publicando... esperá la confirmación' : 'Publicar e iniciar partido'}</button></div>
     </form></AdminDialog>}
     {editing?.match && <AdminDialog title={`${editing.match.status === 'PLAYED' ? 'Editar resultado' : 'Resultado'} P${editing.sequence}`} onClose={() => { if (!busy) { setEditing(null); setCorrectionPhoto(null); } }}><form className="editor-form" onSubmit={save}>
       {error && <div className="inline-state span-2" role="alert">{error}</div>}

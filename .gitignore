@@ -13,3 +13,4 @@ tmp/load-*.json
 tmp/resultados-concurrentes-*.json
 
 /entregables/*
+/tmp/muestra-placa-resultado.jpg

@@ -89,6 +89,33 @@ it('shows in-progress matches first, then startable matches, ordered by match nu
   ]);
 });
 
+it('closes the start form when the upload response is lost but the match did start', async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  const court = { id: 3, name: 'Cancha 3', venue: { name: 'Club' } } as Court;
+  const slot = { id: 8, matchId: 80, tournamentId: 1, tournamentCategoryId: 2, tournamentCategory: { pointsPerSet: 25, category: { name: 'Damas A' } }, stage: 'ZONE', zoneName: 'Zona A', matchOrder: 1, sequence: 4, courtId: 3, court, scheduledAt: '2026-11-20T13:00:00Z', match: { id: 80, matchOrder: 1, status: 'READY', homeRegistration: { playerOneName: 'Ana', playerTwoName: 'Bea', locality: { name: 'Junín' } }, awayRegistration: { playerOneName: 'Cata', playerTwoName: 'Dora', locality: { name: 'Salta' } }, homeScore: null, awayScore: null, scheduledAt: null } } as TournamentScheduleSlot;
+  const inProgress = { ...slot, match: { ...slot.match!, status: 'IN_PROGRESS', resultPhotoAvailable: true } } as TournamentScheduleSlot;
+  vi.mocked(getTournamentOperations)
+    .mockResolvedValueOnce({ tournament: { id: 1, name: 'Copa' }, courts: [court], slots: [slot] } as TournamentOperations)
+    .mockResolvedValueOnce({ tournament: { id: 1, name: 'Copa' }, courts: [court], slots: [inProgress] } as TournamentOperations);
+  vi.mocked(startMatch).mockRejectedValueOnce(new Error('Se perdió la respuesta del servidor'));
+  container = document.createElement('div'); document.body.append(container); root = createRoot(container);
+  await act(async () => root.render(createElement(AdminResultsPage)));
+
+  const startButton = [...container.querySelectorAll('button')].find((item) => item.textContent === 'Iniciar partido')!;
+  await act(async () => startButton.click());
+  const form = document.querySelector('form')!;
+  const photo = new File(['foto'], 'inicio.jpg', { type: 'image/jpeg' });
+  const input = form.querySelector<HTMLInputElement>('input[type="file"]')!;
+  Object.defineProperty(input, 'files', { value: [photo] });
+  await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
+  await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+
+  expect(document.querySelector('form')).toBeNull();
+  expect(container.textContent).toContain('P4 iniciado correctamente');
+  expect(container.textContent).toContain('En juego');
+  expect(container.textContent).not.toContain('Se perdió la respuesta');
+});
+
 it('asks for the original photo when correcting a legacy result', async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   const court = { id: 3, name: 'Cancha 3', venue: { name: 'Club' } } as Court;

@@ -530,6 +530,20 @@ describe('fixtures with unassigned places', () => {
     expect(matches[3]).toMatchObject({ homeRegistrationId: 20, awayRegistrationId: 30, status: MatchStatus.READY });
   });
 
+  it('treats a repeated start as success when the first mobile response was lost', async () => {
+    const { service, matches } = setup();
+    await service.fixture(1);
+    await service.assignPlace(1, 10, 1);
+    await service.assignPlace(1, 30, 3);
+
+    await expect(service.startMatch(matches[0].id, director, testPhoto)).resolves.toMatchObject({ status: MatchStatus.IN_PROGRESS });
+    await expect(service.startMatch(matches[0].id, director, testPhoto)).resolves.toMatchObject({
+      status: MatchStatus.IN_PROGRESS,
+      resultPhotoAvailable: true,
+    });
+    expect(matches[0]).toMatchObject({ status: MatchStatus.IN_PROGRESS, resultPhotoStoredName: 'match.jpg' });
+  });
+
   it('preserves the clean source photo and regenerates the plate when correcting a result', async () => {
     const { service, matches } = setup();
     await service.fixture(1);
