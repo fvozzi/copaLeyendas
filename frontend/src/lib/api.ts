@@ -392,13 +392,11 @@ export function saveMatchResult(id: number, homeScore: number, awayScore: number
   form.set('homeScore', String(homeScore)); form.set('awayScore', String(awayScore)); form.set('photo', photo);
   return request<TournamentMatch>(`/tournaments/matches/${id}/result`, { method: 'POST', body: form }, true);
 }
-export async function openMatchResultPhoto(id: number) {
-  const token = getToken();
-  const response = await fetch(`${API_URL}/tournaments/matches/${id}/result-photo`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-  if (!response.ok) throw new Error(await readError(response));
-  const url = URL.createObjectURL(await response.blob());
-  window.open(url, '_blank', 'noopener,noreferrer');
-  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+export function matchResultPhotoUrl(id: number, apiUrl = API_URL) {
+  return resolveApiAssetUrl(`/api/public/tournaments/matches/${id}/photo`, apiUrl)!;
+}
+export function openMatchResultPhoto(id: number) {
+  window.open(matchResultPhotoUrl(id), '_blank', 'noopener,noreferrer');
 }
 export function updateMatchSchedule(id: number, scheduledAt: string) { return request<TournamentMatch>(`/tournaments/matches/${id}/schedule`, { method: 'PATCH', body: JSON.stringify({ scheduledAt }) }, true); }
 export function getZone(id: number) { return request<ZoneDetail>(`/tournaments/zones/${id}`, {}, true); }
