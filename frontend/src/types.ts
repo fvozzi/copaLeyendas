@@ -341,7 +341,7 @@ export interface TournamentPayload { name: string; feePerPlayer?: number; starts
 export type ZoneMethodology = 'PROVINCE' | 'ROUND_ROBIN';
 export type KnockoutStage = 'QUARTERFINAL' | 'SEMIFINAL' | 'FINAL';
 export interface TournamentCategory { id: number; categoryId: number; pointsPerSet: number; setsToWin: number; zoneSize: number; zoneCount: number | null; zoneCapacities: number[] | null; methodology: ZoneMethodology; qualifiersPerZone: number; category: Category; }
-export interface TournamentZone { id: number; name: string; capacity: number; tournamentCategoryId: number; venueId: number; venue: Venue; tournamentCategory: TournamentCategory; }
+export interface TournamentZone { id: number; name: string; capacity: number; tournamentCategoryId: number; venueId: number; venue: Venue; tournamentCategory: TournamentCategory; entries?: ZoneEntry[]; }
 export interface TournamentDetail extends Tournament { categories: TournamentCategory[]; zones: TournamentZone[]; }
 export interface TournamentDistributionRegistration { id: number; localityId: number; localityName: string; label: string; }
 export interface TournamentAttendanceRegistration extends TournamentDistributionRegistration { tournamentCategoryId: number; categoryName: string; present: boolean; }

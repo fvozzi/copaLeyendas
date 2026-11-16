@@ -31,3 +31,16 @@ it('keeps pair positions and ignores later winners for zones of three and four',
   expect(mapZonePairs(zone, slots).map((place) => [place.seed, place.registration?.id ?? null])).toEqual([[1, null], [2, null], [3, null], [4, 9]]);
   expect(mapZonePairs({ ...zone, capacity: 3 }, slots).map((place) => [place.seed, place.registration?.id ?? null])).toEqual([[1, null], [2, null], [3, 9]]);
 });
+
+it('uses the official zone entries when round-robin games repeat pairs', () => {
+  const { tournament, slots } = programMapFixture();
+  const registrations = [1, 2, 3, 4].map((id) => ({ id, playerOneName: `Jugadora ${id}A`, playerTwoName: `Jugadora ${id}B`, locality: { id, name: `Equipo ${id}` } })) as NonNullable<(typeof tournament.zones)[number]['entries']>[number]['registration'][];
+  const zone = { ...tournament.zones[0], entries: registrations.map((registration, index) => ({ id: index + 1, seed: index + 1, registration })) };
+  const games = slots.filter((slot) => slot.match?.zoneId === zone.id);
+  games[0].match!.homeRegistration = registrations[0] as never;
+  games[0].match!.awayRegistration = registrations[1] as never;
+  games[1].match!.homeRegistration = registrations[0] as never;
+  games[1].match!.awayRegistration = registrations[2] as never;
+
+  expect(mapZonePairs(zone, games).map((place) => place.registration?.id)).toEqual([1, 2, 3, 4]);
+});

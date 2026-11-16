@@ -8,6 +8,12 @@ export interface MapNode { id: string; column: number; zone?: TournamentZone; sl
 export interface MapEdge { from: string; to: string; side: 'home' | 'away'; rank?: number | null; }
 
 export function mapZonePairs(zone: TournamentZone, slots: TournamentScheduleSlot[]) {
+  if (zone.entries) {
+    return Array.from({ length: zone.capacity }, (_, index) => ({
+      seed: index + 1,
+      registration: zone.entries?.find((entry) => entry.seed === index + 1)?.registration ?? null,
+    }));
+  }
   const games = slots.filter((slot) => slot.match?.zoneId === zone.id);
   const first = games.find((slot) => slot.match?.matchOrder === 1)?.match;
   const second = games.find((slot) => slot.match?.matchOrder === 2)?.match;

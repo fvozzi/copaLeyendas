@@ -32,6 +32,7 @@ export function publicProgramView(detail: Awaited<ReturnType<TournamentQueryServ
       zones: detail.zones.map(zone => ({
         id: zone.id, name: zone.name, capacity: zone.capacity, tournamentCategoryId: zone.tournamentCategoryId,
         venueId: zone.venueId, venue: publicVenue(zone.venue), tournamentCategory: publicCategory(zone.tournamentCategory),
+        entries: zone.entries.map(entry => ({ id: entry.id, seed: entry.seed, registration: publicPair(entry.registration) })),
       })),
     },
     slots: slots.filter(slot => slot.stage !== 'ZONE' || slot.matchId).map(slot => ({
