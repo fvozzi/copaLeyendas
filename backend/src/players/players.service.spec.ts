@@ -101,6 +101,25 @@ describe('registered player agreements', () => {
     expect(insurance.content).not.toContain('Dabber');
     expect(insurance.content).toContain('1980-04-03');
   });
+
+  it('exports Extranjera instead of CUIL for players whose team province is Uruguay', async () => {
+    const { service } = setup();
+    vi.spyOn(service, 'list').mockResolvedValue([
+      {
+        id: 4, fullName: 'Ana Uruguaya', dni: '12345678', cuil: null, birthDate: '1980-04-03',
+        locality: { name: 'Montevideo', provinceName: 'Uruguay' },
+      },
+      {
+        id: 5, fullName: 'Bea Argentina', dni: '23456789', cuil: '27234567890', birthDate: '1981-05-04',
+        locality: { name: 'Ciudad', provinceName: 'Buenos Aires' },
+      },
+    ] as never);
+
+    const insurance = await service.export('insurance');
+
+    expect(insurance.content).toContain('"Ana Uruguaya";"1980-04-03";"12345678";"Extranjera"');
+    expect(insurance.content).toContain('"Bea Argentina";"1981-05-04";"23456789";"27-23456789-0"');
+  });
 });
 
 describe('registered player photos', () => {

@@ -150,7 +150,12 @@ export class PlayersService {
     if (kind === 'insurance') {
       return {
         filename: 'jugadoras-seguro.csv',
-        content: toCsv(['Nombre completo', 'Fecha nacimiento', 'DNI', 'CUIL'], players.map((player) => [player.fullName, player.birthDate ?? '', player.dni, formatCuil(player.cuil)])),
+        content: toCsv(['Nombre completo', 'Fecha nacimiento', 'DNI', 'CUIL'], players.map((player) => [
+          player.fullName,
+          player.birthDate ?? '',
+          player.dni,
+          insuranceCuil(player.cuil, player.locality?.provinceName),
+        ])),
       };
     }
     if (kind === 'full') {
@@ -504,4 +509,8 @@ function registeredPhotos(registrations: PairRegistration[]) {
 
 function toCsv(headers: string[], rows: (string | number)[][]) {
   return [headers, ...rows].map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(';')).join('\r\n');
+}
+
+function insuranceCuil(cuil: string | null, provinceName?: string | null) {
+  return provinceName?.trim().toLocaleLowerCase('es') === 'uruguay' ? 'Extranjera' : formatCuil(cuil);
 }
