@@ -195,18 +195,34 @@ export class TournamentsService {
       const repository = manager.getRepository(ZoneEntry);
       let swappedEntry: ZoneEntry | null = null;
       if (sourceEntry) {
-        const previousRegistrationId = targetEntry?.registrationId ?? null;
-        if (targetEntry) {
-          targetEntry.registrationId = registrationId;
-          await repository.save(targetEntry);
+        if (sourceEntry.zoneId === zoneId) {
+          if (targetEntry) {
+            // Inside one zone, keep each registration on its own row and swap
+            // only the positions. Swapping registration ids sequentially would
+            // temporarily duplicate a pair and violate zone_entries' unique key.
+            const sourceSeed = sourceEntry.seed;
+            sourceEntry.seed = targetEntry.seed;
+            targetEntry.seed = sourceSeed;
+            await repository.save([sourceEntry, targetEntry]);
+            swappedEntry = targetEntry;
+          } else {
+            sourceEntry.seed = seed;
+            await repository.save(sourceEntry);
+          }
         } else {
-          sourceEntry.zoneId = zoneId;
-          sourceEntry.seed = seed;
+          const previousRegistrationId = targetEntry?.registrationId ?? null;
+          if (targetEntry) {
+            targetEntry.registrationId = registrationId;
+            await repository.save(targetEntry);
+          } else {
+            sourceEntry.zoneId = zoneId;
+            sourceEntry.seed = seed;
+          }
+          if (previousRegistrationId !== null) {
+            sourceEntry.registrationId = previousRegistrationId;
+            swappedEntry = await repository.save(sourceEntry);
+          } else if (!targetEntry) swappedEntry = await repository.save(sourceEntry);
         }
-        if (previousRegistrationId !== null) {
-          sourceEntry.registrationId = previousRegistrationId;
-          swappedEntry = await repository.save(sourceEntry);
-        } else if (!targetEntry) swappedEntry = await repository.save(sourceEntry);
       } else if (targetEntry) {
         targetEntry.registrationId = registrationId;
         await repository.save(targetEntry);

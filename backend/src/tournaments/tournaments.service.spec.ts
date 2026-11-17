@@ -505,15 +505,23 @@ describe('fixtures with unassigned places', () => {
   });
 
   it('reorders pairs inside a zone and updates the fixture without recreating its matches', async () => {
-    const { service, entries, matches } = setup();
+    const { service, entries, matches, entryRepository } = setup();
     await service.fixture(1);
     for (let seed = 1; seed <= 4; seed++) await service.assignPlace(1, seed * 10, seed);
     const matchIds = matches.map((match) => match.id);
+    const entryIdsByRegistration = new Map(entries.map((entry) => [entry.registrationId, entry.id]));
+    entryRepository.save.mockClear();
 
     await service.assignPlace(1, 10, 4);
 
     expect(entries.find((entry) => entry.seed === 1)?.registrationId).toBe(40);
     expect(entries.find((entry) => entry.seed === 4)?.registrationId).toBe(10);
+    expect(entries.find((entry) => entry.registrationId === 10)?.id).toBe(entryIdsByRegistration.get(10));
+    expect(entries.find((entry) => entry.registrationId === 40)?.id).toBe(entryIdsByRegistration.get(40));
+    expect(entryRepository.save).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ registrationId: 10, seed: 4 }),
+      expect.objectContaining({ registrationId: 40, seed: 1 }),
+    ]));
     expect(matches.map((match) => match.id)).toEqual(matchIds);
     expect(matches[0]).toMatchObject({ homeRegistrationId: 40, awayRegistrationId: 30, status: MatchStatus.READY });
     expect(matches[1]).toMatchObject({ homeRegistrationId: 20, awayRegistrationId: 10, status: MatchStatus.READY });
