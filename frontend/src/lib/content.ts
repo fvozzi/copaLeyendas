@@ -19,8 +19,8 @@ export const sectionMeta: Record<
     intro: 'Jugadoras, referentes y nombres que hicieron historia en la pelota paleta.',
   },
   canchas: {
-    label: 'Canchas',
-    intro: 'Sedes, trinquetes y datos operativos para vivir el torneo en Buenos Aires.',
+    label: 'Sedes',
+    intro: 'Direcciones y datos para llegar a cada sede del torneo.',
   },
   torneos: {
     label: 'Torneos',

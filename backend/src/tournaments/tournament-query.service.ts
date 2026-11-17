@@ -98,7 +98,7 @@ export class TournamentQueryService {
     const [zones, matches, courts, slots, detail] = await Promise.all([
       this.zones.find({ where: { tournamentCategory: { tournamentId: tournament.id } }, relations: { venue: true, tournamentCategory: { category: true } }, order: { name: 'ASC' } }),
       this.matches.find({ where: { zone: { tournamentCategory: { tournamentId: tournament.id } } }, relations: { zone: { tournamentCategory: { category: true } }, homeRegistration: { locality: true }, awayRegistration: { locality: true }, scheduleSlot: { court: { venue: true } } }, order: { zoneId: 'ASC', matchOrder: 'ASC' } }),
-      this.courts.find({ where: { active: true }, relations: { venue: true }, order: { name: 'ASC' } }),
+      this.courts.find({ where: { active: true, venue: { active: true } }, relations: { venue: true }, order: { name: 'ASC' } }),
       this.matches.manager.getRepository(TournamentScheduleSlot).find({ where: { tournamentId: tournament.id }, relations: programRelations, order: { sequence: 'ASC' } }),
       this.detail(tournament.id),
     ]);
