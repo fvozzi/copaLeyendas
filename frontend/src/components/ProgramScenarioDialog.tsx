@@ -48,12 +48,22 @@ export function ProgramScenarioDialog({ tournamentId, courts, venues, onClose, o
           }
         }
       }
-      setDetail(data); setConfig({ mainDay, finalsDay, interleaveCategories: false, rules });
+      setDetail(data); setConfig({ mainDay, finalsDay, interleaveCategories: true, interleaveZones: true, rules });
     }).catch((reason: Error) => { if (current) setError(reason.message); });
     return () => { current = false; };
   }, [tournamentId]);
   const change = (next: ProgramScenario) => { setConfig(next); setPreview(null); setEditingTime(false); setError(null); };
   const changeRule = (key: string, patch: Partial<ProgramScenarioRule>) => { if (config) change({ ...config, rules: config.rules.map((rule) => keyOf(rule) === key ? { ...rule, ...patch } : rule) }); };
+  const changeCategoryWait = (rule: ProgramScenarioRule, startAfterCategoryId: number | null) => {
+    if (!config) return;
+    const date = rule.day === 'MAIN' ? config.mainDay : config.finalsDay;
+    change({ ...config, rules: config.rules.map((candidate) => candidate.stage === 'ZONE'
+      && candidate.categoryId === rule.categoryId
+      && candidate.venueId === rule.venueId
+      && (candidate.day === 'MAIN' ? config.mainDay : config.finalsDay) === date
+      ? { ...candidate, startAfterCategoryId }
+      : candidate) });
+  };
   const calculate = async (settings = config) => {
     if (!settings) return;
     setBusy(true); setError(null); setPreviewStale(true);
@@ -77,8 +87,11 @@ export function ProgramScenarioDialog({ tournamentId, courts, venues, onClose, o
       <div className="scenario-steps"><button className={step === 'config' ? 'is-selected' : ''} disabled={busy} onClick={() => { setEditingTime(false); setStep('config'); }}>1. Configuración</button><button className={step === 'preview' ? 'is-selected' : ''} disabled={!preview || busy} onClick={() => setStep('preview')}>2. Vista previa</button></div>
       {step === 'config' ? <>
         <div className="scenario-days"><label>Día principal<input type="date" value={config.mainDay} disabled={busy} onChange={(event) => change({ ...config, mainDay: event.target.value })} /></label><label>Día de finales<input type="date" min={config.mainDay} value={config.finalsDay} disabled={busy} onChange={(event) => change({ ...config, finalsDay: event.target.value })} /></label></div>
-        <label className="scenario-interleave"><input type="checkbox" checked={config.interleaveCategories} disabled={busy} onChange={(event) => change({ ...config, interleaveCategories: event.target.checked })} />Intercalar partidos por categoría en cada sede</label>
-        <p className="field-hint">Se reparte entre todas las canchas activas de cada sede. Podés fijar una cancha en cada zona o cruce. Se respetan los partidos previos y su duración; los turnos diarios son una referencia.</p>
+        <div className="scenario-interleave-options">
+          <label className="scenario-interleave"><input type="checkbox" checked={config.interleaveCategories} disabled={busy} onChange={(event) => change({ ...config, interleaveCategories: event.target.checked })} />Intercalar categorías en cada sede</label>
+          <label className="scenario-interleave"><input type="checkbox" checked={config.interleaveZones !== false} disabled={busy} onChange={(event) => change({ ...config, interleaveZones: event.target.checked })} />Intercalar zonas dentro de cada categoría</label>
+        </div>
+        <p className="field-hint">Se reparte entre todas las canchas activas de cada sede. Podés fijar una cancha en cada zona o cruce y, si hace falta, indicar que una categoría comience después de otra. Se respetan los partidos previos y su duración; los turnos diarios son una referencia.</p>
         {!!config.overrides?.length && <p className="field-hint">Hay {config.overrides.length} horarios manuales que se conservan al recalcular. <button className="inline-link" disabled={busy} onClick={() => change({ ...config, overrides: [] })}>Quitar horarios manuales</button></p>}
         <div className="scenario-filters"><label>Categoría<select aria-label="Categoría del escenario" value={categoryFilter} onChange={(event) => setCategoryFilter(Number(event.target.value))}><option value={0}>Todas</option>{detail.categories.map((category) => <option key={category.id} value={category.id}>{category.category.name}</option>)}</select></label><label>Sede<select aria-label="Sede del escenario" value={venueFilter} onChange={(event) => setVenueFilter(Number(event.target.value))}><option value={0}>Todas</option>{venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}</select></label></div>
         <p className="field-hint">Los filtros solo cambian lo que ves. Se calcula el torneo completo.</p>
@@ -87,10 +100,13 @@ export function ProgramScenarioDialog({ tournamentId, courts, venues, onClose, o
           {visibleRules.filter((rule) => rule.stage === stage).map((rule) => {
             const key = keyOf(rule), zone = detail.zones.find((zone) => zone.id === rule.zoneId);
             const label = `${categoryName(rule.categoryId)} · ${zone ? `Zona ${zone.name}` : `${title}${rule.stage === 'FINAL' ? '' : ` ${rule.matchOrder}`}`}`;
-            return <div className="scenario-rule" key={key}><strong>{categoryName(rule.categoryId)}<small>{zone ? `Zona ${zone.name} · ${zone.capacity} parejas` : `${title}${rule.stage === 'FINAL' ? '' : ` ${rule.matchOrder}`}`}</small></strong>
-              <label>Día<select aria-label={`Día: ${label}`} disabled={busy} value={rule.day} onChange={(event) => changeRule(key, { day: event.target.value as ProgramScenarioRule['day'] })}><option value="MAIN">Principal</option><option value="FINALS">Finales</option></select></label>
-              <label>Sede<select aria-label={`Sede: ${label}`} disabled={busy} value={rule.venueId} onChange={(event) => changeRule(key, { venueId: Number(event.target.value), courtId: null })}><option value={0}>Seleccionar sede</option>{venues.filter((venue) => venue.active || venue.id === rule.venueId).map((venue) => <option key={venue.id} value={venue.id} disabled={!venue.active}>{venue.name}</option>)}</select></label>
+            const ruleDate = rule.day === 'MAIN' ? config.mainDay : config.finalsDay;
+            const precedingCategories = detail.categories.filter((candidate) => candidate.id !== rule.categoryId && config.rules.some((other) => other.stage === 'ZONE' && other.categoryId === candidate.id && other.venueId === rule.venueId && (other.day === 'MAIN' ? config.mainDay : config.finalsDay) === ruleDate));
+            return <div className={`scenario-rule${zone ? ' has-delay' : ''}`} key={key}><strong>{categoryName(rule.categoryId)}<small>{zone ? `Zona ${zone.name} · ${zone.capacity} parejas` : `${title}${rule.stage === 'FINAL' ? '' : ` ${rule.matchOrder}`}`}</small></strong>
+              <label>Día<select aria-label={`Día: ${label}`} disabled={busy} value={rule.day} onChange={(event) => changeRule(key, { day: event.target.value as ProgramScenarioRule['day'], startAfterCategoryId: null })}><option value="MAIN">Principal</option><option value="FINALS">Finales</option></select></label>
+              <label>Sede<select aria-label={`Sede: ${label}`} disabled={busy} value={rule.venueId} onChange={(event) => changeRule(key, { venueId: Number(event.target.value), courtId: null, startAfterCategoryId: null })}><option value={0}>Seleccionar sede</option>{venues.filter((venue) => venue.active || venue.id === rule.venueId).map((venue) => <option key={venue.id} value={venue.id} disabled={!venue.active}>{venue.name}</option>)}</select></label>
               <label>Cancha<select aria-label={`Cancha: ${label}`} disabled={busy} value={rule.courtId ?? 0} onChange={(event) => changeRule(key, { courtId: Number(event.target.value) || null })}><option value={0}>Todas · repartir</option>{courts.filter((court) => court.venueId === rule.venueId && (court.active || court.id === rule.courtId)).map((court) => <option key={court.id} value={court.id} disabled={!court.active}>{court.name}</option>)}</select></label>
+              {zone && <label>Comenzar después de<select aria-label={`Comenzar después de: ${label}`} disabled={busy} value={rule.startAfterCategoryId ?? 0} onChange={(event) => changeCategoryWait(rule, Number(event.target.value) || null)}><option value={0}>Sin espera especial</option>{precedingCategories.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.category.name}</option>)}</select></label>}
             </div>;
           })}
         </section>)}

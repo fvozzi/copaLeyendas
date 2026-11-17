@@ -61,6 +61,15 @@ it('allows explicitly fixing a court without locking the other zones and knockou
   const rules = vi.mocked(previewProgramScenario).mock.calls[0][1].rules;
   expect(rules.filter((rule) => rule.courtId !== null)).toEqual([expect.objectContaining({ stage: 'ZONE', categoryId: 1, courtId: 1 })]);
 });
+it('allows a zone category to wait for another category at the same venue', async () => {
+  const waitingFor = container.querySelector<HTMLSelectElement>('[aria-label="Comenzar después de: Damas A · Zona A"]')!;
+  expect([...waitingFor.options].map((option) => option.textContent)).toContain('Damas B');
+  await act(async () => { waitingFor.value = '2'; waitingFor.dispatchEvent(new Event('change', { bubbles: true })); });
+  await click('Calcular vista previa');
+  const delayed = vi.mocked(previewProgramScenario).mock.calls[0][1].rules.filter((rule) => rule.stage === 'ZONE' && rule.categoryId === 1 && rule.venueId === 1);
+  expect(delayed).toHaveLength(2);
+  expect(delayed.every((rule) => rule.startAfterCategoryId === 2)).toBe(true);
+});
 it('invalidates the preview when a setting changes and keeps all rules when filtering', async () => {
   const filter = container.querySelector<HTMLSelectElement>('[aria-label="Categoría del escenario"]')!;
   await act(async () => { filter.value = '1'; filter.dispatchEvent(new Event('change', { bubbles: true })); });
@@ -68,10 +77,13 @@ it('invalidates the preview when a setting changes and keeps all rules when filt
   await click('Calcular vista previa');
   expect(vi.mocked(previewProgramScenario).mock.calls[0][1].rules).toHaveLength(22);
   await click('Ajustar escenario');
-  await act(async () => container.querySelector<HTMLInputElement>('[type="checkbox"]')!.click());
+  const interleave = container.querySelectorAll<HTMLInputElement>('.scenario-interleave input');
+  expect([...interleave].map((input) => input.checked)).toEqual([true, true]);
+  await act(async () => interleave[1].click());
   expect(button('Aplicar escenario')).toBeUndefined();
   await click('Calcular vista previa');
   expect(vi.mocked(previewProgramScenario).mock.calls[1][1].interleaveCategories).toBe(true);
+  expect(vi.mocked(previewProgramScenario).mock.calls[1][1].interleaveZones).toBe(false);
 });
 it('shows invalid times and prevents applying an incomplete scenario', async () => {
   vi.mocked(previewProgramScenario).mockResolvedValue({ ...result, warnings: [{ sequence: 1, message: 'No entra en la sede ese día.' }] });

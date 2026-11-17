@@ -22,6 +22,16 @@ export function simulateProgram(slots: TournamentScheduleSlot[], zones: Zone[], 
     if (!eligible.length || (rule.courtId && !eligible.some((c) => c.id === rule.courtId))) throw new BadRequestException('Seleccioná una cancha activa que pertenezca a la sede indicada.');
     rules.set(key, rule);
   }
+  const configuredDay = (rule: ProgramScenarioRuleDto) => rule.day === 'MAIN' ? config.mainDay : config.finalsDay;
+  for (const rule of rules.values()) {
+    if (!rule.startAfterCategoryId) continue;
+    if (rule.stage !== 'ZONE' || rule.startAfterCategoryId === rule.categoryId) throw new BadRequestException('La espera entre categorías solo puede configurarse en zonas y debe apuntar a otra categoría.');
+    const sourceExists = [...rules.values()].some((candidate) => candidate.stage === 'ZONE'
+      && candidate.categoryId === rule.startAfterCategoryId
+      && candidate.venueId === rule.venueId
+      && configuredDay(candidate) === configuredDay(rule));
+    if (!sourceExists) throw new BadRequestException('La categoría previa debe tener partidos de zona en la misma sede y el mismo día.');
+  }
   const items = slots.map((slot) => ({ ...slot, court: null, courtId: null, scheduledAt: null })) as TournamentScheduleSlot[];
   const ruleFor = (slot: TournamentScheduleSlot) => {
     const key = { categoryId: slot.tournamentCategoryId, stage: slot.stage, zoneId: slot.match?.zoneId ?? undefined };
@@ -33,10 +43,17 @@ export function simulateProgram(slots: TournamentScheduleSlot[], zones: Zone[], 
   const dependencies = new Map(items.map((slot) => {
     const match = slot.match;
     const zone = zones.find((z) => z.id === match?.zoneId);
+    const slotRule = ruleFor(slot);
     const sources = [match?.homeSourceMatchId, match?.awaySourceMatchId].filter(Boolean);
     const qualifiers = [match?.homeQualifierZoneId, match?.awayQualifierZoneId].filter(Boolean);
     const deps = items.filter((other) => {
       if (other.id === slot.id) return false;
+      if (slot.stage === 'ZONE' && slotRule.startAfterCategoryId && other.stage === 'ZONE') {
+        const otherRule = ruleFor(other);
+        if (other.tournamentCategoryId === slotRule.startAfterCategoryId
+          && otherRule.venueId === slotRule.venueId
+          && configuredDay(otherRule) === configuredDay(slotRule)) return true;
+      }
       if (sources.includes(other.matchId) || (other.stage === 'ZONE' && qualifiers.includes(other.match?.zoneId))) return true;
       // The final must wait for BOTH semifinals, including partially linked legacy fixtures.
       if (slot.stage === 'FINAL' && other.stage === 'SEMIFINAL' && other.tournamentCategoryId === slot.tournamentCategoryId) return true;
@@ -77,6 +94,7 @@ export function simulateProgram(slots: TournamentScheduleSlot[], zones: Zone[], 
   const occupied = new Map<number, { start: number; end: number; id: number }[]>();
   for (const [id, reservation] of manual) occupied.set(reservation.court.id, [...(occupied.get(reservation.court.id) ?? []), { ...reservation, id }]);
   const categoryCounts = new Map<string, number>();
+  const zoneCounts = new Map<string, number>();
   const warnings: { sequence: number; message: string }[] = [];
   const capacityWarnings: { sequence: number; message: string }[] = [];
   while (pending.size) {
@@ -85,8 +103,12 @@ export function simulateProgram(slots: TournamentScheduleSlot[], zones: Zone[], 
     const chosen = ready.sort((a, b) => {
       const ar = ruleFor(a), br = ruleFor(b);
       const dayA = ar.day === 'MAIN' ? config.mainDay : config.finalsDay, dayB = br.day === 'MAIN' ? config.mainDay : config.finalsDay;
-      const fairness = config.interleaveCategories ? (categoryCounts.get(`${ar.venueId}:${dayA}:${ar.categoryId}`) ?? 0) - (categoryCounts.get(`${br.venueId}:${dayB}:${br.categoryId}`) ?? 0) : ar.categoryId - br.categoryId;
-      return latestEnd(a) - latestEnd(b) || dayA.localeCompare(dayB) || ar.venueId - br.venueId || fairness || stages.indexOf(a.stage) - stages.indexOf(b.stage) || a.matchOrder - b.matchOrder || a.sequence - b.sequence;
+      const categoryFairness = config.interleaveCategories ? (categoryCounts.get(`${ar.venueId}:${dayA}:${ar.categoryId}`) ?? 0) - (categoryCounts.get(`${br.venueId}:${dayB}:${br.categoryId}`) ?? 0) : ar.categoryId - br.categoryId;
+      const sameCategoryZones = a.stage === 'ZONE' && b.stage === 'ZONE' && a.tournamentCategoryId === b.tournamentCategoryId;
+      const zoneFairness = !sameCategoryZones ? 0 : config.interleaveZones !== false
+        ? (zoneCounts.get(`${ar.venueId}:${dayA}:${a.match?.zoneId}`) ?? 0) - (zoneCounts.get(`${br.venueId}:${dayB}:${b.match?.zoneId}`) ?? 0)
+        : (a.match?.zoneId ?? 0) - (b.match?.zoneId ?? 0);
+      return latestEnd(a) - latestEnd(b) || dayA.localeCompare(dayB) || ar.venueId - br.venueId || categoryFairness || stages.indexOf(a.stage) - stages.indexOf(b.stage) || zoneFairness || a.matchOrder - b.matchOrder || a.sequence - b.sequence;
     })[0];
     const rule = ruleFor(chosen), deps = dependencies.get(chosen.id)!;
     const day = rule.day === 'MAIN' ? config.mainDay : config.finalsDay;
@@ -145,6 +167,10 @@ export function simulateProgram(slots: TournamentScheduleSlot[], zones: Zone[], 
     }
     const countKey = `${rule.venueId}:${day}:${rule.categoryId}`;
     categoryCounts.set(countKey, (categoryCounts.get(countKey) ?? 0) + 1);
+    if (chosen.stage === 'ZONE' && chosen.match?.zoneId) {
+      const zoneKey = `${rule.venueId}:${day}:${chosen.match.zoneId}`;
+      zoneCounts.set(zoneKey, (zoneCounts.get(zoneKey) ?? 0) + 1);
+    }
     pending.delete(chosen); completed.add(chosen.id);
   }
   for (const warning of programCapacityWarnings(items)) if (!capacityWarnings.some((item) => item.sequence === warning.sequence)) capacityWarnings.push(warning);

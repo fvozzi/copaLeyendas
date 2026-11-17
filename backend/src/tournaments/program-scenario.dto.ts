@@ -9,6 +9,7 @@ export class ProgramScenarioRuleDto {
   @IsInt() @Min(1) venueId: number;
   @IsOptional() @IsInt() @Min(1) courtId?: number | null;
   @IsIn(['MAIN', 'FINALS']) day: 'MAIN' | 'FINALS';
+  @IsOptional() @IsInt() @Min(1) startAfterCategoryId?: number | null;
 }
 export class ProgramMatchOverrideDto {
   @IsInt() @Min(1) sequence: number;
@@ -19,6 +20,7 @@ export class ProgramScenarioDto {
   @Matches(/^\d{4}-\d{2}-\d{2}$/) mainDay: string;
   @Matches(/^\d{4}-\d{2}-\d{2}$/) finalsDay: string;
   @IsBoolean() interleaveCategories: boolean;
+  @IsOptional() @IsBoolean() interleaveZones?: boolean;
   @IsArray() @ArrayMinSize(1) @ArrayMaxSize(2000) @ValidateNested({ each: true }) @Type(() => ProgramScenarioRuleDto) rules: ProgramScenarioRuleDto[];
   @IsOptional() @IsString() @Matches(/^[a-f0-9]{64}$/) baseVersion?: string;
   @IsOptional() @IsArray() @ArrayMaxSize(2000) @ValidateNested({ each: true }) @Type(() => ProgramMatchOverrideDto) overrides?: ProgramMatchOverrideDto[];

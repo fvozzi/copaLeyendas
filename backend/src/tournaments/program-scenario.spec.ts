@@ -10,7 +10,7 @@ function fixture() {
   const courts = [1, 2].map((id) => ({ id, venueId: 1, active: true, venue })) as Court[];
   const zones = [1, 2].map((id) => ({ id, name: 'A', capacity: 3, venueId: 1, tournamentCategoryId: id, venue })) as Zone[];
   const slots = zones.flatMap((zone) => [1, 2, 3].map((order) => ({ id: zone.id * 10 + order, matchId: zone.id * 10 + order, sequence: zone.id * 10 + order, matchOrder: order, stage: 'ZONE', tournamentCategoryId: zone.tournamentCategoryId, zoneName: zone.name, scheduledAt: new Date('2020-01-01'), courtId: 2, match: { id: zone.id * 10 + order, zoneId: zone.id, status: 'PENDING' } }))) as TournamentScheduleSlot[];
-  const config: ProgramScenarioDto = { mainDay: '2026-11-20', finalsDay: '2026-11-21', interleaveCategories: true, rules: zones.map((zone) => ({ categoryId: zone.tournamentCategoryId, stage: 'ZONE', zoneId: zone.id, venueId: 1, courtId: 1, day: 'MAIN' })) };
+  const config: ProgramScenarioDto = { mainDay: '2026-11-20', finalsDay: '2026-11-21', interleaveCategories: true, interleaveZones: true, rules: zones.map((zone) => ({ categoryId: zone.tournamentCategoryId, stage: 'ZONE', zoneId: zone.id, venueId: 1, courtId: 1, day: 'MAIN' })) };
   return { courts, zones, slots, config };
 }
 it('interleaves categories on a shared court, preserves inputs, and supports contiguous categories', () => {
@@ -22,6 +22,30 @@ it('interleaves categories on a shared court, preserves inputs, and supports con
   expect(chronological(result.slots)).toEqual([1, 2, 1, 2, 1, 2]);
   expect(chronological(simulateProgram(slots, zones, courts, { ...config, interleaveCategories: false }).slots)).toEqual([1, 1, 1, 2, 2, 2]);
   expect(slots).toEqual(before);
+});
+
+it('interleaves zones within the same category instead of scheduling one complete zone at a time', () => {
+  const { slots, zones, courts, config } = fixture();
+  zones[1].tournamentCategoryId = 1;
+  for (const slot of slots) slot.tournamentCategoryId = 1;
+  for (const rule of config.rules) rule.categoryId = 1;
+  config.interleaveCategories = false;
+  const chronologicalZones = (values: TournamentScheduleSlot[]) => [...values]
+    .sort((left, right) => left.scheduledAt!.getTime() - right.scheduledAt!.getTime())
+    .map((slot) => slot.match!.zoneId);
+
+  expect(chronologicalZones(simulateProgram(slots, zones, courts, config).slots)).toEqual([1, 2, 1, 2, 1, 2]);
+  expect(chronologicalZones(simulateProgram(slots, zones, courts, { ...config, interleaveZones: false }).slots)).toEqual([1, 1, 1, 2, 2, 2]);
+});
+
+it('can delay one category until all zone games of another category finish at that venue', () => {
+  const { slots, zones, courts, config } = fixture();
+  config.rules.find((rule) => rule.categoryId === 2)!.startAfterCategoryId = 1;
+  const chronologicalCategories = simulateProgram(slots, zones, courts, config).slots
+    .sort((left, right) => left.scheduledAt!.getTime() - right.scheduledAt!.getTime())
+    .map((slot) => slot.tournamentCategoryId);
+
+  expect(chronologicalCategories).toEqual([1, 1, 1, 2, 2, 2]);
 });
 
 it('balances sequential games across available courts even when both are free at the next start', () => {

@@ -364,9 +364,9 @@ export interface ZoneRegistrationPlacement {
   seed: number | null;
 }
 
-export interface ProgramScenarioRule { categoryId: number; stage: 'ZONE' | 'QUARTERFINAL' | 'SEMIFINAL' | 'FINAL'; zoneId?: number; matchOrder?: number; venueId: number; courtId?: number | null; day: 'MAIN' | 'FINALS'; }
+export interface ProgramScenarioRule { categoryId: number; stage: 'ZONE' | 'QUARTERFINAL' | 'SEMIFINAL' | 'FINAL'; zoneId?: number; matchOrder?: number; venueId: number; courtId?: number | null; day: 'MAIN' | 'FINALS'; startAfterCategoryId?: number | null; }
 export interface ProgramMatchOverride { sequence: number; courtId: number; scheduledAt: string; }
-export interface ProgramScenario { mainDay: string; finalsDay: string; interleaveCategories: boolean; rules: ProgramScenarioRule[]; baseVersion?: string; overrides?: ProgramMatchOverride[]; }
+export interface ProgramScenario { mainDay: string; finalsDay: string; interleaveCategories: boolean; interleaveZones?: boolean; rules: ProgramScenarioRule[]; baseVersion?: string; overrides?: ProgramMatchOverride[]; }
 export interface ProgramScenarioPreview { baseVersion: string; slots: TournamentScheduleSlot[]; warnings: { sequence: number; message: string }[]; capacityWarnings?: { sequence: number; message: string }[]; }
 export interface PublicStanding { registration: PairRegistration; played: number; wins: number; losses: number; pointsFor: number; pointsAgainst: number; tablePoints: number; }
 export interface PublicTournamentZone { id: number; name: string; category: string; venue: Venue; court?: Court; standings: PublicStanding[]; matches: TournamentMatch[]; }
