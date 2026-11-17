@@ -357,6 +357,7 @@ function setup(capacity = 4, methodology = ZoneMethodology.PROVINCE) {
     find: vi.fn(async ({ where }: any) => matches.filter((match) => (Array.isArray(where) ? where : [where]).some((condition) => Object.entries(condition).every(([key, value]) => match[key] === value)))),
     findOne: vi.fn(async ({ where }: any) => hydrateMatch(matches.find((match) => match.id === where.id) ?? null)),
     findOneBy: vi.fn(async ({ id }: any) => matches.find((match) => match.id === id) ?? null),
+    update: vi.fn(async (id: number, value: any) => Object.assign(matches.find((match) => match.id === id), value)),
     create: vi.fn((value) => ({ homeRegistrationId: null, awayRegistrationId: null, homeScore: null, awayScore: null, homeSource: ParticipantSource.DIRECT, awaySource: ParticipantSource.DIRECT, ...value })),
     save: vi.fn(async (value: any): Promise<any> => {
       if (Array.isArray(value)) return Promise.all(value.map((item) => matchRepository.save(item)));

@@ -960,9 +960,20 @@ export class TournamentsService {
             if (!match) continue;
             const home = participant(definition.home), away = participant(definition.away);
             const status = home.registrationId && away.registrationId ? MatchStatus.READY : MatchStatus.PENDING;
-            if (match.homeSource !== home.source || match.homeRegistrationId !== home.registrationId || match.homeSourceMatchId !== home.sourceMatchId
+            const matchChanged = match.homeSource !== home.source || match.homeRegistrationId !== home.registrationId || match.homeSourceMatchId !== home.sourceMatchId
               || match.awaySource !== away.source || match.awayRegistrationId !== away.registrationId || match.awaySourceMatchId !== away.sourceMatchId
-              || match.status !== status) changed = true;
+              || match.status !== status;
+            if (matchChanged) {
+              changed = true;
+              // Use an explicit column update: these matches were loaded with
+              // registration relations and save() would re-persist the stale
+              // relation after clearing its foreign key for a dynamic source.
+              await repository.update(match.id, {
+                homeSource: home.source, homeRegistrationId: home.registrationId, homeSourceMatchId: home.sourceMatchId,
+                awaySource: away.source, awayRegistrationId: away.registrationId, awaySourceMatchId: away.sourceMatchId,
+                status,
+              });
+            }
             match.homeSource = home.source;
             match.homeRegistrationId = home.registrationId;
             match.homeSourceMatchId = home.sourceMatchId;
@@ -972,7 +983,6 @@ export class TournamentsService {
             match.status = status;
           }
           if (changed) {
-            await repository.save(existing);
             existing = await repository.find({ where: { zoneId }, relations: { homeRegistration: true, awayRegistration: true }, order: { matchOrder: 'ASC' } });
           }
         }
