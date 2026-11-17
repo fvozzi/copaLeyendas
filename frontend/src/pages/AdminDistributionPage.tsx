@@ -116,12 +116,18 @@ export function AdminDistributionPage() {
     </div>
     <section className="data-card distribution-rules">
       <div><h2>Asignación de parejas a zonas</h2><p>Definí la sede de cada zona y revisá cómo quedan agrupadas las parejas. Los partidos se crean recién al aplicar la vista previa.</p></div>
-      <ol>{(distribution?.rules ?? [
-        'Dirección puede configurar hasta cuatro zonas de 3 o 4 parejas.',
-        'Se pueden reservar lugares para futuras parejas confirmadas.',
-        'Sin una configuración manual, el sistema calcula el esquema automáticamente.',
-        'Las parejas de la misma localidad comparten sede, pero no zona.',
-      ]).map((rule) => <li key={rule}>{rule}</li>)}</ol>
+      <details className="distribution-help">
+        <summary><span aria-hidden="true">?</span> Cómo funciona</summary>
+        <div className="distribution-help-popover">
+          <strong>Reglas del armado</strong>
+          <ol>{(distribution?.rules ?? [
+            'Dirección puede configurar hasta cuatro zonas de 3 o 4 parejas.',
+            'Se pueden reservar lugares para futuras parejas confirmadas.',
+            'Sin una configuración manual, el sistema calcula el esquema automáticamente.',
+            'Las parejas de la misma localidad comparten sede, pero no zona.',
+          ]).map((rule) => <li key={rule}>{rule}</li>)}</ol>
+        </div>
+      </details>
     </section>
     <div className="distribution-toolbar">
       <label>Torneo<select value={tournamentId} onChange={(event) => setTournamentId(Number(event.target.value))}><option value="0">Seleccionar</option>{tournaments.map((tournament) => <option key={tournament.id} value={tournament.id}>{tournament.name}</option>)}</select></label>
