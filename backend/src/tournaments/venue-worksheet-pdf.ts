@@ -13,8 +13,10 @@ export interface VenueWorksheetTeam {
 export interface VenueWorksheetMatch {
   sequence: number;
   matchOrder: number;
-  home: string;
-  away: string;
+  homeTeam: string;
+  homePlayers: string;
+  awayTeam: string;
+  awayPlayers: string;
   homeSource: string;
   awaySource: string;
   homeScore: number | null;
@@ -141,33 +143,45 @@ function drawZoneCard(doc: PDFKit.PDFDocument, zone: VenueWorksheetZone, categor
   doc.fillColor(colors.teal).font('Helvetica-Bold').fontSize(8).text('PARTIDOS Y RESULTADOS', innerX, cursor);
   cursor += 14;
   for (const match of zone.matches) {
-    const rowHeight = 30;
+    const rowHeight = 40;
     doc.save().rect(innerX, cursor, innerW, rowHeight).fillAndStroke(colors.paper, colors.line).restore();
     doc.fillColor(colors.muted).font('Helvetica-Bold').fontSize(7).text(`P${match.sequence}`, innerX + 5, cursor + 4, { width: 32 });
     doc.font('Helvetica').fontSize(5.4).text(`${formatDate(match.scheduledAt)} · ${match.court || 'Cancha a definir'}`, innerX + 5, cursor + 17, { width: 128 });
     const nameX = innerX + 136;
     const scoreW = 30;
-    const nameW = (innerW - 136 - scoreW * 2 - 18) / 2;
-    doc.fillColor(colors.ink).font('Helvetica-Bold').fontSize(6.8).text(fitText(doc, match.home, nameW - 6, 6.8), nameX, cursor + 7, { width: nameW, lineBreak: false });
-    cell(doc, nameX + nameW, cursor + 4, scoreW, 22, match.homeScore === null ? '' : String(match.homeScore), { bold: true, align: 'center', fill: colors.orangePale, size: 9 });
-    doc.fillColor(colors.muted).font('Helvetica-Bold').fontSize(8).text('-', nameX + nameW + scoreW + 4, cursor + 11, { width: 10, align: 'center' });
-    cell(doc, nameX + nameW + scoreW + 18, cursor + 4, scoreW, 22, match.awayScore === null ? '' : String(match.awayScore), { bold: true, align: 'center', fill: colors.tealPale, size: 9 });
-    doc.fillColor(colors.ink).font('Helvetica-Bold').fontSize(6.8).text(fitText(doc, match.away, nameW - 6, 6.8), nameX + nameW + scoreW * 2 + 24, cursor + 7, { width: nameW, lineBreak: false });
+    const nameW = (innerW - 136 - scoreW * 2 - 24) / 2;
+    drawMatchTeam(doc, match.homeTeam, match.homePlayers, nameX, cursor, nameW, rowHeight);
+    cell(doc, nameX + nameW, cursor + 6, scoreW, 28, match.homeScore === null ? '' : String(match.homeScore), { bold: true, align: 'center', fill: colors.orangePale, size: 9 });
+    doc.fillColor(colors.muted).font('Helvetica-Bold').fontSize(8).text('-', nameX + nameW + scoreW + 4, cursor + 16, { width: 10, align: 'center' });
+    cell(doc, nameX + nameW + scoreW + 18, cursor + 6, scoreW, 28, match.awayScore === null ? '' : String(match.awayScore), { bold: true, align: 'center', fill: colors.tealPale, size: 9 });
+    drawMatchTeam(doc, match.awayTeam, match.awayPlayers, nameX + nameW + scoreW * 2 + 24, cursor, nameW, rowHeight);
     cursor += rowHeight + 2;
   }
 }
 
+function drawMatchTeam(doc: PDFKit.PDFDocument, team: string, players: string, x: number, y: number, width: number, height: number) {
+  const teamSize = 6.8;
+  const playersSize = 6.1;
+  const hasPlayers = Boolean(players.trim());
+  const teamY = y + (hasPlayers ? 7 : (height - teamSize) / 2 - 1);
+  doc.fillColor(colors.ink).font('Helvetica-Bold').fontSize(teamSize)
+    .text(fitText(doc, team, width - 6, teamSize), x, teamY, { width, lineBreak: false });
+  if (hasPlayers) {
+    doc.fillColor(colors.muted).font('Helvetica').fontSize(playersSize)
+      .text(fitText(doc, players, width - 6, playersSize), x, y + 22, { width, lineBreak: false });
+  }
+}
+
 function drawZonePages(doc: PDFKit.PDFDocument, data: VenueWorksheetData, category: VenueWorksheetCategory, logoPath?: string) {
-  for (let start = 0; start < category.zones.length; start += 4) {
-    const zones = category.zones.slice(start, start + 4);
+  for (let start = 0; start < category.zones.length; start += 2) {
+    const zones = category.zones.slice(start, start + 2);
     addPage(doc);
     sectionTitle(doc, `${category.name} · Zonas`, `Sede ${data.venueName} · completar resultados y posición final de cada zona.`);
     const top = 150;
     const gap = 14;
     const cardW = (doc.page.width - 68 - gap) / 2;
-    const rows = Math.ceil(zones.length / 2);
-    const cardH = rows === 1 ? 620 : 323;
-    zones.forEach((zone, index) => drawZoneCard(doc, zone, category.name, 34 + (index % 2) * (cardW + gap), top + Math.floor(index / 2) * (cardH + gap), cardW, cardH));
+    const cardH = 620;
+    zones.forEach((zone, index) => drawZoneCard(doc, zone, category.name, 34 + index * (cardW + gap), top, cardW, cardH));
   }
 }
 

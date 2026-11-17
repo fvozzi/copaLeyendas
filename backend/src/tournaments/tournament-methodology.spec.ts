@@ -19,15 +19,25 @@ describe('zoneMatchDefinitions', () => {
     ]);
   });
 
-  it('creates every pairing once for all against all', () => {
-    expect(zoneMatchDefinitions(4, ZoneMethodology.ROUND_ROBIN).map((match) => [match.home, match.away])).toEqual([
-      [{ source: 'DIRECT', seed: 1 }, { source: 'DIRECT', seed: 2 }],
-      [{ source: 'DIRECT', seed: 1 }, { source: 'DIRECT', seed: 3 }],
-      [{ source: 'DIRECT', seed: 1 }, { source: 'DIRECT', seed: 4 }],
-      [{ source: 'DIRECT', seed: 2 }, { source: 'DIRECT', seed: 3 }],
-      [{ source: 'DIRECT', seed: 2 }, { source: 'DIRECT', seed: 4 }],
-      [{ source: 'DIRECT', seed: 3 }, { source: 'DIRECT', seed: 4 }],
+  it('delays the decisive all-against-all games in zones of four', () => {
+    expect(zoneMatchDefinitions(4, ZoneMethodology.ROUND_ROBIN)).toEqual([
+      { order: 1, home: { source: 'DIRECT', seed: 1 }, away: { source: 'DIRECT', seed: 2 } },
+      { order: 2, home: { source: 'DIRECT', seed: 3 }, away: { source: 'DIRECT', seed: 4 } },
+      { order: 3, home: { source: 'WINNER', matchOrder: 1 }, away: { source: 'LOSER', matchOrder: 2 } },
+      { order: 4, home: { source: 'LOSER', matchOrder: 1 }, away: { source: 'WINNER', matchOrder: 2 } },
+      { order: 5, home: { source: 'LOSER', matchOrder: 1 }, away: { source: 'LOSER', matchOrder: 2 } },
+      { order: 6, home: { source: 'WINNER', matchOrder: 1 }, away: { source: 'WINNER', matchOrder: 2 } },
     ]);
+  });
+
+  it('still produces each pairing exactly once regardless of the first two winners', () => {
+    const definitions = zoneMatchDefinitions(4, ZoneMethodology.ROUND_ROBIN);
+    for (const winnerOne of [1, 2]) for (const winnerTwo of [3, 4]) {
+      const result = new Map([[1, { winner: winnerOne, loser: winnerOne === 1 ? 2 : 1 }], [2, { winner: winnerTwo, loser: winnerTwo === 3 ? 4 : 3 }]]);
+      const participant = (side: (typeof definitions)[number]['home']) => side.source === 'DIRECT' ? side.seed : result.get(side.matchOrder)![side.source === 'WINNER' ? 'winner' : 'loser'];
+      const pairings = definitions.map((match) => [participant(match.home), participant(match.away)].sort().join('-')).sort();
+      expect(pairings).toEqual(['1-2', '1-3', '1-4', '2-3', '2-4', '3-4']);
+    }
   });
 });
 

@@ -32,6 +32,16 @@ export function zoneMatchDefinitions(capacity: number, methodology: ZoneMethodol
           { order: 4, home: winner(2), away: loser(1) },
         ];
   }
+  if (capacity === 4) {
+    return [
+      { order: 1, home: direct(1), away: direct(2) },
+      { order: 2, home: direct(3), away: direct(4) },
+      { order: 3, home: winner(1), away: loser(2) },
+      { order: 4, home: loser(1), away: winner(2) },
+      { order: 5, home: loser(1), away: loser(2) },
+      { order: 6, home: winner(1), away: winner(2) },
+    ];
+  }
   const definitions: ZoneMatchDefinition[] = [];
   let order = 1;
   for (let home = 1; home <= capacity; home += 1) for (let away = home + 1; away <= capacity; away += 1) {

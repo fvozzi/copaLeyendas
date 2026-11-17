@@ -43,11 +43,16 @@ export class TournamentVenuePdfService {
 
     const sequenceByMatch = new Map(allSlots.flatMap((slot) => slot.matchId ? [[slot.matchId, slot.sequence] as const] : []));
     const zoneById = new Map(venueZones.map((zone) => [zone.id, zone]));
-    const teamName = (registration: PairRegistration | null | undefined) => {
+    const teamTitle = (registration: PairRegistration | null | undefined) => {
       if (!registration) return '';
       const players = playerNames(registration);
       const team = registration.representingText?.trim();
-      return team && !players.toLocaleLowerCase('es').includes(team.toLocaleLowerCase('es')) ? `${team} · ${players}` : players;
+      if (team && !players.toLocaleLowerCase('es').includes(team.toLocaleLowerCase('es'))) return team;
+      return [registration.locality?.name, registration.locality?.provinceName].filter(Boolean).join(', ') || team || 'Pareja';
+    };
+    const teamName = (registration: PairRegistration | null | undefined) => {
+      if (!registration) return '';
+      return [teamTitle(registration), playerNames(registration)].filter(Boolean).join(' · ');
     };
     const sourceLabel = (slot: TournamentScheduleSlot, side: 'home' | 'away') => {
       const match = slot.match;
@@ -66,20 +71,26 @@ export class TournamentVenuePdfService {
       }
       return 'A definir';
     };
-    const worksheetMatch = (slot: TournamentScheduleSlot): VenueWorksheetMatch => ({
-      sequence: slot.sequence,
-      matchOrder: slot.matchOrder,
-      home: teamName(slot.match?.homeRegistration) || sourceLabel(slot, 'home'),
-      away: teamName(slot.match?.awayRegistration) || sourceLabel(slot, 'away'),
-      homeSource: sourceLabel(slot, 'home'),
-      awaySource: sourceLabel(slot, 'away'),
-      homeScore: slot.match?.homeScore ?? null,
-      awayScore: slot.match?.awayScore ?? null,
-      court: slot.court?.name ?? '',
-      venue: slot.court?.venue?.name ?? '',
-      scheduledAt: slot.scheduledAt,
-      atWorksheetVenue: slot.court?.venueId === venueId,
-    });
+    const worksheetMatch = (slot: TournamentScheduleSlot): VenueWorksheetMatch => {
+      const home = slot.match?.homeRegistration;
+      const away = slot.match?.awayRegistration;
+      return {
+        sequence: slot.sequence,
+        matchOrder: slot.matchOrder,
+        homeTeam: teamTitle(home) || sourceLabel(slot, 'home'),
+        homePlayers: home ? playerNames(home) : '',
+        awayTeam: teamTitle(away) || sourceLabel(slot, 'away'),
+        awayPlayers: away ? playerNames(away) : '',
+        homeSource: sourceLabel(slot, 'home'),
+        awaySource: sourceLabel(slot, 'away'),
+        homeScore: slot.match?.homeScore ?? null,
+        awayScore: slot.match?.awayScore ?? null,
+        court: slot.court?.name ?? '',
+        venue: slot.court?.venue?.name ?? '',
+        scheduledAt: slot.scheduledAt,
+        atWorksheetVenue: slot.court?.venueId === venueId,
+      };
+    };
 
     const categories: VenueWorksheetCategory[] = [...categoryIds].map((categoryId) => {
       const categoryZones = venueZones.filter((zone) => zone.tournamentCategoryId === categoryId);

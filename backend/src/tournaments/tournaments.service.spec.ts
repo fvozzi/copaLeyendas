@@ -628,14 +628,25 @@ describe('fixtures with unassigned places', () => {
     expect(entries.map((entry) => entry.seed)).toEqual([1, 2, 3]);
   });
 
-  it('generates every direct pairing with the all-against-all methodology', async () => {
+  it('generates a balanced all-against-all fixture and resolves its four final games', async () => {
     const { service, matches } = setup(4, ZoneMethodology.ROUND_ROBIN);
     await service.fixture(1);
     for (let seed = 1; seed <= 4; seed++) await service.assignPlace(1, seed * 10, seed);
     expect(matches).toHaveLength(6);
     expect(matches.map((match) => [match.homeRegistrationId, match.awayRegistrationId])).toEqual([
-      [10, 20], [10, 30], [10, 40], [20, 30], [20, 40], [30, 40],
+      [10, 20], [30, 40], [null, null], [null, null], [null, null], [null, null],
     ]);
-    expect(matches.every((match) => match.status === MatchStatus.READY)).toBe(true);
+    expect(matches.slice(0, 2).every((match) => match.status === MatchStatus.READY)).toBe(true);
+    expect(matches.slice(2).every((match) => match.status === MatchStatus.PENDING)).toBe(true);
+
+    await startFixtureMatch(service, matches[0].id);
+    await service.result(matches[0].id, 25, 10, director);
+    await startFixtureMatch(service, matches[1].id);
+    await service.result(matches[1].id, 10, 25, director);
+
+    expect(matches.slice(2).map((match) => [match.homeRegistrationId, match.awayRegistrationId])).toEqual([
+      [10, 30], [20, 40], [20, 30], [10, 40],
+    ]);
+    expect(matches.slice(2).every((match) => match.status === MatchStatus.READY)).toBe(true);
   });
 });
