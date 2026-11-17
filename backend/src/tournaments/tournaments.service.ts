@@ -939,12 +939,46 @@ export class TournamentsService {
   private async fixtureInManager(manager: EntityManager, zone: Zone) {
       const zoneId = zone.id;
       const repository = manager.getRepository(TournamentMatch);
-      const existing = await repository.find({ where: { zoneId }, relations: { homeRegistration: true, awayRegistration: true }, order: { matchOrder: 'ASC' } });
-      // Repeated clicks must not erase scheduled games or results.
-      if (existing.length) return this.linkZoneMatches(manager, zone, existing);
-      if (![3, 4].includes(zone.capacity)) throw new BadRequestException('El cupo de la zona debe ser de 3 o 4 parejas');
+      let existing = await repository.find({ where: { zoneId }, relations: { homeRegistration: true, awayRegistration: true }, order: { matchOrder: 'ASC' } });
       const category = await manager.getRepository(TournamentCategory).findOneBy({ id: zone.tournamentCategoryId });
       if (!category) throw new NotFoundException('Categoria no encontrada');
+      // Repeated clicks must not erase scheduled games or results.
+      if (existing.length) {
+        const definitions = zoneMatchDefinitions(zone.capacity, category.methodology ?? ZoneMethodology.PROVINCE);
+        const canReconcile = existing.length === definitions.length
+          && existing.every((match) => ![MatchStatus.IN_PROGRESS, MatchStatus.PLAYED].includes(match.status));
+        if (canReconcile) {
+          const entries = await this.orderedEntries(manager, zoneId);
+          const positions = new Map(entries.map((entry) => [entry.seed, entry.registrationId]));
+          const matchesByOrder = new Map(existing.map((match) => [match.matchOrder, match]));
+          const participant = (definition: ZoneParticipantDefinition) => definition.source === 'DIRECT'
+            ? { source: ParticipantSource.DIRECT, registrationId: positions.get(definition.seed) ?? null, sourceMatchId: null }
+            : { source: definition.source === 'WINNER' ? ParticipantSource.WINNER : ParticipantSource.LOSER, registrationId: null, sourceMatchId: matchesByOrder.get(definition.matchOrder)?.id ?? null };
+          let changed = false;
+          for (const definition of definitions) {
+            const match = matchesByOrder.get(definition.order);
+            if (!match) continue;
+            const home = participant(definition.home), away = participant(definition.away);
+            const status = home.registrationId && away.registrationId ? MatchStatus.READY : MatchStatus.PENDING;
+            if (match.homeSource !== home.source || match.homeRegistrationId !== home.registrationId || match.homeSourceMatchId !== home.sourceMatchId
+              || match.awaySource !== away.source || match.awayRegistrationId !== away.registrationId || match.awaySourceMatchId !== away.sourceMatchId
+              || match.status !== status) changed = true;
+            match.homeSource = home.source;
+            match.homeRegistrationId = home.registrationId;
+            match.homeSourceMatchId = home.sourceMatchId;
+            match.awaySource = away.source;
+            match.awayRegistrationId = away.registrationId;
+            match.awaySourceMatchId = away.sourceMatchId;
+            match.status = status;
+          }
+          if (changed) {
+            await repository.save(existing);
+            existing = await repository.find({ where: { zoneId }, relations: { homeRegistration: true, awayRegistration: true }, order: { matchOrder: 'ASC' } });
+          }
+        }
+        return this.linkZoneMatches(manager, zone, existing);
+      }
+      if (![3, 4].includes(zone.capacity)) throw new BadRequestException('El cupo de la zona debe ser de 3 o 4 parejas');
       const entries = await this.orderedEntries(manager, zoneId);
       const positions = new Map(entries.map((entry) => [entry.seed, entry.registrationId]));
       const planned = await manager.getRepository(TournamentScheduleSlot).find({ where: { tournamentCategoryId: zone.tournamentCategoryId, zoneName: zone.name, stage: 'ZONE' } });

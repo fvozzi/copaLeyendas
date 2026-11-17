@@ -358,7 +358,8 @@ function setup(capacity = 4, methodology = ZoneMethodology.PROVINCE) {
     findOne: vi.fn(async ({ where }: any) => hydrateMatch(matches.find((match) => match.id === where.id) ?? null)),
     findOneBy: vi.fn(async ({ id }: any) => matches.find((match) => match.id === id) ?? null),
     create: vi.fn((value) => ({ homeRegistrationId: null, awayRegistrationId: null, homeScore: null, awayScore: null, homeSource: ParticipantSource.DIRECT, awaySource: ParticipantSource.DIRECT, ...value })),
-    save: vi.fn(async (value) => {
+    save: vi.fn(async (value: any): Promise<any> => {
+      if (Array.isArray(value)) return Promise.all(value.map((item) => matchRepository.save(item)));
       const saved = { ...value, id: value.id ?? matches.length + 1 };
       const index = matches.findIndex((match) => match.id === saved.id);
       if (index < 0) matches.push(saved); else matches[index] = saved;
@@ -648,5 +649,33 @@ describe('fixtures with unassigned places', () => {
       [10, 30], [20, 40], [20, 30], [10, 40],
     ]);
     expect(matches.slice(2).every((match) => match.status === MatchStatus.READY)).toBe(true);
+  });
+
+  it('upgrades a legacy direct round-robin fixture without replacing its games or schedules', async () => {
+    const { service, matches } = setup(4, ZoneMethodology.ROUND_ROBIN);
+    await service.fixture(1);
+    for (let seed = 1; seed <= 4; seed++) await service.assignPlace(1, seed * 10, seed);
+    const ids = matches.map((match) => match.id);
+    const schedules = matches.map((match) => match.scheduledAt);
+    const legacyPairings = [[10, 20], [10, 30], [10, 40], [20, 30], [20, 40], [30, 40]];
+    matches.forEach((match, index) => Object.assign(match, {
+      homeSource: ParticipantSource.DIRECT,
+      awaySource: ParticipantSource.DIRECT,
+      homeSourceMatchId: null,
+      awaySourceMatchId: null,
+      homeRegistrationId: legacyPairings[index][0],
+      awayRegistrationId: legacyPairings[index][1],
+      status: MatchStatus.READY,
+    }));
+
+    await service.fixture(1);
+
+    expect(matches.map((match) => match.id)).toEqual(ids);
+    expect(matches.map((match) => match.scheduledAt)).toEqual(schedules);
+    expect(matches.map((match) => [match.homeRegistrationId, match.awayRegistrationId])).toEqual([
+      [10, 20], [30, 40], [null, null], [null, null], [null, null], [null, null],
+    ]);
+    expect(matches[2]).toMatchObject({ homeSource: ParticipantSource.WINNER, homeSourceMatchId: matches[0].id, awaySource: ParticipantSource.LOSER, awaySourceMatchId: matches[1].id, status: MatchStatus.PENDING });
+    expect(matches[5]).toMatchObject({ homeSource: ParticipantSource.WINNER, homeSourceMatchId: matches[0].id, awaySource: ParticipantSource.WINNER, awaySourceMatchId: matches[1].id, status: MatchStatus.PENDING });
   });
 });
