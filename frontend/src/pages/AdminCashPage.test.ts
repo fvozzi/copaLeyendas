@@ -2,11 +2,11 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { AdminCashPage } from './AdminCashPage';
-import { createCashExpense, createCashIncome, getCash, updateCashExpense, updateCashIncome } from '../lib/api';
+import { createCashExpense, createCashIncome, getCash, updateCashExpense, updateCashIncome, updateRegistrationCashIncome } from '../lib/api';
 import type { CashSummary } from '../types';
 
 vi.mock('../lib/api', () => ({ getCash: vi.fn(), createCashIncome: vi.fn(), updateCashIncome: vi.fn(), deleteCashIncome: vi.fn(),
-  createCashExpense: vi.fn(), updateCashExpense: vi.fn(), deleteCashExpense: vi.fn(), openRegistrationPaymentProof: vi.fn() }));
+  createCashExpense: vi.fn(), updateCashExpense: vi.fn(), deleteCashExpense: vi.fn(), openRegistrationPaymentProof: vi.fn(), updateRegistrationCashIncome: vi.fn() }));
 
 let root: Root;
 let container: HTMLDivElement;
@@ -84,6 +84,21 @@ it('creates a projected sponsor income and can realize both kinds of movement', 
   const expenseRow = container.querySelector('#cash-panel-expenses tbody tr')!;
   await act(async () => ([...expenseRow.querySelectorAll('button')].find(button => button.textContent === 'Efectivizar') as HTMLButtonElement).click());
   expect(updateCashExpense).toHaveBeenCalledWith(4, { status: 'REALIZED', occurredAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) });
+});
+
+it('edits the amount and collection date of a registration income', async () => {
+  await render();
+  const registrationRow = [...container.querySelectorAll('#cash-panel-incomes tbody tr')].find(row => row.textContent?.includes('Junín'))!;
+  await act(async () => ([...registrationRow.querySelectorAll('button')].find(button => button.textContent === 'Editar') as HTMLButtonElement).click());
+  const form = document.querySelector('[role="dialog"] form') as HTMLFormElement;
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Editar ingreso de inscripción');
+  expect((form.querySelector('input') as HTMLInputElement).disabled).toBe(true);
+  const amount = form.querySelector<HTMLInputElement>('input[type="number"]')!;
+  const date = form.querySelector<HTMLInputElement>('input[type="date"]')!;
+  await type(amount, '28000');
+  await type(date, '2026-09-18');
+  await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+  expect(updateRegistrationCashIncome).toHaveBeenCalledWith(1, { amount: 28000, occurredAt: '2026-09-18' });
 });
 
 it('creates an expense projection from its tab', async () => {

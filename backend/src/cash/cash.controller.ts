@@ -22,6 +22,10 @@ class ExpenseDto extends MovementDatesDto {
   @IsInt() @Min(0) unitPrice: number;
 }
 class UpdateIncomeDto extends PartialType(IncomeDto) {}
+class UpdateRegistrationIncomeDto {
+  @IsOptional() @IsInt() @Min(1) @Max(2_147_483_647) amount?: number;
+  @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) occurredAt?: string;
+}
 class UpdateExpenseDto extends PartialType(ExpenseDto) {}
 
 @Controller('cash')
@@ -35,6 +39,7 @@ export class CashController {
   @Post('incomes') income(@Body() dto: IncomeDto) { return this.cash.createIncome(dto); }
   @Patch('incomes/:id') updateIncome(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateIncomeDto) { return this.cash.updateIncome(id, dto); }
   @Delete('incomes/:id') removeIncome(@Param('id', ParseIntPipe) id: number) { return this.cash.removeIncome(id); }
+  @Patch('registration-incomes/:id') updateRegistrationIncome(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateRegistrationIncomeDto) { return this.cash.updateRegistrationIncome(id, dto); }
 
   @Post('expenses') expense(@Body() dto: ExpenseDto) { return this.cash.createExpense(dto); }
   @Patch('expenses/:id') updateExpense(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateExpenseDto) { return this.cash.updateExpense(id, dto); }

@@ -24,7 +24,7 @@ import type {
   PlayerPayload,
   PublicTeamCuilRoster,
   Category, CategoryPayload, Court, CourtPayload, Venue, VenuePayload,
-  Tournament, TournamentPayload, TournamentDetail, TournamentMatch, ZoneDetail, ZoneRegistrationPlacement, AdminUser, AdminUserPayload, CashExpense, CashExpensePayload, CashIncomePayload, CashSummary, TournamentScheduleSlot,
+  Tournament, TournamentPayload, TournamentDetail, TournamentMatch, ZoneDetail, ZoneRegistrationPlacement, AdminUser, AdminUserPayload, CashExpense, CashExpensePayload, CashIncomePayload, CashSummary, RegistrationCashIncomePayload, TournamentScheduleSlot,
   ActivityLogPage, TournamentOperations, VenuePlayerRosterItem, ZoneMethodology,
 } from '../types';
 
@@ -279,6 +279,7 @@ export function getCash() { return request<CashSummary>('/cash', {}, true); }
 export function updateCashFee(feePerPlayer: number) { return request<{ id: number; feePerPlayer: number }>('/cash/fee', { method: 'PATCH', body: JSON.stringify({ feePerPlayer }) }, true); }
 export function createCashIncome(payload: CashIncomePayload) { return request<{ id: number }>('/cash/incomes', { method: 'POST', body: JSON.stringify(payload) }, true); }
 export function updateCashIncome(id: number, payload: Partial<CashIncomePayload>) { return request<{ id: number }>(`/cash/incomes/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true); }
+export function updateRegistrationCashIncome(id: number, payload: RegistrationCashIncomePayload) { return request<{ id: number }>(`/cash/registration-incomes/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true); }
 export function deleteCashIncome(id: number) { return request<{ success: boolean }>(`/cash/incomes/${id}`, { method: 'DELETE' }, true); }
 export function createCashExpense(payload: CashExpensePayload) { return request<CashExpense>('/cash/expenses', { method: 'POST', body: JSON.stringify(payload) }, true); }
 export function updateCashExpense(id: number, payload: Partial<CashExpensePayload>) { return request<CashExpense>(`/cash/expenses/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, true); }

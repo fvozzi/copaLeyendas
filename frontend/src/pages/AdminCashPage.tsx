@@ -4,7 +4,7 @@ import { AdminDialog } from '../components/AdminDialog';
 import { CashProjectionChart } from '../components/CashProjectionChart';
 import {
   createCashExpense, createCashIncome, deleteCashExpense, deleteCashIncome, getCash,
-  openRegistrationPaymentProof, updateCashExpense, updateCashIncome,
+  openRegistrationPaymentProof, updateCashExpense, updateCashIncome, updateRegistrationCashIncome,
 } from '../lib/api';
 import type { CashExpense, CashExpensePayload, CashIncome, CashIncomePayload, CashStatus, CashSummary } from '../types';
 
@@ -22,6 +22,7 @@ export function AdminCashPage() {
   const [income, setIncome] = useState<CashIncomePayload>(initialIncome);
   const [expense, setExpense] = useState<CashExpensePayload>(initialExpense);
   const [editingIncomeId, setEditingIncomeId] = useState<number | null>(null);
+  const [editingRegistrationIncomeId, setEditingRegistrationIncomeId] = useState<number | null>(null);
   const [editingExpenseId, setEditingExpenseId] = useState<number | null>(null);
   const [dialog, setDialog] = useState<'income' | 'expense' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +37,7 @@ export function AdminCashPage() {
   useEffect(() => { void load(); }, []);
 
   const openIncome = (item?: CashIncome) => {
-    setTab('incomes'); setEditingIncomeId(item?.manualIncomeId ?? null); setFormError(null);
+    setTab('incomes'); setEditingIncomeId(item?.manualIncomeId ?? null); setEditingRegistrationIncomeId(item?.source === 'REGISTRATION' ? item.id : null); setFormError(null);
     setIncome(item ? { concept: item.concept, payer: item.team ?? '', amount: item.amount,
       status: item.status, expectedAt: item.expectedAt, occurredAt: item.paidAt?.slice(0, 10) ?? null } : { ...initialIncome });
     setDialog('income');
@@ -52,7 +53,8 @@ export function AdminCashPage() {
     event.preventDefault(); if (savingRef.current) return;
     savingRef.current = true; setSaving(true); setFormError(null);
     try {
-      if (editingIncomeId === null) await createCashIncome(income);
+      if (editingRegistrationIncomeId !== null) await updateRegistrationCashIncome(editingRegistrationIncomeId, { amount: income.amount, occurredAt: income.occurredAt! });
+      else if (editingIncomeId === null) await createCashIncome(income);
       else await updateCashIncome(editingIncomeId, income);
       setDialog(null); await load();
     } catch (reason) { setFormError(reason instanceof Error ? reason.message : 'No se pudo guardar el ingreso.'); }
@@ -146,7 +148,7 @@ export function AdminCashPage() {
         { label: 'Previsto', render: (item) => dateLabel(item.expectedAt) },
         { label: 'Cobrado', render: (item) => dateLabel(item.paidAt) },
       ]} renderActions={(item) => item.source === 'REGISTRATION'
-        ? <button className="inline-link" onClick={() => openRegistrationPaymentProof(item.registrationId!, item.id).catch((reason: Error) => setError(reason.message))}>Ver comprobante</button>
+        ? <><button className="inline-link" onClick={() => openIncome(item)}>Editar</button><button className="inline-link" onClick={() => openRegistrationPaymentProof(item.registrationId!, item.id).catch((reason: Error) => setError(reason.message))}>Ver comprobante</button></>
         : <><button className="inline-link" onClick={() => openIncome(item)}>Editar</button>{item.status === 'PROJECTED' && <button className="inline-link" onClick={() => realizeIncome(item)}>Efectivizar</button>}<button className="danger-link" onClick={() => removeIncome(item)}>Eliminar</button></>} />
     </section> : <section className="data-card" role="tabpanel" id="cash-panel-expenses" aria-labelledby="cash-tab-expenses">
       <div className="panel-header"><div><h2>Egresos</h2><p className="field-hint">Cada monto se calcula como cantidad por valor unitario.</p></div><button className="primary-button" onClick={() => openExpense()}>Agregar egreso</button></div>
@@ -160,13 +162,14 @@ export function AdminCashPage() {
         { label: 'Pagado', render: (item) => dateLabel(item.occurredAt) },
       ]} renderActions={(item) => <><button className="inline-link" onClick={() => openExpense(item)}>Editar</button>{item.status === 'PROJECTED' && <button className="inline-link" onClick={() => realizeExpense(item)}>Efectivizar</button>}<button className="danger-link" onClick={() => removeExpense(item)}>Eliminar</button></>} />
     </section>}
-    {dialog === 'income' && <AdminDialog title={editingIncomeId === null ? 'Agregar ingreso' : 'Editar ingreso'} onClose={() => setDialog(null)}><form className="editor-form" onSubmit={saveIncome}>
+    {dialog === 'income' && <AdminDialog title={editingRegistrationIncomeId !== null ? 'Editar ingreso de inscripción' : editingIncomeId === null ? 'Agregar ingreso' : 'Editar ingreso'} onClose={() => setDialog(null)}><form className="editor-form" onSubmit={saveIncome}>
       {formError && <div className="form-error span-2" role="alert">{formError}</div>}
-      <label className="span-2">Concepto<input value={income.concept} onChange={(event) => setIncome({ ...income, concept: event.target.value })} minLength={2} required placeholder="Auspicio, donación…" /></label>
-      <label className="span-2">Auspiciante / pagador<input value={income.payer} onChange={(event) => setIncome({ ...income, payer: event.target.value })} placeholder="Opcional" /></label>
+      {editingRegistrationIncomeId !== null && <p className="field-hint span-2">Podés corregir el monto y la fecha. El equipo, el concepto y el comprobante continúan vinculados a la inscripción original.</p>}
+      <label className="span-2">Concepto<input value={income.concept} disabled={editingRegistrationIncomeId !== null} onChange={(event) => setIncome({ ...income, concept: event.target.value })} minLength={2} required placeholder="Auspicio, donación…" /></label>
+      <label className="span-2">{editingRegistrationIncomeId !== null ? 'Equipo' : 'Auspiciante / pagador'}<input value={income.payer} disabled={editingRegistrationIncomeId !== null} onChange={(event) => setIncome({ ...income, payer: event.target.value })} placeholder="Opcional" /></label>
       <label>Monto<input type="number" min="1" step="1" value={income.amount} onChange={(event) => setIncome({ ...income, amount: Number(event.target.value) })} required /></label>
-      <label>Estado<select value={income.status} onChange={(event) => { const status = event.target.value as CashStatus; setIncome({ ...income, status, occurredAt: status === 'REALIZED' ? income.occurredAt ?? today() : null }); }}><option value="PROJECTED">Proyectado</option><option value="REALIZED">Efectivo</option></select></label>
-      <label>Fecha prevista<input type="date" value={income.expectedAt ?? ''} onChange={(event) => setIncome({ ...income, expectedAt: event.target.value || null })} /></label>
+      <label>Estado<select value={income.status} disabled={editingRegistrationIncomeId !== null} onChange={(event) => { const status = event.target.value as CashStatus; setIncome({ ...income, status, occurredAt: status === 'REALIZED' ? income.occurredAt ?? today() : null }); }}><option value="PROJECTED">Proyectado</option><option value="REALIZED">Efectivo</option></select></label>
+      {editingRegistrationIncomeId === null && <label>Fecha prevista<input type="date" value={income.expectedAt ?? ''} onChange={(event) => setIncome({ ...income, expectedAt: event.target.value || null })} /></label>}
       {income.status === 'REALIZED' && <label>Fecha de cobro<input type="date" value={income.occurredAt ?? ''} onChange={(event) => setIncome({ ...income, occurredAt: event.target.value || null })} required /></label>}
       <div className="span-2 form-actions"><button className="primary-button" disabled={saving}>{saving ? 'Guardando…' : 'Guardar ingreso'}</button></div>
     </form></AdminDialog>}

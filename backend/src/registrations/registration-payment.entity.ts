@@ -15,5 +15,6 @@ export class RegistrationPayment {
   @Column() originalName: string;
   @Column() mimeType: string;
   @Column({ type: 'integer', nullable: true }) sizeBytes: number | null;
+  @Column({ type: 'date', default: () => 'CURRENT_DATE' }) occurredAt: string;
   @CreateDateColumn() createdAt: Date;
 }

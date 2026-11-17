@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PairRegistration } from '../registrations/pair-registration.entity';
+import { RegistrationPayment } from '../registrations/registration-payment.entity';
 import { CashExpense } from './cash-expense.entity';
 import { CashIncome } from './cash-income.entity';
 import { CashSettings } from './cash-settings.entity';
@@ -10,6 +11,7 @@ import { TournamentStatus } from '../tournaments/tournament.enums';
 
 export type CashStatus = 'PROJECTED' | 'REALIZED';
 export interface IncomeInput { concept: string; payer?: string | null; amount: number; status?: CashStatus; expectedAt?: string | null; occurredAt?: string | null }
+export interface RegistrationIncomeInput { amount?: number; occurredAt?: string }
 export interface ExpenseInput { reason: string; quantity: number; unitPrice: number; status?: CashStatus; expectedAt?: string | null; occurredAt?: string | null }
 
 const today = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' }).format(new Date());
@@ -33,6 +35,7 @@ export class CashService {
     @InjectRepository(CashIncome) private manualIncomes: Repository<CashIncome>,
     @InjectRepository(PairRegistration) private registrations: Repository<PairRegistration>,
     @InjectRepository(Tournament) private tournaments: Repository<Tournament>,
+    @InjectRepository(RegistrationPayment) private registrationPayments: Repository<RegistrationPayment>,
   ) {}
 
   async summary() {
@@ -46,7 +49,7 @@ export class CashService {
     const registrationIncomes = registrations.filter((item) => !item.feeWaived).flatMap((item) => item.payments.filter((payment) => payment.amount > 0).map((payment) => ({
       id: payment.id, source: 'REGISTRATION' as const, manualIncomeId: null, registrationId: item.id,
       team: item.locality.name, players: payment.players, amount: payment.amount,
-      paidAt: payment.createdAt as Date | string | null, expectedAt: null as string | null,
+      paidAt: payment.occurredAt ?? payment.createdAt as Date | string | null, expectedAt: null as string | null,
       status: 'REALIZED' as const, createdAt: payment.createdAt,
       concept: payment.kind === 'ADDITIONAL' ? 'Jugadora adicional' : 'Inscripción',
     })));
@@ -114,6 +117,17 @@ export class CashService {
     if (!income) throw new NotFoundException('Ingreso no encontrado');
     await this.manualIncomes.remove(income);
     return { success: true };
+  }
+
+  async updateRegistrationIncome(id: number, input: RegistrationIncomeInput) {
+    const payment = await this.registrationPayments.findOneBy({ id });
+    if (!payment) throw new NotFoundException('Pago de inscripción no encontrado');
+    if (input.amount !== undefined) {
+      if (!Number.isSafeInteger(input.amount) || input.amount < 1 || input.amount > 2_147_483_647) throw new BadRequestException('Ingresá un monto válido.');
+      payment.amount = input.amount;
+    }
+    if (input.occurredAt !== undefined) payment.occurredAt = input.occurredAt;
+    return this.registrationPayments.save(payment);
   }
 
   createExpense(input: ExpenseInput) {

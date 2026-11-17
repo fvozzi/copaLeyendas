@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { CashService } from './cash.service';
 vi.mock('../registrations/pair-registration.entity', () => ({ PairRegistration: class {} }));
+vi.mock('../registrations/registration-payment.entity', () => ({ RegistrationPayment: class {} }));
 vi.mock('../tournaments/tournament.entity', () => ({ Tournament: class {} }));
 vi.mock('./cash-settings.entity', () => ({ CashSettings: class {} }));
 vi.mock('./cash-expense.entity', () => ({ CashExpense: class {} }));
@@ -16,7 +17,8 @@ it('adds each payment once using its recorded amount, independently of the curre
     { find: vi.fn().mockResolvedValue([{ amount: 5000 }]) } as never,
     { find: vi.fn().mockResolvedValue([]) } as never,
     { find: vi.fn().mockResolvedValue([registration, { id: 9, locality: { name: 'Otro' }, payments: [] }]) } as never,
-    { findOne: vi.fn().mockResolvedValue(null) } as never);
+    { findOne: vi.fn().mockResolvedValue(null) } as never,
+    {} as never);
   const summary = await service.summary();
   expect(summary).toMatchObject({ totalIncome: 45000, totalExpense: 5000, balance: 40000 });
   expect(summary.incomes).toHaveLength(2);
@@ -38,6 +40,7 @@ it('separates effective and projected amounts without counting registration paym
     ]) } as never,
     { find: vi.fn().mockResolvedValue([{ id: 4, locality: { name: 'Junín' }, payments: [{ id: 3, amount: 30, players: 2, kind: 'INITIAL', createdAt: new Date('2026-09-03') }] }]) } as never,
     { findOne: vi.fn().mockResolvedValue(null) } as never,
+    {} as never,
   );
   const summary = await service.summary();
   expect(summary).toMatchObject({ totalIncome: 80, projectedIncome: 100, forecastIncome: 180,
@@ -59,6 +62,7 @@ it('calculates the minimum paid pairs needed to cover final projected expenses a
     { find: vi.fn().mockResolvedValue([{ id: 1, concept: 'Auspicio', amount: 20000, status: 'PROJECTED', expectedAt: null, createdAt: new Date('2026-09-01') }]) } as never,
     { find: vi.fn().mockResolvedValue(registrations) } as never,
     { findOne: vi.fn().mockResolvedValue({ feePerPlayer: 20000 }) } as never,
+    {} as never,
   );
   await expect(service.summary()).resolves.toMatchObject({
     forecastIncome: 50000, forecastExpense: 100000, incomeToCover: 50000,
@@ -78,7 +82,7 @@ it('creates projections and realizes income and expenses on the supplied date', 
     create: vi.fn((value) => value), save: vi.fn(async (value) => { const saved = { ...value, id: value.id ?? 1 }; expenses.set(saved.id, saved); return saved; }),
     findOneBy: vi.fn(async ({ id }) => expenses.get(id) ?? null),
   };
-  const service = new CashService({} as never, expenseRepository as never, incomeRepository as never, {} as never, {} as never);
+  const service = new CashService({} as never, expenseRepository as never, incomeRepository as never, {} as never, {} as never, {} as never);
   await service.createIncome({ concept: ' Auspicio ', payer: ' Guastavino ', amount: 1000, status: 'PROJECTED', expectedAt: '2026-10-01' });
   await service.createExpense({ reason: ' Pelotas ', quantity: 2, unitPrice: 200, status: 'PROJECTED', expectedAt: '2026-10-02' });
   expect(incomes.get(1)).toMatchObject({ concept: 'Auspicio', payer: 'Guastavino', status: 'PROJECTED', occurredAt: null });
@@ -89,4 +93,17 @@ it('creates projections and realizes income and expenses on the supplied date', 
   expect(expenses.get(1)).toMatchObject({ status: 'REALIZED', occurredAt: '2026-10-04', amount: 500 });
   await service.updateIncome(1, { status: 'PROJECTED' });
   expect(incomes.get(1).occurredAt).toBeNull();
+});
+
+it('corrects the amount and collection date of a registration payment without detaching it', async () => {
+  const payment = { id: 7, registrationId: 3, amount: 30000, occurredAt: '2026-11-14', createdAt: new Date('2026-11-14T15:00:00.000Z') };
+  const payments = { findOneBy: vi.fn().mockResolvedValue(payment), save: vi.fn(async (value) => value) };
+  const service = new CashService({} as never, {} as never, {} as never, {} as never, {} as never, payments as never);
+
+  await service.updateRegistrationIncome(7, { amount: 28000, occurredAt: '2026-11-12' });
+
+  expect(payments.findOneBy).toHaveBeenCalledWith({ id: 7 });
+  expect(payments.save).toHaveBeenCalledWith(expect.objectContaining({ id: 7, registrationId: 3, amount: 28000 }));
+  expect(payment.occurredAt).toBe('2026-11-12');
+  expect(payment.createdAt.toISOString()).toBe('2026-11-14T15:00:00.000Z');
 });

@@ -454,6 +454,7 @@ export interface CashExpense {
 
 export type CashStatus = 'PROJECTED' | 'REALIZED';
 export interface CashIncomePayload { concept: string; payer: string; amount: number; status: CashStatus; expectedAt: string | null; occurredAt: string | null }
+export interface RegistrationCashIncomePayload { amount: number; occurredAt: string }
 export interface CashExpensePayload { reason: string; quantity: number; unitPrice: number; status: CashStatus; expectedAt: string | null; occurredAt: string | null }
 
 export interface CashSummary {
