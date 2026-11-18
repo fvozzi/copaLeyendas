@@ -32,7 +32,7 @@ export const sectionMeta: Record<
   },
 };
 
-export const publicSectionKeys: ContentSection[] = ['canchas', 'torneos', 'historias'];
+export const publicSectionKeys: ContentSection[] = ['torneos', 'historias'];
 
 export const registrationStatusLabels: Record<RegistrationStatus, string> = {
   RECEIVED: 'Recibida',

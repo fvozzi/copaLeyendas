@@ -13,13 +13,13 @@ export function SectionPage() {
   const validSection = section && section in sectionMeta ? section : undefined;
 
   useEffect(() => {
-    if (!validSection || validSection === 'leyendas') return;
+    if (!validSection || validSection === 'leyendas' || validSection === 'canchas') return;
     setLoading(true);
     getPublicPosts({ section: validSection }).then(setPosts).catch(() => setPosts([])).finally(() => setLoading(false));
   }, [validSection]);
 
   if (!validSection) return <Navigate to="/" replace />;
-  if (validSection === 'leyendas') return <Navigate to="/secciones/torneos" replace />;
+  if (validSection === 'leyendas' || validSection === 'canchas') return <Navigate to="/secciones/torneos" replace />;
 
   return (
     <section className="content-band section-page">

@@ -15,7 +15,7 @@ export function HomePage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const featuredPosts = posts.filter((post) => post.featured && post.section !== 'leyendas').slice(0, 3);
+  const featuredPosts = posts.filter((post) => post.featured && publicSectionKeys.includes(post.section)).slice(0, 3);
   const currentEdition = tournamentEditions.find((edition) => edition.usesLiveTournament);
 
   return (
