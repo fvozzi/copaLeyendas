@@ -24,13 +24,15 @@ export const sectionMeta: Record<
   },
   torneos: {
     label: 'Torneos',
-    intro: 'Fechas, convocatorias y torneos aliados que alimentan el calendario federal.',
+    intro: 'Ediciones y próximos torneos.',
   },
   historias: {
     label: 'Historias',
-    intro: 'Cronicas, archivo y relatos del recorrido cultural de la paleta.',
+    intro: 'Crónicas, archivo y relatos del recorrido cultural de la paleta.',
   },
 };
+
+export const publicSectionKeys: ContentSection[] = ['canchas', 'torneos', 'historias'];
 
 export const registrationStatusLabels: Record<RegistrationStatus, string> = {
   RECEIVED: 'Recibida',

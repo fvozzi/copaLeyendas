@@ -27,4 +27,6 @@ it('links the home hero to the current tournament edition', async () => {
 
   const link = [...container.querySelectorAll('a')].find((item) => item.textContent?.trim() === 'Ver torneo');
   expect(link?.getAttribute('href')).toBe('/torneos/femme-2026');
+  expect(container.querySelector('a[href="/secciones/leyendas"]')).toBeNull();
+  expect(container.querySelectorAll('.section-grid .section-card')).toHaveLength(3);
 });

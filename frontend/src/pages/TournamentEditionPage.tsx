@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { PublicProgramMap } from '../components/PublicProgramMap';
 import { getPublicCurrentTournament, getPublicPosts, resolveApiAssetUrl } from '../lib/api';
-import { getTournamentEdition, normalizeSearchText } from '../lib/tournament-editions';
+import { getTournamentEdition, normalizeSearchText, type TournamentEdition } from '../lib/tournament-editions';
 import { pairPlayerNames, pairTeamName } from '../lib/pair-display';
 import { venuesWithEnabledCourts } from '../lib/public-venues';
 import type { ContentPost, PairRegistration, PublicCurrentTournament, PublicTournamentZone, TournamentScheduleSlot } from '../types';
@@ -71,7 +71,7 @@ export function TournamentEditionPage() {
       </nav>
 
       <div className="edition-tab-panel">
-        {tab === 'legend' && <LegendSection name={edition.legendName} post={legendPost} loading={legendLoading} />}
+        {tab === 'legend' && <LegendSection edition={edition} post={legendPost} loading={legendLoading} />}
         {tab === 'photos' && <PhotoSection name={edition.name} photos={edition.photos} />}
         {tab === 'results' && (edition.usesLiveTournament
           ? <LiveResults current={currentTournament} error={tournamentError} />
@@ -83,10 +83,21 @@ export function TournamentEditionPage() {
   );
 }
 
-function LegendSection({ name, post, loading }: { name: string; post?: ContentPost; loading: boolean }) {
+function LegendSection({ edition, post, loading }: { edition: TournamentEdition; post?: ContentPost; loading: boolean }) {
   if (loading) return <div className="inline-state">Cargando la nota de la leyenda...</div>;
-  if (!post) return <div className="edition-empty"><p className="eyebrow">Leyenda de la edición</p><h2>{name}</h2><p>La nota todavía no está publicada. Cuando se publique en Leyendas aparecerá también acá automáticamente.</p><Link to="/secciones/leyendas" className="inline-link">Ir a Leyendas</Link></div>;
-  return <article className="edition-legend-article"><p className="eyebrow">Leyenda de la edición</p><h2>{post.title}</h2><p className="article-excerpt">{post.excerpt}</p><div className="article-body">{post.body}</div><Link to={`/post/${post.slug}`} className="inline-link">Abrir nota completa</Link></article>;
+  const content = edition.legendContent;
+  return <article className={`edition-legend-feature${content.image ? '' : ' without-image'}`}>
+    {content.image && <img src={content.image.src} alt={content.image.alt} width="960" height="1358" loading="lazy" decoding="async" />}
+    <div className="edition-legend-copy">
+      <p className="eyebrow">Leyenda de la edición</p>
+      <h2>{post?.title ?? content.title}</h2>
+      {post ? <><p className="article-excerpt">{post.excerpt}</p><div className="article-body">{post.body}</div></> : content.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+      {content.interview && <div className="edition-legend-video"><iframe src={content.interview.embedUrl} title={content.interview.label} loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen /></div>}
+      <div className="edition-legend-actions">
+        {post && <Link to={`/post/${post.slug}`} className="inline-link">Abrir nota completa</Link>}
+      </div>
+    </div>
+  </article>;
 }
 
 function PhotoSection({ name, photos }: { name: string; photos: { src: string; alt: string }[] }) {

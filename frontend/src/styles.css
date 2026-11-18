@@ -342,7 +342,7 @@ img {
 }
 
 .section-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .post-grid {
@@ -430,6 +430,151 @@ img {
 .tournament-archive {
   display: grid;
   gap: 1.5rem;
+}
+
+.history-feature {
+  display: grid;
+  gap: clamp(2.5rem, 6vw, 5.5rem);
+}
+
+.history-feature-heading {
+  max-width: 900px;
+}
+
+.history-feature-heading h2 {
+  max-width: 17ch;
+  margin: 0.5rem 0 1rem;
+  font-family: 'Newsreader', serif;
+  font-size: clamp(2.8rem, 6vw, 5.5rem);
+  line-height: 0.95;
+  text-wrap: balance;
+}
+
+.history-feature-heading > p:last-child {
+  max-width: 64ch;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: clamp(1rem, 1.6vw, 1.2rem);
+}
+
+.history-chapter {
+  display: grid;
+  grid-template-columns: minmax(0, 0.82fr) minmax(320px, 1.18fr);
+  gap: clamp(2rem, 5vw, 5rem);
+  align-items: start;
+  padding-top: clamp(1.5rem, 3vw, 2.5rem);
+  border-top: 1px solid var(--line);
+}
+
+.history-chapter.is-reverse .history-chapter-copy {
+  order: 2;
+}
+
+.history-chapter-copy {
+  min-width: 0;
+}
+
+.history-chapter-copy > span {
+  display: inline-flex;
+  margin-bottom: 0.8rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: var(--clay);
+  color: var(--white);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.history-chapter-copy h3 {
+  margin: 0 0 1.2rem;
+  font-family: 'Newsreader', serif;
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  line-height: 1;
+  text-wrap: balance;
+}
+
+.history-chapter-copy p {
+  margin: 0 0 1rem;
+  color: var(--ink-soft);
+  line-height: 1.75;
+}
+
+.history-media-grid {
+  display: grid;
+  min-width: 0;
+  gap: 1rem;
+}
+
+.history-media-grid.is-mosaic {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.history-media-grid.is-mosaic figure:last-child {
+  grid-column: 1 / -1;
+}
+
+.history-media-grid figure {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid var(--line);
+  box-shadow: 0 14px 32px rgba(18, 35, 40, 0.08);
+}
+
+.history-media-grid img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  filter: sepia(0.08) contrast(1.04);
+}
+
+.history-media-grid figure.is-portrait img {
+  aspect-ratio: 4 / 5;
+  object-position: center top;
+}
+
+.history-media-grid figcaption {
+  padding: 0.8rem 1rem 0.95rem;
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.tournament-archive-story {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.42fr) minmax(0, 1fr);
+  gap: clamp(1.5rem, 4vw, 3rem);
+  padding: clamp(1.5rem, 4vw, 3rem);
+  border: 1px solid rgba(23, 63, 57, 0.2);
+  border-radius: 14px;
+  background:
+    linear-gradient(120deg, rgba(7, 18, 21, 0.96), rgba(23, 63, 57, 0.9)),
+    url('/FondoFemmeAgua.webp') center / cover;
+  color: var(--white);
+}
+
+.tournament-archive-story h2 {
+  max-width: 10ch;
+  margin: 0;
+  font-family: 'Newsreader', serif;
+  font-size: clamp(2.4rem, 5vw, 4.5rem);
+  line-height: 0.95;
+}
+
+.tournament-archive-story-copy {
+  display: grid;
+  gap: 0.9rem;
+  align-content: center;
+}
+
+.tournament-archive-story-copy p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.84);
+  line-height: 1.65;
 }
 
 .tournament-archive-note {
@@ -700,6 +845,76 @@ img {
   border: 1px solid var(--line);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.76);
+}
+
+.edition-legend-feature {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.55fr) minmax(0, 1fr);
+  max-width: 1120px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 18px 42px rgba(18, 35, 40, 0.08);
+}
+
+.edition-legend-feature.without-image {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 900px;
+}
+
+.edition-legend-feature > img {
+  width: 100%;
+  height: 100%;
+  max-height: 760px;
+  object-fit: cover;
+  object-position: center top;
+}
+
+.edition-legend-copy {
+  display: grid;
+  gap: 1rem;
+  align-content: center;
+  padding: clamp(1.5rem, 4vw, 3rem);
+}
+
+.edition-legend-copy h2 {
+  margin: 0;
+  font-family: 'Newsreader', serif;
+  font-size: clamp(2.3rem, 5vw, 4.4rem);
+  line-height: 0.96;
+}
+
+.edition-legend-copy p,
+.edition-legend-copy .article-body {
+  margin: 0;
+  color: var(--ink-soft);
+  line-height: 1.7;
+  white-space: pre-line;
+}
+
+.edition-legend-actions {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+  padding-top: 0.5rem;
+}
+
+.edition-legend-video {
+  width: 100%;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  background: var(--forest-deep);
+  box-shadow: 0 12px 28px rgba(18, 35, 40, 0.16);
+}
+
+.edition-legend-video iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
 }
 
 .edition-empty p,
@@ -2911,16 +3126,42 @@ textarea {
 
 @media (max-width: 900px) {
   .edition-card-grid,
-  .historical-results-grid {
+  .historical-results-grid,
+  .tournament-archive-story {
     grid-template-columns: 1fr;
   }
 
   .edition-card {
     min-height: 0;
   }
+
+  .history-chapter {
+    grid-template-columns: 1fr;
+  }
+
+  .history-chapter.is-reverse .history-chapter-copy {
+    order: 0;
+  }
 }
 
 @media (max-width: 640px) {
+  .history-feature {
+    gap: 3rem;
+  }
+
+  .history-feature-heading h2 {
+    max-width: none;
+    font-size: clamp(2.5rem, 13vw, 3.7rem);
+  }
+
+  .history-media-grid.is-mosaic {
+    grid-template-columns: 1fr;
+  }
+
+  .history-media-grid.is-mosaic figure:last-child {
+    grid-column: auto;
+  }
+
   .tournament-archive-note {
     grid-template-columns: 1fr;
     gap: 0.5rem;
@@ -2930,6 +3171,35 @@ textarea {
     min-height: 0;
     align-items: flex-start;
     padding: 1.4rem;
+  }
+
+  .tournament-archive-story {
+    gap: 1.25rem;
+    padding: 1.4rem;
+  }
+
+  .tournament-archive-story h2 {
+    max-width: none;
+    font-size: clamp(2.25rem, 12vw, 3.5rem);
+  }
+
+  .edition-legend-feature {
+    grid-template-columns: 1fr;
+  }
+
+  .edition-legend-feature > img {
+    height: auto;
+    max-height: none;
+  }
+
+  .edition-legend-copy {
+    padding: 1.35rem;
+  }
+
+  .edition-legend-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
   }
 
   .tournament-edition-page.is-femme .edition-hero {

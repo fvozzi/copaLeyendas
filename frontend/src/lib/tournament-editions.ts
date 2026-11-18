@@ -16,6 +16,17 @@ export interface TournamentPhoto {
   alt: string;
 }
 
+export interface TournamentLegendContent {
+  title: string;
+  paragraphs: string[];
+  image?: TournamentPhoto;
+  interview?: {
+    label: string;
+    url: string;
+    embedUrl: string;
+  };
+}
+
 export interface TournamentEdition {
   slug: string;
   name: string;
@@ -24,6 +35,7 @@ export interface TournamentEdition {
   dateLabel: string;
   legendName: string;
   legendSearchTerms: string[];
+  legendContent: TournamentLegendContent;
   summary: string;
   status: TournamentEditionStatus;
   specialEdition?: boolean;
@@ -31,6 +43,17 @@ export interface TournamentEdition {
   photos: TournamentPhoto[];
   finals: TournamentFinal[];
 }
+
+export const tournamentArchiveStory = {
+  title: 'Donde la historia sigue viva',
+  paragraphs: [
+    'La Copa Leyendas nace en marzo de 2025 con un propósito que va mucho más allá de la competencia: rendir homenaje a quienes, con su talento, pasión y entrega, escribieron las páginas más memorables de la historia de nuestro deporte.',
+    'Porque las leyendas no se miden solamente por los títulos conquistados o las hazañas dentro de la cancha, sino también por la huella que dejan, los valores que representan y la inspiración que transmiten.',
+    'Cada leyenda es una historia de esfuerzo, sacrificio y amor por la pelota. Un legado que trasciende generaciones y que merece seguir vivo.',
+    'La Copa Leyendas es encuentro, homenaje y reconocimiento. Es reunir a quienes hicieron grande nuestro deporte con las nuevas generaciones, compartir experiencias, transmitir valores e inspirar a quienes hoy comienzan a escribir su propia historia.',
+    'Porque las verdaderas leyendas nunca dejan de jugar: siguen vivas en su legado y en cada nueva generación que mantiene encendida la pasión por nuestro deporte.',
+  ],
+};
 
 function createTournamentPhotos(year: number, count: number): TournamentPhoto[] {
   return Array.from({ length: count }, (_, index) => {
@@ -51,6 +74,17 @@ export const tournamentEditions: TournamentEdition[] = [
     dateLabel: 'Noviembre 2026',
     legendName: 'Silvina Cimadamore',
     legendSearchTerms: ['silvina', 'cimadamore'],
+    legendContent: {
+      title: 'Silvina Cimadamore',
+      paragraphs: [
+        'En esta edición especial “Femme”, le rendimos homenaje a Silvina Cimadamore, una verdadera pionera de la Pelota a Paleta femenina en la Argentina. Su trayectoria abrió el camino para que muchas mujeres encontraran su lugar en este deporte, convirtiéndose en un ejemplo de compromiso, perseverancia y pasión.',
+        'Gracias a pioneras como Silvina, la Pelota a Paleta femenina creció, amplió sus horizontes y sigue construyendo su futuro sobre las bases que ellas ayudaron a forjar.',
+      ],
+      image: {
+        src: '/torneos/femme-2026/silvina-cimadamore.webp',
+        alt: 'Póster de la Copa Leyendas Femme 2026 en homenaje a Silvina Cimadamore',
+      },
+    },
     summary: 'Una edición especial y única dedicada íntegramente a las mujeres.',
     status: 'upcoming',
     specialEdition: true,
@@ -64,8 +98,19 @@ export const tournamentEditions: TournamentEdition[] = [
     shortName: 'Edición 2026',
     year: 2026,
     dateLabel: '2026',
-    legendName: 'Aarón “Quique” Setter',
-    legendSearchTerms: ['aaron', 'quique', 'setter'],
+    legendName: 'Aarón “Quique” Sehter',
+    legendSearchTerms: ['aaron', 'quique', 'sehter'],
+    legendContent: {
+      title: 'Aarón “Quique” Sehter',
+      paragraphs: [
+        'Delantero en frontón y zaguero en trinquete, nació el 11 de enero de 1934 en la Ciudad de Buenos Aires. Empezó a jugar de muy joven y a los 16 años inició su carrera deportiva en primera categoría. Obtuvo 9 campeonatos metropolitanos, 7 campeonatos argentinos, 7 medallas de oro en rioplatenses, 7 medallas de oro en sudamericanos y 13 medallas de oro en mundiales, además de ganar una extensa cantidad de torneos. Fue testigo privilegiado al participar del primer campeonato mundial de pelota vasca, realizado en 1952. Además, conoció y jugó partidos junto a los más grandes pelotaris de nuestra historia.',
+      ],
+      interview: {
+        label: 'Ver entrevista a Quique Sehter',
+        url: 'https://www.youtube.com/watch?v=mS0TVfKJn0I&t=17s',
+        embedUrl: 'https://www.youtube-nocookie.com/embed/mS0TVfKJn0I?start=17',
+      },
+    },
     summary: 'La segunda edición de la Copa Leyendas, con seis finales disputadas.',
     status: 'finished',
     photos: createTournamentPhotos(2026, 63),
@@ -86,6 +131,17 @@ export const tournamentEditions: TournamentEdition[] = [
     dateLabel: '2025',
     legendName: 'Rodolfo “Titi” Bazán',
     legendSearchTerms: ['rodolfo', 'titi', 'bazan'],
+    legendContent: {
+      title: 'Rodolfo “Titi” Bazán',
+      paragraphs: [
+        'Zaguero en trinquete y frontón, nació el 17 de diciembre de 1949 en la Ciudad de Buenos Aires. Motivado por su padre, comenzó a jugar a los 7 años en el club Balcarce de Vicente López y a los 11 años inició su carrera en el Club Ciudad de Buenos Aires. Obtuvo 2 campeonatos metropolitanos, 3 campeonatos argentinos y 2 medallas de oro en campeonatos mundiales. Retirado hace varias décadas de las competencias oficiales, continúa jugando en distintos clubes y disfrutando junto a las nuevas generaciones de pelotaris.',
+      ],
+      interview: {
+        label: 'Ver entrevista a Titi Bazán',
+        url: 'https://www.youtube.com/watch?v=WA8mIbbOJzs&t=114s',
+        embedUrl: 'https://www.youtube-nocookie.com/embed/WA8mIbbOJzs?start=114',
+      },
+    },
     summary: 'La primera edición de la Copa Leyendas y el comienzo de este archivo.',
     status: 'finished',
     photos: createTournamentPhotos(2025, 133),

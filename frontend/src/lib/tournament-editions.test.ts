@@ -18,7 +18,15 @@ describe('tournament editions archive', () => {
   });
 
   it('matches legend names without depending on accents or casing', () => {
-    expect(normalizeSearchText('Aarón “Quique” Setter')).toBe('aaron “quique” setter');
+    expect(normalizeSearchText('Aarón “Quique” Sehter')).toBe('aaron “quique” sehter');
     expect(normalizeSearchText('Rodolfo Bazán')).toContain('bazan');
+  });
+
+  it('includes the editorial profiles and interviews supplied for each edition', () => {
+    expect(getTournamentEdition('femme-2026')?.legendContent.image?.src).toContain('silvina-cimadamore.webp');
+    expect(getTournamentEdition('2026')?.legendContent.interview?.url).toContain('mS0TVfKJn0I');
+    expect(getTournamentEdition('2026')?.legendContent.interview?.embedUrl).toContain('youtube-nocookie.com/embed/mS0TVfKJn0I?start=17');
+    expect(getTournamentEdition('2025')?.legendContent.interview?.url).toContain('WA8mIbbOJzs');
+    expect(getTournamentEdition('2025')?.legendContent.interview?.embedUrl).toContain('youtube-nocookie.com/embed/WA8mIbbOJzs?start=114');
   });
 });

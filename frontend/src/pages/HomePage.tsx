@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getPublicPosts } from '../lib/api';
-import { sectionMeta, tournamentHighlights, tournamentStory } from '../lib/content';
+import { publicSectionKeys, sectionMeta, tournamentHighlights, tournamentStory } from '../lib/content';
 import { tournamentEditions } from '../lib/tournament-editions';
 import type { ContentPost } from '../types';
 
@@ -15,7 +15,7 @@ export function HomePage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const featuredPosts = posts.filter((post) => post.featured).slice(0, 3);
+  const featuredPosts = posts.filter((post) => post.featured && post.section !== 'leyendas').slice(0, 3);
   const currentEdition = tournamentEditions.find((edition) => edition.usesLiveTournament);
 
   return (
@@ -56,13 +56,13 @@ export function HomePage() {
       <section className="content-band">
         <div className="section-heading">
           <p className="eyebrow">Secciones editoriales</p>
-          <h2>Una base digital para todo el ano</h2>
+          <h2>Una base digital para todo el año</h2>
         </div>
         <div className="section-grid">
-          {Object.entries(sectionMeta).map(([key, value]) => (
+          {publicSectionKeys.map((key) => (
             <article key={key} className={`section-card section-card-${key}`}>
-              <p className="section-card-kicker">{value.label}</p>
-              <p>{value.intro}</p>
+              <p className="section-card-kicker">{sectionMeta[key].label}</p>
+              <p>{sectionMeta[key].intro}</p>
               <Link to={`/secciones/${key}`} className="inline-link">
                 Abrir seccion
               </Link>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { sectionMeta, tournamentStory } from '../lib/content';
+import { publicSectionKeys, sectionMeta, tournamentStory } from '../lib/content';
 
 export function SiteLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -25,9 +25,9 @@ export function SiteLayout() {
           <span />
         </button>
         <nav id="site-navigation" className={`site-nav ${menuOpen ? 'is-open' : ''}`} onClick={() => setMenuOpen(false)}>
-          {Object.entries(sectionMeta).map(([key, value]) => (
+          {publicSectionKeys.map((key) => (
             <NavLink key={key} to={`/secciones/${key}`} className="site-nav-link">
-              {value.label}
+              {sectionMeta[key].label}
             </NavLink>
           ))}
           <NavLink to="/inscripcion" className="site-nav-link site-nav-link-accent">
