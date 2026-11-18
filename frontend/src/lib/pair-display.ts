@@ -10,3 +10,7 @@ export function pairPlayerNames(pair: PairPlayerNames) {
     .filter((name): name is string => Boolean(name))
     .join(' / ');
 }
+
+export function pairTeamName(pair: PairPlayerNames & { representingText?: string | null; locality?: { name?: string | null } }) {
+  return pair.representingText?.trim() || pair.locality?.name?.trim() || pairPlayerNames(pair) || 'A definir';
+}

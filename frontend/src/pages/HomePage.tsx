@@ -20,12 +20,7 @@ export function HomePage() {
 
   return (
     <>
-      <section
-        className="hero-band"
-        style={{
-          backgroundImage: 'linear-gradient(90deg, rgba(7, 18, 21, 0.88) 0%, rgba(7, 18, 21, 0.68) 34%, rgba(7, 18, 21, 0.12) 62%, transparent 100%), url(/BannerFemme.png)',
-        }}
-      >
+      <section className="hero-band">
         <div className="hero-content">
           <p className="eyebrow">Pelota paleta federal</p>
           <h1>{tournamentStory.title}</h1>

@@ -28,7 +28,10 @@ import type {
   ActivityLogPage, TournamentOperations, VenuePlayerRosterItem, ZoneMethodology,
 } from '../types';
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
+const configuredApiUrl = import.meta.env.VITE_API_URL;
+const API_URL = configuredApiUrl === 'auto'
+  ? `${window.location.protocol}//${window.location.hostname}:3001/api`
+  : configuredApiUrl ?? 'http://localhost:3000/api';
 const TOKEN_KEY = 'copa_leyendas_token';
 const USER_KEY = 'copa_leyendas_user';
 

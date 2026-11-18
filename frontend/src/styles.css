@@ -191,6 +191,7 @@ img {
   background-size: 100% 100%, 100% 100%;
   background-position: center, top center;
   background-repeat: no-repeat;
+  background-image: linear-gradient(90deg, rgba(7, 18, 21, 0.88) 0%, rgba(7, 18, 21, 0.68) 34%, rgba(7, 18, 21, 0.12) 62%, transparent 100%), url('/BannerFemme.webp');
   padding: clamp(1.5rem, 4vw, 4rem);
 }
 
@@ -358,28 +359,30 @@ img {
   min-height: 240px;
   align-content: end;
   overflow: hidden;
+  content-visibility: auto;
+  contain-intrinsic-size: 240px;
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
 }
 
 .section-card-leyendas {
-  background-image: linear-gradient(180deg, rgba(7, 18, 21, 0.04), rgba(7, 18, 21, 0.86)), url('/FondoLeyendasFemme.png');
+  background-image: linear-gradient(180deg, rgba(7, 18, 21, 0.04), rgba(7, 18, 21, 0.86)), url('/FondoLeyendasFemme.webp');
   color: var(--white);
 }
 
 .section-card-canchas {
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(7, 18, 21, 0.82)), url('/FondoFemmePaletas.png');
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(7, 18, 21, 0.82)), url('/FondoFemmePaletas.webp');
   color: var(--white);
 }
 
 .section-card-torneos {
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(7, 18, 21, 0.8)), url('/FondoFemmeAgua.png');
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(7, 18, 21, 0.8)), url('/FondoFemmeAgua.webp');
   color: var(--white);
 }
 
 .section-card-historias {
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(7, 18, 21, 0.82)), url('/FondoFemme.png');
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(7, 18, 21, 0.82)), url('/FondoFemme.webp');
   color: var(--white);
 }
 
@@ -459,14 +462,14 @@ img {
   border-radius: 12px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(232, 239, 233, 0.92)),
-    url('/FondoFemmeAgua.png') center / cover;
+    url('/FondoFemmeAgua.webp') center / cover;
   box-shadow: 0 14px 35px rgba(18, 35, 40, 0.06);
 }
 
 .edition-card.is-femme {
   background:
     linear-gradient(180deg, rgba(255, 252, 246, 0.88), rgba(249, 229, 209, 0.92)),
-    url('/FondoFemme.png') center / cover;
+    url('/FondoFemme.webp') center / cover;
 }
 
 .edition-card > div:nth-child(2) {
@@ -539,7 +542,7 @@ img {
   border-radius: 14px;
   background:
     linear-gradient(115deg, rgba(7, 18, 21, 0.92), rgba(23, 63, 57, 0.72)),
-    url('/FondoFemmeAgua.png') center / cover;
+    url('/FondoFemmeAgua.webp') center / cover;
   color: var(--white);
   overflow: hidden;
 }
@@ -547,7 +550,7 @@ img {
 .tournament-edition-page.is-femme .edition-hero {
   background:
     linear-gradient(100deg, rgba(7, 18, 21, 0.9), rgba(7, 18, 21, 0.62) 55%, rgba(7, 18, 21, 0.15)),
-    url('/BannerFemme.png') center / cover;
+    url('/BannerFemme.webp') center / cover;
 }
 
 .edition-hero > div {
@@ -751,7 +754,7 @@ img {
 }
 
 .public-tournament-femme {
-  background-image: linear-gradient(135deg, rgba(248, 251, 247, 0.93), rgba(255, 246, 233, 0.8)), url('/FondoFemme.png');
+  background-image: linear-gradient(135deg, rgba(248, 251, 247, 0.93), rgba(255, 246, 233, 0.8)), url('/FondoFemme.webp');
   background-position: center;
   background-size: cover;
 }
@@ -771,9 +774,11 @@ img {
   padding: 1.5rem;
   border: 1px solid var(--line);
   border-radius: 12px;
-  background-image: linear-gradient(135deg, rgba(255, 249, 237, 0.9), rgba(255, 255, 255, 0.8)), url('/FondoFemme.png');
+  background-image: linear-gradient(135deg, rgba(255, 249, 237, 0.9), rgba(255, 255, 255, 0.8)), url('/FondoFemme.webp');
   background-position: center;
   background-size: cover;
+  content-visibility: auto;
+  contain-intrinsic-size: 620px;
 }
 
 .tournament-regulations h2 { margin: 0; font-size: clamp(2rem, 4vw, 3.1rem); }
@@ -841,7 +846,7 @@ img {
 .live-match-card p,
 .live-match-card small { margin: 0; color: var(--ink-soft); }
 .live-match-card strong { overflow-wrap: anywhere; }
-.live-match-card span { color: var(--terracotta); font-size: 0.78rem; font-weight: 800; text-transform: uppercase; }
+.live-match-versus { color: var(--terracotta); font-size: 0.78rem; font-weight: 800; text-transform: uppercase; }
 
 .live-dot {
   width: 0.65rem;
@@ -922,8 +927,9 @@ img {
 .bracket-round { display: grid; gap: 0.8rem; align-content: center; }
 .bracket-round > p { margin: 0; color: var(--clay); font-size: 0.78rem; font-weight: 800; text-transform: uppercase; }
 .bracket-match { display: grid; gap: 0.35rem; padding: 0.75rem 0.9rem; border: 1px solid var(--line); border-radius: 8px; background: var(--white); }
-.bracket-match span { display: flex; justify-content: space-between; gap: 0.75rem; }
-.bracket-match span + span { padding-top: 0.35rem; border-top: 1px solid var(--line); }
+.bracket-participant { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.75rem; align-items: center; }
+.bracket-participant + .bracket-participant { padding-top: 0.35rem; border-top: 1px solid var(--line); }
+.bracket-participant > span { color: var(--ink-soft); }
 .bracket-final { position: relative; }
 .bracket-final::before { content: ''; position: absolute; left: -2.1rem; top: 50%; width: 1.5rem; height: 48%; border: solid var(--forest); border-width: 2px 0 2px 2px; transform: translateY(-50%); opacity: 0.55; }
 
@@ -1220,24 +1226,55 @@ img {
 }
 
 .match-list li {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   gap: 1rem;
   padding-top: 0.7rem;
   border-top: 1px solid var(--line);
 }
 
-.match-list li > div:first-child,
+.match-teams,
 .match-score {
   display: grid;
-  gap: 0.2rem;
+  gap: 0.45rem;
 }
 
-.match-list span,
 .match-score small,
 .empty-copy {
   color: var(--ink-soft);
 }
+
+.public-team {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.public-team summary {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0.45rem 0.6rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.public-team summary::-webkit-details-marker { display: none; }
+.public-team summary::after { content: '+'; flex: 0 0 auto; color: var(--ink-soft); font-weight: 800; }
+.public-team[open] summary::after { content: '−'; }
+.public-team summary strong { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.public-team > p { margin: 0; padding: 0 0.6rem 0.55rem; color: var(--ink-soft); font-size: 0.78rem; line-height: 1.35; }
+.public-team-side { flex: 0 0 auto; color: var(--ink-soft); font-size: 0.64rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+.public-team.is-home { border-color: rgba(54, 162, 105, 0.35); background: rgba(231, 246, 239, 0.82); }
+.public-team.is-away { border-color: rgba(207, 100, 72, 0.34); background: rgba(255, 239, 233, 0.82); }
+.public-team.is-compact { border: 0; background: transparent; }
+.public-team.is-compact summary { min-height: 34px; padding: 0.25rem 0; }
+.public-team.is-compact > p { padding: 0 0 0.4rem; }
+.public-team-empty { color: var(--ink-soft); }
 
 .distribution-page { min-width: 0; }
 .distribution-rules { position: relative; display: flex; justify-content: space-between; align-items: start; gap: 1.5rem; }
@@ -2618,9 +2655,17 @@ textarea {
     flex-direction: column;
   }
 
+  .match-list li {
+    grid-template-columns: 1fr;
+  }
+
   .match-score {
+    grid-template-columns: auto minmax(0, 1fr);
+    width: 100%;
     text-align: left;
   }
+
+  .match-score small { text-align: right; }
 
   .span-2,
   .registration-copy {
@@ -2633,6 +2678,7 @@ textarea {
     align-items: flex-start;
     background-size: 100% 100%, 100% auto;
     background-position: center, top center;
+    background-image: linear-gradient(90deg, rgba(7, 18, 21, 0.88) 0%, rgba(7, 18, 21, 0.68) 34%, rgba(7, 18, 21, 0.12) 62%, transparent 100%), url('/BannerFemme-mobile.webp');
     padding: calc(33.333vw + 1.25rem) 1.25rem 1.5rem;
   }
 
@@ -2884,6 +2930,62 @@ textarea {
     min-height: 0;
     align-items: flex-start;
     padding: 1.4rem;
+  }
+
+  .tournament-edition-page.is-femme .edition-hero {
+    background-image:
+      linear-gradient(100deg, rgba(7, 18, 21, 0.9), rgba(7, 18, 21, 0.62) 55%, rgba(7, 18, 21, 0.15)),
+      url('/BannerFemme-mobile.webp');
+  }
+
+  .public-tournament {
+    gap: 1rem;
+    padding: 1rem;
+    overflow: hidden;
+  }
+
+  .public-tournament-tabs,
+  .public-category-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    max-width: 100%;
+    padding-bottom: 0.5rem;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
+  }
+
+  .public-tournament-tabs button,
+  .public-category-tabs button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .tournament-zone-grid,
+  .tournament-public-card {
+    min-width: 0;
+  }
+
+  .tournament-public-card {
+    padding: 0.85rem;
+  }
+
+  .public-table {
+    font-size: 0.75rem;
+  }
+
+  .public-table th,
+  .public-table td {
+    padding: 0.45rem 0.2rem;
+  }
+
+  .public-table th:nth-child(2),
+  .public-table td:nth-child(2) {
+    min-width: 140px;
+  }
+
+  .standings-rule {
+    font-size: 0.88rem;
+    line-height: 1.4;
   }
 
   .edition-hero img {
