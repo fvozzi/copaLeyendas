@@ -10,14 +10,10 @@ const pairName = (slot: TournamentScheduleSlot, side: 'home' | 'away') => {
   const pair = side === 'home' ? slot.match?.homeRegistration : slot.match?.awayRegistration;
   return pair ? `${pair.locality.name} · ${pairPlayerNames(pair)}` : 'A definir';
 };
-const byOperationPriority = (left: TournamentScheduleSlot, right: TournamentScheduleSlot) => {
-  const priority = (slot: TournamentScheduleSlot) => {
-    if (slot.match?.status === 'IN_PROGRESS') return 0;
-    if (slot.match?.status === 'READY') return 1;
-    if (slot.match?.status === 'PLAYED') return 3;
-    return 2;
-  };
-  return priority(left) - priority(right) || left.sequence - right.sequence;
+const byScheduledTime = (left: TournamentScheduleSlot, right: TournamentScheduleSlot) => {
+  const leftTime = left.scheduledAt ? new Date(left.scheduledAt).getTime() : Number.POSITIVE_INFINITY;
+  const rightTime = right.scheduledAt ? new Date(right.scheduledAt).getTime() : Number.POSITIVE_INFINITY;
+  return leftTime - rightTime || left.sequence - right.sequence;
 };
 
 export function AdminResultsPage() {
@@ -66,7 +62,7 @@ export function AdminResultsPage() {
     return () => URL.revokeObjectURL(preview);
   }, [startPhoto]);
 
-  const slots = useMemo(() => [...(data?.slots ?? [])].sort(byOperationPriority), [data]);
+  const slots = useMemo(() => [...(data?.slots ?? [])].sort(byScheduledTime), [data]);
   const visibleVenuePlayers = useMemo(() => {
     const term = playerSearch.trim().toLocaleLowerCase('es');
     if (!term) return venuePlayers;

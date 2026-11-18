@@ -14,3 +14,4 @@ tmp/resultados-concurrentes-*.json
 
 /entregables/*
 /tmp/muestra-placa-resultado.jpg
+/exports/*
