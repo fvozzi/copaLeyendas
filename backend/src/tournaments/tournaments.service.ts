@@ -442,7 +442,7 @@ export class TournamentsService {
       id: registration.id,
       localityId: registration.localityId,
       localityName: registration.locality.name,
-      label: registration.representingText?.trim() || playerLabel(registration),
+      label: currentLocalityLabel(registration.locality),
     };
   }
 
@@ -1264,6 +1264,10 @@ function teamLabel(registration: PairRegistration) {
 
 function playerLabel(registration: PairRegistration) {
   return [registration.playerOneName, registration.playerTwoName, registration.playerThreeName].filter(Boolean).join(' / ');
+}
+
+function currentLocalityLabel(locality: Pick<Locality, 'name' | 'provinceName'>) {
+  return [locality.name, locality.provinceName].map((value) => value?.trim()).filter(Boolean).join(', ');
 }
 
 function directQualifierPairs(zones: Zone[], qualifiersPerZone: number) {

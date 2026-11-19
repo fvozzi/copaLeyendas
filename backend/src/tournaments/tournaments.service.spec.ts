@@ -45,6 +45,21 @@ vi.mock('./match-result-photo-storage', () => ({
 const director = { sub: 1, role: 'DIRECTOR' } as never;
 const testPhoto = { buffer: Buffer.from('photo'), originalname: 'inicio.jpg', mimetype: 'image/jpeg', size: 5 } as Express.Multer.File;
 
+it('uses the current team name in distribution instead of stale registration text', () => {
+  const service = new TournamentsService({} as never, {} as never, {} as never, {} as never, {} as never,
+    {} as never, {} as never, {} as never, {} as never, {} as never);
+
+  const result = (service as unknown as { distributionRegistration: (registration: PairRegistration) => { localityName: string; label: string } })
+    .distributionRegistration({
+      id: 1,
+      localityId: 7,
+      locality: { id: 7, name: 'Florida', provinceName: 'Buenos Aires' },
+      representingText: 'Venado Tuerto, Santa Fe',
+    } as PairRegistration);
+
+  expect(result).toMatchObject({ localityName: 'Florida', label: 'Florida, Buenos Aires' });
+});
+
 it('gives a venue leader access to matches on every court at the assigned venue', async () => {
   const assignedVenue = { id: 10, name: 'Sede Centro', startsAt: '10:00', matchDurationMinutes: 40, matchesPerDay: 16 };
   const otherVenue = { id: 20, name: 'Sede Norte', startsAt: '10:00', matchDurationMinutes: 40, matchesPerDay: 16 };
