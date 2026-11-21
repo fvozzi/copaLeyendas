@@ -78,6 +78,9 @@ NGINX_PATH="/etc/nginx/sites-available/${APP_NAME}.conf"
 if [[ -f "$NGINX_PATH" ]] && grep -Fq 'try_files $uri $uri/ /index.html;' "$NGINX_PATH"; then
   sed -i 's|try_files $uri $uri/ /index.html;|try_files $uri /index.html;|g' "$NGINX_PATH"
 fi
+if [[ -f "$NGINX_PATH" ]] && ! grep -Fq 'location ~ ^/torneos/[^/]+/?$' "$NGINX_PATH"; then
+  sed -i '/^[[:space:]]*location \/ {/i\  location ~ ^/torneos/[^/]+/?$ {\n    try_files /index.html =404;\n  }\n' "$NGINX_PATH"
+fi
 
 nginx -t
 systemctl reload nginx
