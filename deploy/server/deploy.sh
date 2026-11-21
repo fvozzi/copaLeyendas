@@ -68,6 +68,17 @@ chown -R "$APP_USER:$APP_GROUP" \
 sudo -u "$APP_USER" npm --prefix backend run migration:run:prod
 
 systemctl restart "${APP_NAME}-backend"
+
+# Older installations tried physical directories before the SPA fallback. A
+# public asset directory can share a name with a React route (for example
+# /torneos/femme-2026/) and Nginx then returns 403 because it has no index file.
+# Apply this narrow migration to the active config without regenerating it, so
+# any HTTPS directives previously added by Certbot remain untouched.
+NGINX_PATH="/etc/nginx/sites-available/${APP_NAME}.conf"
+if [[ -f "$NGINX_PATH" ]] && grep -Fq 'try_files $uri $uri/ /index.html;' "$NGINX_PATH"; then
+  sed -i 's|try_files $uri $uri/ /index.html;|try_files $uri /index.html;|g' "$NGINX_PATH"
+fi
+
 nginx -t
 systemctl reload nginx
 
