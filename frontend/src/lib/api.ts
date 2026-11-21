@@ -405,6 +405,11 @@ export function startMatch(id: number, photo: File) {
 export function cancelMatchStart(id: number) {
   return request<TournamentMatch>(`/tournaments/matches/${id}/start`, { method: 'DELETE' }, true);
 }
+export function replaceMatchPhoto(id: number, photo: File) {
+  const form = new FormData();
+  form.set('photo', photo);
+  return request<TournamentMatch>(`/tournaments/matches/${id}/photo`, { method: 'POST', body: form }, true);
+}
 export function saveMatchResult(id: number, homeScore: number, awayScore: number, photo?: File) {
   if (!photo) return request<TournamentMatch>(`/tournaments/matches/${id}/result`, { method: 'POST', body: JSON.stringify({ homeScore, awayScore }) }, true);
   const form = new FormData();

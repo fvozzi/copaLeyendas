@@ -2,10 +2,10 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AdminResultsPage } from './AdminResultsPage';
-import { cancelMatchStart, getTournamentOperationPlayers, getTournamentOperations, openMatchResultPhoto, saveMatchResult, startMatch } from '../lib/api';
+import { cancelMatchStart, getTournamentOperationPlayers, getTournamentOperations, openMatchResultPhoto, replaceMatchPhoto, saveMatchResult, startMatch } from '../lib/api';
 import type { Court, TournamentOperations, TournamentScheduleSlot } from '../types';
 
-vi.mock('../lib/api', () => ({ cancelMatchStart: vi.fn(), getTournamentOperationPlayers: vi.fn(), getTournamentOperations: vi.fn(), openMatchResultPhoto: vi.fn(), saveMatchResult: vi.fn(), startMatch: vi.fn() }));
+vi.mock('../lib/api', () => ({ cancelMatchStart: vi.fn(), getTournamentOperationPlayers: vi.fn(), getTournamentOperations: vi.fn(), openMatchResultPhoto: vi.fn(), replaceMatchPhoto: vi.fn(), saveMatchResult: vi.fn(), startMatch: vi.fn() }));
 
 let root: Root;
 let container: HTMLDivElement;
@@ -110,6 +110,30 @@ it('cancels an in-progress match and returns it to the start queue', async () =>
   expect(container.textContent).toContain('Iniciar partido');
   expect(container.textContent).not.toContain('En juego');
   confirm.mockRestore();
+});
+
+it('replaces the photo of an in-progress match from its own action', async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  const court = { id: 3, name: 'Cancha 3', venue: { name: 'Club' } } as Court;
+  const slot = { id: 8, matchId: 50, tournamentId: 1, tournamentCategoryId: 2, tournamentCategory: { pointsPerSet: 25, category: { name: 'Damas A' } }, stage: 'SEMIFINAL', zoneName: 'Semifinal', matchOrder: 1, sequence: 50, courtId: 3, court, scheduledAt: '2026-11-21T13:00:00Z', match: { id: 50, matchOrder: 1, status: 'IN_PROGRESS', homeRegistration: { playerOneName: 'Ana', playerTwoName: 'Bea', locality: { name: 'Junín' } }, awayRegistration: { playerOneName: 'Cata', playerTwoName: 'Dora', locality: { name: 'Salta' } }, homeScore: null, awayScore: null, resultPhotoAvailable: true } } as TournamentScheduleSlot;
+  const operations = { tournament: { id: 1, name: 'Copa' }, courts: [court], slots: [slot] } as TournamentOperations;
+  vi.mocked(getTournamentOperations).mockResolvedValue(operations);
+  container = document.createElement('div'); document.body.append(container); root = createRoot(container);
+  await act(async () => root.render(createElement(AdminResultsPage)));
+
+  const changeButton = [...container.querySelectorAll('button')].find((item) => item.textContent === 'Cambiar foto')!;
+  await act(async () => changeButton.click());
+  const form = document.querySelector('form')!;
+  expect(form.textContent).toContain('reemplazará la publicada para este partido en juego');
+  const photo = new File(['foto nueva'], 'nueva.jpg', { type: 'image/jpeg' });
+  const input = form.querySelector<HTMLInputElement>('input[type="file"]')!;
+  expect(input.getAttribute('capture')).toBe('environment');
+  Object.defineProperty(input, 'files', { value: [photo] });
+  await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
+  await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+
+  expect(replaceMatchPhoto).toHaveBeenCalledWith(50, photo);
+  expect(container.textContent).toContain('Se cambió la foto de P50.');
 });
 
 it('shows and filters the players from the leader assigned venue', async () => {

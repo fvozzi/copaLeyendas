@@ -17,6 +17,7 @@ import { Locality } from '../localities/locality.entity';
 import { Player } from '../players/player.entity';
 import { ZoneMethodology } from './tournament-methodology';
 import { removeMatchResultPhoto } from './match-result-photo-storage';
+import { renderMatchResultCard } from './match-result-card';
 
 vi.mock('./tournament.entity', () => ({ Tournament: class Tournament {} }));
 vi.mock('./tournament-category.entity', () => ({ TournamentCategory: class TournamentCategory {} }));
@@ -641,6 +642,40 @@ describe('fixtures with unassigned places', () => {
 
     expect(matchRepository.save).toHaveBeenCalled();
     expect(matches[0]).toMatchObject({ homeScore: 25, awayScore: 10, resultSourcePhotoStoredName: 'match.jpg' });
+  });
+
+  it('replaces the published photo while a match is in progress', async () => {
+    const { service, matches, matchRepository } = setup();
+    await service.fixture(1);
+    await service.assignPlace(1, 10, 1);
+    await service.assignPlace(1, 30, 3);
+    await startFixtureMatch(service, matches[0].id);
+    matchRepository.save.mockClear();
+    const replacement = { ...testPhoto, originalname: 'foto-corregida.png' } as Express.Multer.File;
+
+    await expect(service.replaceMatchPhoto(matches[0].id, director, replacement)).resolves.toMatchObject({
+      status: MatchStatus.IN_PROGRESS,
+      resultPhotoAvailable: true,
+      resultSourcePhotoAvailable: false,
+    });
+
+    expect(matchRepository.save).toHaveBeenCalled();
+    expect(matches[0]).toMatchObject({ resultPhotoOriginalName: 'foto-corregida.jpg', resultPhotoMimeType: 'image/jpeg' });
+  });
+
+  it('regenerates the final plate when replacing a played match photo', async () => {
+    const { service, matches } = setup();
+    await service.fixture(1);
+    await service.assignPlace(1, 10, 1);
+    await service.assignPlace(1, 30, 3);
+    await startFixtureMatch(service, matches[0].id);
+    await service.result(matches[0].id, 25, 10, director);
+    vi.mocked(renderMatchResultCard).mockClear();
+
+    await service.replaceMatchPhoto(matches[0].id, director, testPhoto);
+
+    expect(renderMatchResultCard).toHaveBeenCalledOnce();
+    expect(matches[0]).toMatchObject({ status: MatchStatus.PLAYED, homeScore: 25, awayScore: 10, resultSourcePhotoStoredName: 'match.jpg' });
   });
 
   it('requires exactly one team to reach the configured 25 points', async () => {

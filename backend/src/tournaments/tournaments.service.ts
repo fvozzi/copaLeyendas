@@ -1112,6 +1112,44 @@ export class TournamentsService {
     return saved;
   }
 
+  async replaceMatchPhoto(id: number, user: AuthenticatedUser, photo: Express.Multer.File) {
+    const slot = await this.slots.findOneBy({ matchId: id });
+    if (!slot) throw new NotFoundException('Partido fuera del programa');
+    await this.assertMatchAccess(user, id, slot);
+    const initial = await this.matchWithZone(id);
+    if (initial.status === MatchStatus.PLAYED) {
+      if (initial.homeScore === null || initial.awayScore === null) throw new BadRequestException('El partido terminado no tiene un resultado válido.');
+      return this.result(id, initial.homeScore, initial.awayScore, user, photo);
+    }
+    if (initial.status !== MatchStatus.IN_PROGRESS) throw new BadRequestException('La foto solo se puede cambiar cuando el partido está en juego o terminado.');
+
+    const normalized = await normalizeMatchPhoto(photo.buffer).catch(() => { throw new BadRequestException('No se pudo procesar la foto. Probá con una imagen JPG, PNG o WebP.'); });
+    const storedName = await storeMatchPhotoBuffer(normalized.data, '.jpg');
+    let photosToRemove: string[] = [];
+    try {
+      const saved = await this.withLockedMatch(initial, async (manager) => {
+        const repository = manager.getRepository(TournamentMatch);
+        const match = await repository.findOneBy({ id });
+        if (!match) throw new NotFoundException('Partido no encontrado');
+        if (match.status !== MatchStatus.IN_PROGRESS) throw new BadRequestException('El partido ya no está en juego. Volvé a intentar desde su estado actual.');
+        photosToRemove = [...new Set([match.resultPhotoStoredName, match.resultSourcePhotoStoredName]
+          .filter((name): name is string => Boolean(name) && name !== storedName))];
+        match.resultSourcePhotoStoredName = null;
+        match.resultPhotoStoredName = storedName;
+        match.resultPhotoOriginalName = `${photo.originalname.replace(/\.[^.]+$/, '') || `partido-${id}`}.jpg`;
+        match.resultPhotoMimeType = 'image/jpeg';
+        match.resultPhotoSize = normalized.data.length;
+        await repository.save(match);
+        return { ...match, resultPhotoStoredName: undefined, resultPhotoAvailable: true, resultSourcePhotoAvailable: false };
+      });
+      await Promise.all(photosToRemove.map((name) => removeMatchResultPhoto(name)));
+      return saved;
+    } catch (error) {
+      await removeMatchResultPhoto(storedName);
+      throw error;
+    }
+  }
+
   async result(id: number, homeScore: number, awayScore: number, user: AuthenticatedUser, replacementPhoto?: Express.Multer.File) {
     const slot = await this.slots.findOneBy({ matchId: id });
     if (!slot) throw new NotFoundException('Partido fuera del programa');

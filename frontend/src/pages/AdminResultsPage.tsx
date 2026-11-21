@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { AdminDataGrid } from '../components/AdminDataGrid';
 import { AdminDialog } from '../components/AdminDialog';
-import { cancelMatchStart, getTournamentOperationPlayers, getTournamentOperations, openMatchResultPhoto, saveMatchResult, startMatch } from '../lib/api';
+import { cancelMatchStart, getTournamentOperationPlayers, getTournamentOperations, openMatchResultPhoto, replaceMatchPhoto, saveMatchResult, startMatch } from '../lib/api';
 import { pairPlayerNames } from '../lib/pair-display';
 import { clearMatchStartDraft, loadMatchStartDraft, saveMatchStartDraft } from '../lib/match-start-draft';
 import type { TournamentOperations, TournamentScheduleSlot, VenuePlayerRosterItem } from '../types';
@@ -23,8 +23,10 @@ export function AdminResultsPage() {
   const [rosterError, setRosterError] = useState<string | null>(null);
   const [starting, setStarting] = useState<TournamentScheduleSlot | null>(null);
   const [editing, setEditing] = useState<TournamentScheduleSlot | null>(null);
+  const [replacingPhoto, setReplacingPhoto] = useState<TournamentScheduleSlot | null>(null);
   const [scores, setScores] = useState({ home: '', away: '' });
   const [correctionPhoto, setCorrectionPhoto] = useState<File | null>(null);
+  const [replacementPhoto, setReplacementPhoto] = useState<File | null>(null);
   const [startPhoto, setStartPhoto] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +34,7 @@ export function AdminResultsPage() {
   const [startPhotoPreview, setStartPhotoPreview] = useState<string | null>(null);
   const startPhotoId = useId();
   const correctionPhotoId = useId();
+  const replacementPhotoId = useId();
   const draftRestored = useRef(false);
   const startRequestInFlight = useRef(false);
 
@@ -151,6 +154,20 @@ export function AdminResultsPage() {
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo guardar el resultado.'); }
     finally { setBusy(false); }
   };
+  const saveReplacementPhoto = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!replacingPhoto?.matchId || !replacementPhoto) return;
+    setBusy(true); setError(null); setNotice(null);
+    try {
+      await replaceMatchPhoto(replacingPhoto.matchId, replacementPhoto);
+      const sequence = replacingPhoto.sequence;
+      const wasPlayed = replacingPhoto.match?.status === 'PLAYED';
+      setReplacingPhoto(null); setReplacementPhoto(null);
+      await load();
+      setNotice(`Se cambió la foto de P${sequence}${wasPlayed ? ' y se regeneró la placa final' : ''}.`);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo cambiar la foto.'); }
+    finally { setBusy(false); }
+  };
   const cancelStart = async (slot: TournamentScheduleSlot) => {
     if (!slot.matchId || !window.confirm(`¿Cancelar el inicio de P${slot.sequence}?\n\nEl partido volverá a quedar listo para iniciar y se eliminará su foto inicial. Después podrás corregir el resultado del partido anterior.`)) return;
     setBusy(true); setError(null); setNotice(null);
@@ -179,7 +196,7 @@ export function AdminResultsPage() {
         { label: 'Visitante', render: (slot) => pairName(slot, 'away') },
         { label: 'Cancha prevista', render: (slot) => slot.court ? `${slot.court.venue?.name ? `${slot.court.venue.name} · ` : ''}${slot.court.name}` : 'Sin asignar' },
         { label: 'Estado', render: (slot) => slot.match?.status === 'PLAYED' ? <strong>{slot.match.homeScore} - {slot.match.awayScore}</strong> : slot.match?.status === 'IN_PROGRESS' ? <span className="status-chip status-live"><span className="live-dot" />En juego</span> : slot.match?.status === 'READY' ? 'Listo para jugar' : 'A definir' },
-      ]} renderActions={(slot) => <>{slot.match?.status === 'READY' && <button type="button" className="primary-button" disabled={busy} onClick={() => beginStart(slot)}>Iniciar partido</button>}{slot.match?.status === 'IN_PROGRESS' && <><button type="button" className="primary-button" disabled={busy} onClick={() => begin(slot)}>Cargar resultado</button><button type="button" className="danger-link" disabled={busy} onClick={() => void cancelStart(slot)}>Cancelar inicio</button></>}{slot.match?.status === 'PLAYED' && <button type="button" className="inline-link" disabled={busy} onClick={() => begin(slot)}>Editar resultado</button>}{slot.match?.resultPhotoAvailable && <button type="button" className="inline-link" onClick={() => void openMatchResultPhoto(slot.matchId!)}>Ver foto</button>}</>} /></section>
+      ]} renderActions={(slot) => <>{slot.match?.status === 'READY' && <button type="button" className="primary-button" disabled={busy} onClick={() => beginStart(slot)}>Iniciar partido</button>}{slot.match?.status === 'IN_PROGRESS' && <><button type="button" className="primary-button" disabled={busy} onClick={() => begin(slot)}>Cargar resultado</button><button type="button" className="danger-link" disabled={busy} onClick={() => void cancelStart(slot)}>Cancelar inicio</button></>}{slot.match?.status === 'PLAYED' && <button type="button" className="inline-link" disabled={busy} onClick={() => begin(slot)}>Editar resultado</button>}{['IN_PROGRESS', 'PLAYED'].includes(slot.match?.status ?? '') && <button type="button" className="inline-link" disabled={busy} onClick={() => { setReplacingPhoto(slot); setReplacementPhoto(null); setError(null); setNotice(null); }}>Cambiar foto</button>}{slot.match?.resultPhotoAvailable && <button type="button" className="inline-link" onClick={() => void openMatchResultPhoto(slot.matchId!)}>Ver foto</button>}</>} /></section>
       <section className="data-card venue-player-roster">
         <div className="section-heading"><div><p className="eyebrow">Consulta rápida</p><h2>Jugadoras de la sede</h2></div><span>{venuePlayers.length} {venuePlayers.length === 1 ? 'jugadora' : 'jugadoras'}</span></div>
         <div className="toolbar"><input aria-label="Buscar jugadora de la sede" placeholder="Buscar por jugadora, equipo, DNI, teléfono o categoría" value={playerSearch} onChange={(event) => setPlayerSearch(event.target.value)} /></div>
@@ -211,10 +228,22 @@ export function AdminResultsPage() {
       <p className="field-hint span-2">{editing.tournamentCategory.category.name} · {editing.zoneName}</p>
       <label>{pairName(editing, 'home')}<input aria-label="Tantos local" type="number" min="0" max={editing.tournamentCategory.pointsPerSet} value={scores.home} onChange={(event) => setScores({ ...scores, home: event.target.value })} required /></label>
       <label>{pairName(editing, 'away')}<input aria-label="Tantos visitante" type="number" min="0" max={editing.tournamentCategory.pointsPerSet} value={scores.away} onChange={(event) => setScores({ ...scores, away: event.target.value })} required /></label>
-      {editing.match.status === 'PLAYED' && <div className="span-2 result-photo-field"><strong>{editing.match.resultSourcePhotoAvailable ? 'Reemplazar foto original (opcional)' : 'Foto original sin la placa'}</strong><input id={correctionPhotoId} type="file" accept="image/*" onChange={(event) => setCorrectionPhoto(event.target.files?.[0] ?? null)} required={!editing.match.resultSourcePhotoAvailable} />{!editing.match.resultSourcePhotoAvailable && <small>Este resultado fue cargado antes de que el sistema conservara la foto inicial. Seleccionala nuevamente para poder regenerar la placa corregida.</small>}</div>}
+      {editing.match.status === 'PLAYED' && !editing.match.resultSourcePhotoAvailable && <div className="span-2 result-photo-field"><strong>Foto original sin la placa</strong><input id={correctionPhotoId} type="file" accept="image/*" onChange={(event) => setCorrectionPhoto(event.target.files?.[0] ?? null)} required /><small>Este resultado fue cargado antes de que el sistema conservara la foto inicial. Seleccionala nuevamente para poder regenerar la placa corregida.</small></div>}
       <p className="field-hint span-2">Uno de los dos equipos debe llegar a {editing.tournamentCategory.pointsPerSet} tantos.</p>
       <p className="field-hint span-2">Al confirmar, el sistema editará la foto inicial con los equipos, los tantos y el logo de Copa Leyendas.</p>
       <div className="span-2 form-actions"><button className="primary-button" disabled={busy || scores.home === '' || scores.away === '' || (editing.match.status === 'PLAYED' && !editing.match.resultSourcePhotoAvailable && !correctionPhoto)}>{busy ? 'Generando placa...' : editing.match.status === 'PLAYED' ? 'Guardar corrección' : 'Confirmar resultado'}</button></div>
+    </form></AdminDialog>}
+    {replacingPhoto?.match && <AdminDialog title={`Cambiar foto de P${replacingPhoto.sequence}`} onClose={() => { if (!busy) { setReplacingPhoto(null); setReplacementPhoto(null); } }}><form className="editor-form" onSubmit={saveReplacementPhoto} aria-busy={busy}>
+      {error && <div className="inline-state span-2" role="alert">{error}</div>}
+      <p className="field-hint span-2">{replacingPhoto.match.status === 'PLAYED' ? 'La nueva foto reemplazará la original y la placa final se regenerará con el resultado actual.' : 'La nueva foto reemplazará la publicada para este partido en juego.'}</p>
+      <div className="match-photo-orientation span-2"><div><span>Izquierda · Local</span><strong>{pairName(replacingPhoto, 'home')}</strong></div><div><span>Derecha · Visitante</span><strong>{pairName(replacingPhoto, 'away')}</strong></div></div>
+      <div className="span-2 result-photo-field">
+        <strong>Nueva foto del partido</strong>
+        <input id={replacementPhotoId} className="camera-input" type="file" accept="image/*" capture="environment" onChange={(event) => setReplacementPhoto(event.target.files?.[0] ?? null)} />
+        <label className={`camera-button${replacementPhoto ? ' has-photo' : ''}`} htmlFor={replacementPhotoId}><span aria-hidden="true">📷</span>{replacementPhoto ? 'Volver a sacar la foto' : 'Sacar nueva foto'}</label>
+        {replacementPhoto && <span className="camera-photo-ready" role="status">Nueva foto lista</span>}
+      </div>
+      <div className="span-2 form-actions"><button type="submit" className="primary-button" disabled={busy || !replacementPhoto}>{busy ? (replacingPhoto.match.status === 'PLAYED' ? 'Regenerando placa...' : 'Cambiando foto...') : 'Confirmar cambio de foto'}</button></div>
     </form></AdminDialog>}
   </div>;
 }
