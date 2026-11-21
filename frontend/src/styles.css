@@ -1012,6 +1012,8 @@ img {
 
 .match-photo-grid .match-photo-card > a img {
   aspect-ratio: 4 / 3;
+  object-fit: contain;
+  background: #e8e5de;
 }
 
 .match-photo-card figcaption {
@@ -1728,7 +1730,7 @@ img {
 .camera-button span { font-size: 1.45rem; line-height: 1; }
 .camera-button.has-photo { background: transparent; color: var(--brand); }
 .camera-input:focus-visible + .camera-button { outline: 3px solid rgba(215, 100, 67, 0.3); outline-offset: 3px; }
-.result-photo-preview { display: block; width: 100%; max-height: 360px; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); background: var(--white); }
+.result-photo-preview { display: block; width: 100%; max-height: 360px; aspect-ratio: 4 / 3; object-fit: contain; border-radius: 10px; border: 1px solid var(--line); background: #e8e5de; }
 .camera-photo-ready { color: var(--brand); font-size: 0.9rem; font-weight: 800; text-align: center; }
 .match-photo-orientation { display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: rgba(20, 60, 53, 0.05); }
 .match-photo-orientation > div { display: grid; gap: 0.25rem; padding: 1rem; }

@@ -30,4 +30,16 @@ describe('match result card', () => {
     expect(awayPanelPixel[0]).toBeGreaterThan(awayPanelPixel[1]);
     expect(clearBottom.length).toBeGreaterThan(0);
   }, 15_000);
+
+  it('keeps scores and long team labels inside the panels of a vertical photo', async () => {
+    const source = await sharp({ create: { width: 750, height: 1000, channels: 3, background: '#376e9c' } }).jpeg().toBuffer();
+    const result = await renderMatchResultCard(source, {
+      home: { team: 'Ciudad, CIUDAD AUTÓNOMA DE BUENOS AIRES', players: 'Díaz Romina Daniela / Daniela Hegoauburu', score: 19 },
+      away: { team: 'Venado Tuerto, Santa Fe', players: 'Milred Saavedra / Leda Rosso Lastra', score: 25 },
+    });
+    const metadata = await sharp(result).metadata();
+    expect(metadata.format).toBe('jpeg');
+    expect(metadata.width).toBe(750);
+    expect(metadata.height).toBe(1000);
+  }, 15_000);
 });
