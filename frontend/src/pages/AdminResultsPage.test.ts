@@ -2,10 +2,10 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AdminResultsPage } from './AdminResultsPage';
-import { getTournamentOperationPlayers, getTournamentOperations, openMatchResultPhoto, saveMatchResult, startMatch } from '../lib/api';
+import { cancelMatchStart, getTournamentOperationPlayers, getTournamentOperations, openMatchResultPhoto, saveMatchResult, startMatch } from '../lib/api';
 import type { Court, TournamentOperations, TournamentScheduleSlot } from '../types';
 
-vi.mock('../lib/api', () => ({ getTournamentOperationPlayers: vi.fn(), getTournamentOperations: vi.fn(), openMatchResultPhoto: vi.fn(), saveMatchResult: vi.fn(), startMatch: vi.fn() }));
+vi.mock('../lib/api', () => ({ cancelMatchStart: vi.fn(), getTournamentOperationPlayers: vi.fn(), getTournamentOperations: vi.fn(), openMatchResultPhoto: vi.fn(), saveMatchResult: vi.fn(), startMatch: vi.fn() }));
 
 let root: Root;
 let container: HTMLDivElement;
@@ -88,6 +88,28 @@ it('orders matches by scheduled time and then by match number, regardless of sta
   expect([...container.querySelectorAll('tbody tr')].map((row) => row.querySelector('[data-label="Partido"]')?.textContent)).toEqual([
     'P2 · Damas A', 'P4 · Damas A', 'P1 · Damas A', 'P8 · Damas A',
   ]);
+});
+
+it('cancels an in-progress match and returns it to the start queue', async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  const court = { id: 3, name: 'Cancha 3', venue: { name: 'Club' } } as Court;
+  const slot = { id: 8, matchId: 50, tournamentId: 1, tournamentCategoryId: 2, tournamentCategory: { pointsPerSet: 25, category: { name: 'Damas A' } }, stage: 'SEMIFINAL', zoneName: 'Semifinal', matchOrder: 1, sequence: 50, courtId: 3, court, scheduledAt: '2026-11-21T13:00:00Z', match: { id: 50, matchOrder: 1, status: 'IN_PROGRESS', homeRegistration: { playerOneName: 'Ana', playerTwoName: 'Bea', locality: { name: 'Junín' } }, awayRegistration: { playerOneName: 'Cata', playerTwoName: 'Dora', locality: { name: 'Salta' } }, homeScore: null, awayScore: null, resultPhotoAvailable: true } } as TournamentScheduleSlot;
+  const ready = { ...slot, match: { ...slot.match!, status: 'READY', startedAt: null, resultPhotoAvailable: false } } as TournamentScheduleSlot;
+  const operations = (current: TournamentScheduleSlot) => ({ tournament: { id: 1, name: 'Copa' }, courts: [court], slots: [current] } as TournamentOperations);
+  vi.mocked(getTournamentOperations).mockResolvedValueOnce(operations(slot)).mockResolvedValueOnce(operations(ready));
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  container = document.createElement('div'); document.body.append(container); root = createRoot(container);
+  await act(async () => root.render(createElement(AdminResultsPage)));
+
+  const cancelButton = [...container.querySelectorAll('button')].find((item) => item.textContent === 'Cancelar inicio')!;
+  await act(async () => cancelButton.click());
+
+  expect(confirm).toHaveBeenCalledWith(expect.stringContaining('¿Cancelar el inicio de P50?'));
+  expect(cancelMatchStart).toHaveBeenCalledWith(50);
+  expect(container.textContent).toContain('Se canceló el inicio de P50');
+  expect(container.textContent).toContain('Iniciar partido');
+  expect(container.textContent).not.toContain('En juego');
+  confirm.mockRestore();
 });
 
 it('shows and filters the players from the leader assigned venue', async () => {

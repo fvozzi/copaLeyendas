@@ -80,6 +80,10 @@ export class TournamentsController {
     if (!['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'].includes(photo.mimetype)) throw new BadRequestException('La foto debe ser JPG, PNG, WebP, HEIC o HEIF.');
     return this.s.startMatch(id, user, photo);
   }
+  @Delete('matches/:id/start')
+  cancelMatchStart(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number) {
+    return this.s.cancelMatchStart(id, user);
+  }
   @Post('matches/:id/result')
   @UseInterceptors(FileInterceptor('photo', { storage: memoryStorage(), limits: { fileSize: 8 * 1024 * 1024, files: 1 } }))
   result(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseIntPipe) id: number, @Body() dto: ResultDto, @UploadedFile() photo?: Express.Multer.File) {

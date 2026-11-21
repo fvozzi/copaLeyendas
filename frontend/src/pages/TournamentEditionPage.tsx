@@ -5,7 +5,7 @@ import { getPublicCurrentTournament, getPublicPosts, resolveApiAssetUrl } from '
 import { getTournamentEdition, normalizeSearchText, type TournamentEdition } from '../lib/tournament-editions';
 import { pairPlayerNames, pairTeamName } from '../lib/pair-display';
 import { venuesWithEnabledCourts } from '../lib/public-venues';
-import type { ContentPost, PairRegistration, PublicCurrentTournament, PublicTournamentZone, TournamentScheduleSlot } from '../types';
+import type { ContentPost, PairRegistration, PublicCurrentTournament, PublicTournamentZone, TournamentMatch, TournamentScheduleSlot } from '../types';
 
 type EditionTab = 'legend' | 'photos' | 'results';
 
@@ -72,7 +72,7 @@ export function TournamentEditionPage() {
 
       <div className="edition-tab-panel">
         {tab === 'legend' && <LegendSection edition={edition} post={legendPost} loading={legendLoading} />}
-        {tab === 'photos' && <PhotoSection name={edition.name} photos={edition.photos} />}
+        {tab === 'photos' && <PhotoSection name={edition.name} photos={edition.photos} current={edition.usesLiveTournament ? currentTournament : undefined} />}
         {tab === 'results' && (edition.usesLiveTournament
           ? <LiveResults current={currentTournament} error={tournamentError} />
           : <HistoricalResults editionName={edition.name} finals={edition.finals} />)}
@@ -100,9 +100,88 @@ function LegendSection({ edition, post, loading }: { edition: TournamentEdition;
   </article>;
 }
 
-function PhotoSection({ name, photos }: { name: string; photos: { src: string; alt: string }[] }) {
+type MatchGalleryPhoto = {
+  id: number;
+  category: string;
+  stage: string;
+  sequence: number | null;
+  match: TournamentMatch;
+  venue: string;
+};
+
+function PhotoSection({ name, photos, current }: { name: string; photos: { src: string; alt: string }[]; current?: PublicCurrentTournament | null }) {
+  if (current !== undefined) {
+    if (!current) return <div className="inline-state">Cargando fotos del torneo...</div>;
+    const gallery = tournamentMatchPhotos(current);
+    if (!gallery.length) return <div className="edition-empty"><p className="eyebrow">Archivo fotográfico</p><h2>Fotos de {name}</h2><p>Las fotos de los partidos aparecerán aquí a medida que se carguen los resultados.</p></div>;
+    const categories = [...new Set(gallery.map((photo) => photo.category))];
+    return <section className="match-photo-gallery">
+      <div className="edition-panel-heading"><p className="eyebrow">Archivo fotográfico</p><h2>Fotos de {name}</h2><p>{gallery.length} {gallery.length === 1 ? 'partido fotografiado' : 'partidos fotografiados'}, ordenados por categoría e instancia.</p></div>
+      {categories.map((category) => {
+        const categoryPhotos = gallery.filter((photo) => photo.category === category);
+        const headingId = `fotos-${normalizeSearchText(category).replace(/\s+/g, '-')}`;
+        return <section className="match-photo-category" aria-labelledby={headingId} key={category}>
+          <header className="match-photo-category-heading"><div><p className="eyebrow">Categoría</p><h3 id={headingId}>{category}</h3></div><span>{categoryPhotos.length} {categoryPhotos.length === 1 ? 'foto' : 'fotos'}</span></header>
+          <div className="edition-photo-grid match-photo-grid">
+            {categoryPhotos.map((photo) => <MatchPhotoCard photo={photo} key={`${photo.stage}-${photo.id}`} />)}
+          </div>
+        </section>;
+      })}
+    </section>;
+  }
   if (!photos.length) return <div className="edition-empty"><p className="eyebrow">Archivo fotográfico</p><h2>Fotos de {name}</h2><p>La galería está preparada y se completará cuando estén seleccionadas las fotos de esta edición.</p></div>;
   return <section><div className="edition-panel-heading"><p className="eyebrow">Archivo fotográfico</p><h2>Fotos de {name}</h2><p>{photos.length} fotos de esta edición. Abrí una foto para verla en tamaño completo.</p></div><div className="edition-photo-grid">{photos.map((photo) => <figure key={photo.src}><a href={photo.src} target="_blank" rel="noreferrer"><img src={photo.src} alt={photo.alt} loading="lazy" /></a><figcaption>{photo.alt}</figcaption></figure>)}</div></section>;
+}
+
+function MatchPhotoCard({ photo }: { photo: MatchGalleryPhoto }) {
+  const { match } = photo;
+  const imageUrl = resolveApiAssetUrl(match.photoUrl) ?? undefined;
+  const home = teamName(match.homeRegistration);
+  const away = teamName(match.awayRegistration);
+  const score = match.status === 'IN_PROGRESS'
+    ? 'En juego'
+    : match.homeScore === null || match.awayScore === null ? 'Resultado pendiente' : `${match.homeScore} - ${match.awayScore}`;
+  return <figure className="match-photo-card">
+    <a href={imageUrl} target="_blank" rel="noreferrer" aria-label={`Abrir foto del partido ${photo.sequence ?? photo.id}: ${home} contra ${away}`}>
+      <img src={imageUrl} alt={`${photo.category}, ${photo.stage}: ${home} contra ${away}`} loading="lazy" decoding="async" />
+    </a>
+    <figcaption>
+      <div className="match-photo-labels"><strong>{photo.sequence ? `P${photo.sequence}` : 'Partido'}</strong><span>{photo.stage}</span></div>
+      <p>{home} <span>vs.</span> {away}</p>
+      <div className="match-photo-details"><strong>{score}</strong><span>{formatMatchDate(match.scheduledAt)}</span></div>
+      {photo.venue && <small>{photo.venue}</small>}
+    </figcaption>
+  </figure>;
+}
+
+function tournamentMatchPhotos(current: PublicCurrentTournament): MatchGalleryPhoto[] {
+  const tournament = current.tournament;
+  if (!tournament) return [];
+  const zonePhotos = tournament.zones.flatMap((zone) => zone.matches
+    .filter((match) => Boolean(match.photoUrl))
+    .map((match) => ({ id: match.id, category: zone.category, stage: zone.name, sequence: match.sequence ?? null, match, venue: zone.venue.name })));
+  const knockoutPhotos = (tournament.knockout ?? []).flatMap((slot) => slot.match?.photoUrl ? [{
+    id: slot.match.id,
+    category: slot.tournamentCategory.category.name,
+    stage: knockoutStageLabel(slot.stage),
+    sequence: slot.sequence ?? slot.match.sequence ?? null,
+    match: slot.match,
+    venue: slot.court?.venue?.name ?? '',
+  }] : []);
+  return [...zonePhotos, ...knockoutPhotos].sort((left, right) => {
+    const categoryOrder = left.category.localeCompare(right.category, 'es');
+    if (categoryOrder) return categoryOrder;
+    const leftTime = left.match.scheduledAt ? new Date(left.match.scheduledAt).getTime() : Number.MAX_SAFE_INTEGER;
+    const rightTime = right.match.scheduledAt ? new Date(right.match.scheduledAt).getTime() : Number.MAX_SAFE_INTEGER;
+    return leftTime - rightTime || (left.sequence ?? left.id) - (right.sequence ?? right.id);
+  });
+}
+
+function knockoutStageLabel(stage: TournamentScheduleSlot['stage']) {
+  if (stage === 'QUARTERFINAL') return 'Cuartos de final';
+  if (stage === 'SEMIFINAL') return 'Semifinal';
+  if (stage === 'FINAL') return 'Final';
+  return 'Zona';
 }
 
 function HistoricalResults({ editionName, finals }: { editionName: string; finals: { category: string; champion: { locality: string; players: string }; finalist: { locality: string; players: string } }[] }) {

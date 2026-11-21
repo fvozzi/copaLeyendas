@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { AdminDataGrid } from '../components/AdminDataGrid';
 import { AdminDialog } from '../components/AdminDialog';
-import { getTournamentOperationPlayers, getTournamentOperations, openMatchResultPhoto, saveMatchResult, startMatch } from '../lib/api';
+import { cancelMatchStart, getTournamentOperationPlayers, getTournamentOperations, openMatchResultPhoto, saveMatchResult, startMatch } from '../lib/api';
 import { pairPlayerNames } from '../lib/pair-display';
 import { clearMatchStartDraft, loadMatchStartDraft, saveMatchStartDraft } from '../lib/match-start-draft';
 import type { TournamentOperations, TournamentScheduleSlot, VenuePlayerRosterItem } from '../types';
@@ -151,6 +151,17 @@ export function AdminResultsPage() {
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo guardar el resultado.'); }
     finally { setBusy(false); }
   };
+  const cancelStart = async (slot: TournamentScheduleSlot) => {
+    if (!slot.matchId || !window.confirm(`¿Cancelar el inicio de P${slot.sequence}?\n\nEl partido volverá a quedar listo para iniciar y se eliminará su foto inicial. Después podrás corregir el resultado del partido anterior.`)) return;
+    setBusy(true); setError(null); setNotice(null);
+    try {
+      await cancelMatchStart(slot.matchId);
+      if (editing?.matchId === slot.matchId) { setEditing(null); setCorrectionPhoto(null); }
+      await load();
+      setNotice(`Se canceló el inicio de P${slot.sequence}. Ya podés corregir el partido anterior.`);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo cancelar el inicio del partido.'); }
+    finally { setBusy(false); }
+  };
 
   if (!data) return <div className="admin-panel inline-state">{error ?? 'Cargando partidos...'}</div>;
   const venueNames = [...new Set(data.courts.flatMap((court) => court.venue?.name ? [court.venue.name] : []))];
@@ -168,7 +179,7 @@ export function AdminResultsPage() {
         { label: 'Visitante', render: (slot) => pairName(slot, 'away') },
         { label: 'Cancha prevista', render: (slot) => slot.court ? `${slot.court.venue?.name ? `${slot.court.venue.name} · ` : ''}${slot.court.name}` : 'Sin asignar' },
         { label: 'Estado', render: (slot) => slot.match?.status === 'PLAYED' ? <strong>{slot.match.homeScore} - {slot.match.awayScore}</strong> : slot.match?.status === 'IN_PROGRESS' ? <span className="status-chip status-live"><span className="live-dot" />En juego</span> : slot.match?.status === 'READY' ? 'Listo para jugar' : 'A definir' },
-      ]} renderActions={(slot) => <>{slot.match?.status === 'READY' && <button type="button" className="primary-button" disabled={busy} onClick={() => beginStart(slot)}>Iniciar partido</button>}{slot.match?.status === 'IN_PROGRESS' && <button type="button" className="primary-button" disabled={busy} onClick={() => begin(slot)}>Cargar resultado</button>}{slot.match?.status === 'PLAYED' && <button type="button" className="inline-link" disabled={busy} onClick={() => begin(slot)}>Editar resultado</button>}{slot.match?.resultPhotoAvailable && <button type="button" className="inline-link" onClick={() => void openMatchResultPhoto(slot.matchId!)}>Ver foto</button>}</>} /></section>
+      ]} renderActions={(slot) => <>{slot.match?.status === 'READY' && <button type="button" className="primary-button" disabled={busy} onClick={() => beginStart(slot)}>Iniciar partido</button>}{slot.match?.status === 'IN_PROGRESS' && <><button type="button" className="primary-button" disabled={busy} onClick={() => begin(slot)}>Cargar resultado</button><button type="button" className="danger-link" disabled={busy} onClick={() => void cancelStart(slot)}>Cancelar inicio</button></>}{slot.match?.status === 'PLAYED' && <button type="button" className="inline-link" disabled={busy} onClick={() => begin(slot)}>Editar resultado</button>}{slot.match?.resultPhotoAvailable && <button type="button" className="inline-link" onClick={() => void openMatchResultPhoto(slot.matchId!)}>Ver foto</button>}</>} /></section>
       <section className="data-card venue-player-roster">
         <div className="section-heading"><div><p className="eyebrow">Consulta rápida</p><h2>Jugadoras de la sede</h2></div><span>{venuePlayers.length} {venuePlayers.length === 1 ? 'jugadora' : 'jugadoras'}</span></div>
         <div className="toolbar"><input aria-label="Buscar jugadora de la sede" placeholder="Buscar por jugadora, equipo, DNI, teléfono o categoría" value={playerSearch} onChange={(event) => setPlayerSearch(event.target.value)} /></div>

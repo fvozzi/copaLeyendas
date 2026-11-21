@@ -1079,6 +1079,39 @@ export class TournamentsService {
     }
   }
 
+  async cancelMatchStart(id: number, user: AuthenticatedUser) {
+    const slot = await this.slots.findOneBy({ matchId: id });
+    if (!slot) throw new NotFoundException('Partido fuera del programa');
+    await this.assertMatchAccess(user, id, slot);
+    const initial = await this.matchWithZone(id);
+    if (initial.status !== MatchStatus.IN_PROGRESS) throw new BadRequestException('Solo se puede cancelar el inicio de un partido que está en juego.');
+    let photosToRemove: string[] = [];
+    const saved = await this.withLockedMatch(initial, async (manager) => {
+      const repository = manager.getRepository(TournamentMatch);
+      const match = await repository.findOneBy({ id });
+      if (!match) throw new NotFoundException('Partido no encontrado');
+      if (match.status !== MatchStatus.IN_PROGRESS) throw new BadRequestException('El partido ya no está en juego y no se puede cancelar su inicio.');
+      photosToRemove = [...new Set([match.resultPhotoStoredName, match.resultSourcePhotoStoredName].filter((name): name is string => Boolean(name)))];
+      match.status = match.homeRegistrationId && match.awayRegistrationId ? MatchStatus.READY : MatchStatus.PENDING;
+      match.homeScore = null;
+      match.awayScore = null;
+      match.winnerRegistrationId = null;
+      match.startedById = null;
+      match.startedAt = null;
+      match.resultSourcePhotoStoredName = null;
+      match.resultPhotoStoredName = null;
+      match.resultPhotoOriginalName = null;
+      match.resultPhotoMimeType = null;
+      match.resultPhotoSize = null;
+      match.resultSubmittedById = null;
+      match.resultSubmittedAt = null;
+      await repository.save(match);
+      return { ...match, resultPhotoAvailable: false, resultSourcePhotoAvailable: false };
+    });
+    await Promise.all(photosToRemove.map((storedName) => removeMatchResultPhoto(storedName)));
+    return saved;
+  }
+
   async result(id: number, homeScore: number, awayScore: number, user: AuthenticatedUser, replacementPhoto?: Express.Multer.File) {
     const slot = await this.slots.findOneBy({ matchId: id });
     if (!slot) throw new NotFoundException('Partido fuera del programa');

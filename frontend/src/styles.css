@@ -958,6 +958,121 @@ img {
   font-size: 0.8rem;
 }
 
+.match-photo-gallery {
+  display: grid;
+  gap: 2rem;
+}
+
+.match-photo-category {
+  display: grid;
+  gap: 1rem;
+}
+
+.match-photo-category-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: end;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.match-photo-category-heading h3,
+.match-photo-category-heading p {
+  margin: 0;
+}
+
+.match-photo-category-heading h3 {
+  font-family: 'Newsreader', serif;
+  font-size: clamp(1.8rem, 3vw, 2.5rem);
+  line-height: 1;
+}
+
+.match-photo-category-heading > span {
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(23, 63, 57, 0.1);
+  color: var(--forest);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.match-photo-card {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 12px 28px rgba(18, 35, 40, 0.07);
+}
+
+.match-photo-grid .match-photo-card > a,
+.match-photo-grid .match-photo-card > a img {
+  border-radius: 0;
+}
+
+.match-photo-grid .match-photo-card > a img {
+  aspect-ratio: 4 / 3;
+}
+
+.match-photo-card figcaption {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.9rem 1rem 1rem;
+}
+
+.match-photo-card figcaption p,
+.match-photo-card figcaption small {
+  margin: 0;
+}
+
+.match-photo-card figcaption p {
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.match-photo-card figcaption p span {
+  color: var(--clay);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.match-photo-labels,
+.match-photo-details {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.match-photo-labels strong {
+  padding: 0.25rem 0.48rem;
+  border-radius: 6px;
+  background: var(--forest);
+  color: var(--white);
+}
+
+.match-photo-labels span,
+.match-photo-details span,
+.match-photo-card figcaption small {
+  color: var(--ink-soft);
+}
+
+.match-photo-labels span {
+  font-weight: 750;
+}
+
+.match-photo-details strong {
+  color: var(--forest);
+  font-size: 1rem;
+}
+
+.match-photo-card figcaption small {
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--line);
+}
+
 .public-tournament {
   display: grid;
   gap: 1.25rem;

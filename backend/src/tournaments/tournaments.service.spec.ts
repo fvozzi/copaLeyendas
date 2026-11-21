@@ -16,6 +16,7 @@ import { RegistrationAccessGrant } from '../registrations/registration-access-gr
 import { Locality } from '../localities/locality.entity';
 import { Player } from '../players/player.entity';
 import { ZoneMethodology } from './tournament-methodology';
+import { removeMatchResultPhoto } from './match-result-photo-storage';
 
 vi.mock('./tournament.entity', () => ({ Tournament: class Tournament {} }));
 vi.mock('./tournament-category.entity', () => ({ TournamentCategory: class TournamentCategory {} }));
@@ -567,6 +568,36 @@ describe('fixtures with unassigned places', () => {
       resultPhotoAvailable: true,
     });
     expect(matches[0]).toMatchObject({ status: MatchStatus.IN_PROGRESS, resultPhotoStoredName: 'match.jpg' });
+  });
+
+  it('cancels an in-progress dependent match so the previous winner can be corrected', async () => {
+    const { service, matches } = setup();
+    await service.fixture(1);
+    for (let seed = 1; seed <= 4; seed++) await service.assignPlace(1, seed * 10, seed);
+    await startFixtureMatch(service, matches[0].id);
+    await service.result(matches[0].id, 25, 10, director);
+    await startFixtureMatch(service, matches[1].id);
+    await service.result(matches[1].id, 25, 10, director);
+    await startFixtureMatch(service, matches[2].id);
+
+    await expect(service.result(matches[0].id, 10, 25, director)).rejects.toThrow('partido siguiente ya fue iniciado');
+    // The real TypeORM transaction rolls this rejected correction back. The
+    // in-memory repository used by this unit test needs that rollback mirrored.
+    Object.assign(matches[0], { status: MatchStatus.PLAYED, homeScore: 25, awayScore: 10, winnerRegistrationId: 10 });
+    await expect(service.cancelMatchStart(matches[2].id, director)).resolves.toMatchObject({ status: MatchStatus.READY, resultPhotoAvailable: false });
+    expect(matches[2]).toMatchObject({
+      status: MatchStatus.READY,
+      startedAt: null,
+      startedById: null,
+      resultPhotoStoredName: null,
+      homeScore: null,
+      awayScore: null,
+    });
+    expect(removeMatchResultPhoto).toHaveBeenCalledWith('match.jpg');
+
+    await service.result(matches[0].id, 10, 25, director);
+    expect(matches[2]).toMatchObject({ homeRegistrationId: 30, awayRegistrationId: 40, status: MatchStatus.READY });
+    expect(matches[3]).toMatchObject({ homeRegistrationId: 20, awayRegistrationId: 10, status: MatchStatus.READY });
   });
 
   it('preserves the clean source photo and regenerates the plate when correcting a result', async () => {
