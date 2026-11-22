@@ -1052,8 +1052,9 @@ img {
 
 .edition-legend-feature {
   display: grid;
-  grid-template-columns: minmax(260px, 0.55fr) minmax(0, 1fr);
-  max-width: 1120px;
+  grid-template-columns: minmax(320px, 0.42fr) minmax(0, 0.58fr);
+  width: 100%;
+  max-width: none;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -1063,7 +1064,7 @@ img {
 
 .edition-legend-feature.without-image {
   grid-template-columns: minmax(0, 1fr);
-  max-width: 900px;
+  max-width: none;
 }
 
 .edition-legend-feature > img {
