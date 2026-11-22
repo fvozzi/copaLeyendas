@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { publicSectionKeys, sectionMeta, tournamentStory } from '../lib/content';
+import { PageViewTracker } from './PageViewTracker';
 
 export function SiteLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <div className="site-shell">
+      <PageViewTracker />
       <header className="site-header">
         <NavLink to="/" className="brandmark" onClick={() => setMenuOpen(false)}>
           <span className="brandmark-kicker">Copa</span>

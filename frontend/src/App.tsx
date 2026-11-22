@@ -30,6 +30,7 @@ import { AdminResultsPage } from './pages/AdminResultsPage';
 import { AdminDistributionPage } from './pages/AdminDistributionPage';
 import { TeamCuilPage } from './pages/TeamCuilPage';
 import { MuseumPage } from './pages/MuseumPage';
+import { AdminAnalyticsPage } from './pages/AdminAnalyticsPage';
 
 export default function App() {
   return (
@@ -68,6 +69,7 @@ export default function App() {
               <Route path="usuarios" element={<AdminUsersPage />} />
               <Route path="backups" element={<AdminBackupsPage />} />
               <Route path="actividad" element={<AdminActivityPage />} />
+              <Route path="estadisticas" element={<AdminAnalyticsPage />} />
             </Route>
           </Route>
         </Routes>

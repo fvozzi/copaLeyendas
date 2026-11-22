@@ -2345,6 +2345,110 @@ textarea {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.analytics-period {
+  display: grid;
+  min-width: min(100%, 220px);
+  gap: 0.35rem;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.analytics-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.analytics-daily-card h2,
+.analytics-ranking h2 {
+  margin: 0 0 1rem;
+}
+
+.analytics-chart {
+  display: flex;
+  min-height: 230px;
+  align-items: end;
+  gap: clamp(0.2rem, 1vw, 0.8rem);
+  overflow-x: auto;
+  padding: 1.5rem 0 0.25rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.analytics-chart-column {
+  display: grid;
+  grid-template-rows: 1.2rem minmax(120px, 1fr) 1.4rem;
+  flex: 1 0 28px;
+  min-width: 28px;
+  height: 205px;
+  align-items: end;
+  text-align: center;
+}
+
+.analytics-chart-column > span,
+.analytics-chart-column small {
+  color: var(--ink-soft);
+  font-size: 0.68rem;
+}
+
+.analytics-chart-column > div {
+  width: min(100%, 38px);
+  min-height: 4px;
+  margin: 0 auto;
+  border-radius: 5px 5px 0 0;
+  background: linear-gradient(180deg, var(--coral), var(--clay));
+}
+
+.analytics-ranking ol {
+  display: grid;
+  gap: 0.9rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.analytics-ranking li,
+.analytics-ranking li > div {
+  display: grid;
+  min-width: 0;
+  gap: 0.25rem;
+}
+
+.analytics-ranking li > div {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.analytics-ranking li strong {
+  overflow-wrap: anywhere;
+}
+
+.analytics-ranking li span {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  text-align: right;
+}
+
+.analytics-ranking-bar {
+  display: block;
+  height: 0.4rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(23, 63, 57, 0.1);
+}
+
+.analytics-ranking-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--forest);
+}
+
 .cash-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .cash-total-summary {
   display: grid;
@@ -2877,6 +2981,7 @@ textarea {
   .cash-coverage-values { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
   .dashboard-overview-grid { grid-template-columns: 1fr; }
+  .analytics-grid { grid-template-columns: 1fr; }
 }
 
 @media (min-width: 1101px) and (max-height: 820px) {

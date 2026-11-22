@@ -44,4 +44,10 @@ describe('ActivityInterceptor', () => {
       level: 'WARNING', statusCode: 400, detail: 'BadRequestException: playerTwoPhone must be longer than or equal to 6 characters',
     }));
   });
+
+  it('does not duplicate anonymous page views in the technical activity log', async () => {
+    const { activity, context, interceptor } = setup({ method: 'POST', originalUrl: '/api/public/analytics/page-view' });
+    await firstValueFrom(interceptor.intercept(context as never, { handle: () => of(undefined) }));
+    expect(activity.record).not.toHaveBeenCalled();
+  });
 });

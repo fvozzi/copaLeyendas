@@ -62,7 +62,7 @@ function safeRoute(request: Request) {
 }
 
 function excluded(method: string, path: string) {
-  return path.endsWith('/health') || path.endsWith('/activity') || (method === 'GET' && path.endsWith('/backups'));
+  return path.endsWith('/health') || path.endsWith('/activity') || path.endsWith('/public/analytics/page-view') || (method === 'GET' && path.endsWith('/backups'));
 }
 
 function describeActivity(method: string, path: string, status: number) {

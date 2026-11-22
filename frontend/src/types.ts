@@ -48,6 +48,18 @@ export interface ActivityLogPage {
   pages: number;
 }
 
+export interface AnalyticsSummary {
+  days: number;
+  from: string;
+  views: number;
+  visitors: number;
+  sections: { label: string; views: number; visitors: number }[];
+  pages: { label: string; views: number; visitors: number }[];
+  devices: { label: 'MOBILE' | 'TABLET' | 'DESKTOP'; views: number }[];
+  referrers: { label: string; views: number }[];
+  daily: { date: string; views: number; visitors: number }[];
+}
+
 export interface AdminUser {
   id: number;
   email: string;

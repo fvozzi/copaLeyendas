@@ -51,6 +51,7 @@ export function AdminLayout() {
           {isDirector && <NavLink to="/app/usuarios" className="admin-nav-link">Usuarios</NavLink>}
           {isDirector && <NavLink to="/app/backups" className="admin-nav-link">Backups</NavLink>}
           {isDirector && <NavLink to="/app/actividad" className="admin-nav-link">Actividad</NavLink>}
+          {isDirector && <NavLink to="/app/estadisticas" className="admin-nav-link">Estadísticas</NavLink>}
           <NavLink to="/" className="admin-nav-link">
             Ver sitio
           </NavLink>

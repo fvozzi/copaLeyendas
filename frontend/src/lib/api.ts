@@ -26,6 +26,7 @@ import type {
   Category, CategoryPayload, Court, CourtPayload, Venue, VenuePayload,
   Tournament, TournamentPayload, TournamentDetail, TournamentMatch, ZoneDetail, ZoneRegistrationPlacement, AdminUser, AdminUserPayload, CashExpense, CashExpensePayload, CashIncomePayload, CashSummary, RegistrationCashIncomePayload, TournamentScheduleSlot,
   ActivityLogPage, TournamentOperations, VenuePlayerRosterItem, ZoneMethodology,
+  AnalyticsSummary,
 } from '../types';
 
 const configuredApiUrl = import.meta.env.VITE_API_URL;
@@ -43,6 +44,11 @@ export function resolveApiAssetUrl(path: string | null | undefined, apiUrl = API
 
 export function getBackups() { return request<BackupOverview>('/backups', {}, true); }
 export function getActivity(params: { page?: number; pageSize?: number; level?: string; method?: string; search?: string }) { return request<ActivityLogPage>(`/activity${buildQuery(params)}`, {}, true); }
+export function getAnalyticsSummary(days = 30) { return request<AnalyticsSummary>(`/analytics/summary?days=${days}`, {}, true); }
+export async function recordPageView(payload: { path: string; visitorId: string; referrer?: string }) {
+  const response = await fetch(`${API_URL}/public/analytics/page-view`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), keepalive: true });
+  if (!response.ok) throw new Error('No se pudo registrar la visita.');
+}
 export function updateBackupSettings(settings: BackupSettings) { return request<BackupOverview>('/backups/settings', { method: 'PATCH', body: JSON.stringify(settings) }, true); }
 export function createBackup() { return request<{ id: number; status: 'RUNNING' }>('/backups', { method: 'POST' }, true); }
 export async function downloadBackup(backup: DatabaseBackup) {
