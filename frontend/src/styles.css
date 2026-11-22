@@ -411,6 +411,27 @@ img {
   min-height: 60vh;
 }
 
+.section-page-historias > .section-heading {
+  grid-template-columns: minmax(7rem, auto) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0.5rem clamp(1.5rem, 4vw, 4rem);
+  max-width: none;
+  margin-bottom: clamp(1.5rem, 3vw, 2.5rem);
+  padding-bottom: clamp(1rem, 2vw, 1.5rem);
+  border-bottom: 1px solid var(--line);
+}
+
+.section-page-historias > .section-heading .eyebrow {
+  margin: 0;
+}
+
+.section-page-historias > .section-heading h1 {
+  max-width: none;
+  font-size: clamp(1.75rem, 3vw, 3rem);
+  line-height: 1.05;
+  text-wrap: balance;
+}
+
 .section-subheading {
   display: grid;
   gap: 0.35rem;
@@ -438,23 +459,205 @@ img {
 }
 
 .history-feature-heading {
-  max-width: 900px;
+  display: grid;
+  grid-template-columns: minmax(8rem, 0.24fr) minmax(0, 1fr);
+  grid-template-areas:
+    "label title"
+    ". introduction";
+  gap: 0.75rem clamp(1.5rem, 4vw, 4rem);
+  max-width: none;
+  padding: clamp(1.25rem, 3vw, 2.5rem);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(215, 100, 67, 0.08), rgba(255, 255, 255, 0.48) 58%, rgba(23, 63, 57, 0.06));
+}
+
+.history-feature-heading .eyebrow {
+  grid-area: label;
+  margin: 0.35rem 0 0;
 }
 
 .history-feature-heading h2 {
-  max-width: 17ch;
-  margin: 0.5rem 0 1rem;
+  grid-area: title;
+  max-width: none;
+  margin: 0;
   font-family: 'Newsreader', serif;
-  font-size: clamp(2.8rem, 6vw, 5.5rem);
-  line-height: 0.95;
+  font-size: clamp(2.5rem, 4.5vw, 4.75rem);
+  line-height: 0.98;
   text-wrap: balance;
 }
 
 .history-feature-heading > p:last-child {
+  grid-area: introduction;
   max-width: 64ch;
   margin: 0;
   color: var(--ink-soft);
   font-size: clamp(1rem, 1.6vw, 1.2rem);
+}
+
+.history-museum-reference {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.6fr) minmax(0, 1fr);
+  gap: clamp(1.5rem, 4vw, 4rem);
+  align-items: center;
+  padding: clamp(1.4rem, 3.5vw, 3rem);
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--forest-deep), var(--forest));
+  color: var(--white);
+  box-shadow: 0 16px 38px rgba(18, 35, 40, 0.14);
+}
+
+.history-museum-reference .eyebrow {
+  margin: 0 0 0.5rem;
+  color: #ffd095;
+}
+
+.history-museum-reference h2 {
+  margin: 0;
+  font-family: 'Newsreader', serif;
+  font-size: clamp(2rem, 4vw, 3.6rem);
+  line-height: 1;
+  text-wrap: balance;
+}
+
+.history-museum-reference p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.82);
+  line-height: 1.65;
+}
+
+.history-museum-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.8rem 1.25rem;
+  margin-top: 1.25rem;
+}
+
+.history-museum-actions .inline-link {
+  color: var(--white);
+}
+
+.museum-page {
+  display: grid;
+  gap: clamp(2.5rem, 6vw, 5rem);
+}
+
+.museum-heading,
+.museum-about {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.7fr) minmax(0, 1fr);
+  gap: clamp(1.5rem, 5vw, 5rem);
+}
+
+.museum-heading {
+  align-items: end;
+  padding-bottom: clamp(1.5rem, 3vw, 2.5rem);
+  border-bottom: 1px solid var(--line);
+}
+
+.museum-heading .eyebrow,
+.museum-about .eyebrow {
+  margin: 0 0 0.5rem;
+}
+
+.museum-heading h1,
+.museum-about h2,
+.museum-links-heading h2 {
+  margin: 0;
+  font-family: 'Newsreader', serif;
+  text-wrap: balance;
+}
+
+.museum-heading h1 {
+  font-size: clamp(3rem, 7vw, 6.5rem);
+  line-height: 0.92;
+}
+
+.museum-heading > p {
+  max-width: 55ch;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: clamp(1.1rem, 2vw, 1.4rem);
+  line-height: 1.55;
+}
+
+.museum-about {
+  padding: clamp(1.5rem, 4vw, 3rem);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.museum-about h2 {
+  font-size: clamp(2.2rem, 4.5vw, 4rem);
+  line-height: 1;
+}
+
+.museum-about p {
+  margin: 0 0 1rem;
+  color: var(--ink-soft);
+  line-height: 1.75;
+}
+
+.museum-about p:last-child {
+  margin-bottom: 0;
+}
+
+.museum-links-heading {
+  margin-top: 0;
+}
+
+.museum-link-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.museum-link-card {
+  display: grid;
+  min-width: 0;
+  min-height: 220px;
+  align-content: start;
+  gap: 0.65rem;
+  padding: 1.4rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--ink);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.museum-link-card:hover,
+.museum-link-card:focus-visible {
+  transform: translateY(-3px);
+  border-color: rgba(23, 63, 57, 0.35);
+  box-shadow: 0 14px 30px rgba(18, 35, 40, 0.1);
+}
+
+.museum-link-card > span {
+  color: var(--clay);
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.museum-link-card strong {
+  font-family: 'Newsreader', serif;
+  font-size: 2rem;
+}
+
+.museum-link-card p {
+  margin: 0;
+  color: var(--ink-soft);
+  line-height: 1.55;
+}
+
+.museum-link-card small {
+  align-self: end;
+  margin-top: auto;
+  color: var(--forest);
+  font-weight: 800;
 }
 
 .history-chapter {
@@ -3259,16 +3462,106 @@ textarea {
   .history-chapter.is-reverse .history-chapter-copy {
     order: 0;
   }
+
+  .history-museum-reference,
+  .museum-heading,
+  .museum-about {
+    grid-template-columns: 1fr;
+  }
+
+  .museum-link-grid {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
+  .section-page-historias > .section-heading {
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+    margin-bottom: 1.25rem;
+    padding-bottom: 1rem;
+  }
+
+  .section-page-historias > .section-heading h1 {
+    font-size: clamp(1.75rem, 8vw, 2.3rem);
+    line-height: 1.08;
+  }
+
   .history-feature {
-    gap: 3rem;
+    gap: 2.5rem;
+  }
+
+  .history-feature-heading {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "label"
+      "title"
+      "introduction";
+    gap: 0.65rem;
+    padding: 1.1rem;
+    border-radius: 12px;
+  }
+
+  .history-feature-heading .eyebrow {
+    margin: 0;
   }
 
   .history-feature-heading h2 {
     max-width: none;
-    font-size: clamp(2.5rem, 13vw, 3.7rem);
+    font-size: clamp(2.15rem, 10vw, 3rem);
+    line-height: 1;
+  }
+
+  .history-feature-heading > p:last-child {
+    font-size: 1rem;
+    line-height: 1.55;
+  }
+
+  .history-chapter-copy h3 {
+    font-size: clamp(1.9rem, 9vw, 2.7rem);
+  }
+
+  .history-museum-reference {
+    gap: 1.25rem;
+    padding: 1.25rem;
+  }
+
+  .history-museum-reference h2 {
+    font-size: clamp(2rem, 10vw, 2.8rem);
+  }
+
+  .history-museum-actions {
+    display: grid;
+    align-items: stretch;
+  }
+
+  .history-museum-actions .primary-button {
+    width: 100%;
+  }
+
+  .museum-page {
+    gap: 2.5rem;
+  }
+
+  .museum-heading h1 {
+    font-size: clamp(3rem, 16vw, 4.5rem);
+  }
+
+  .museum-about {
+    gap: 1.25rem;
+    padding: 1.25rem;
+  }
+
+  .museum-about h2 {
+    font-size: clamp(2.1rem, 10vw, 3rem);
+  }
+
+  .museum-link-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .museum-link-card {
+    min-height: 0;
   }
 
   .history-media-grid.is-mosaic {

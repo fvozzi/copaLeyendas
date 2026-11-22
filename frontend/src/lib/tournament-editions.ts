@@ -84,6 +84,11 @@ export const tournamentEditions: TournamentEdition[] = [
         src: '/torneos/femme-2026/silvina-cimadamore.webp',
         alt: 'Póster de la Copa Leyendas Femme 2026 en homenaje a Silvina Cimadamore',
       },
+      interview: {
+        label: 'Ver entrevista a Silvina Cimadamore',
+        url: 'https://www.youtube.com/watch?v=3GmOVfJMYR0&list=PLIrYhifQfct3CIuNXUsD_JDbSO6AGcHmk&index=13',
+        embedUrl: 'https://www.youtube-nocookie.com/embed/3GmOVfJMYR0',
+      },
     },
     summary: 'Una edición especial y única dedicada íntegramente a las mujeres.',
     status: 'upcoming',

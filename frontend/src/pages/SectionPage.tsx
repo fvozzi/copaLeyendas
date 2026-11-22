@@ -4,6 +4,7 @@ import { getPublicPosts } from '../lib/api';
 import { sectionMeta } from '../lib/content';
 import { pelotaPaletaHistory } from '../lib/history-content';
 import { tournamentArchiveStory, tournamentEditions } from '../lib/tournament-editions';
+import { museoPelotari } from '../lib/museum-content';
 import type { ContentPost, ContentSection } from '../types';
 
 export function SectionPage() {
@@ -22,7 +23,7 @@ export function SectionPage() {
   if (validSection === 'leyendas' || validSection === 'canchas') return <Navigate to="/secciones/torneos" replace />;
 
   return (
-    <section className="content-band section-page">
+    <section className={`content-band section-page section-page-${validSection}`}>
       <div className="section-heading">
         <p className="eyebrow">{sectionMeta[validSection].label}</p>
         <h1>{sectionMeta[validSection].intro}</h1>
@@ -43,6 +44,19 @@ function HistoryFeature() {
       <h2>{pelotaPaletaHistory.title}</h2>
       <p>{pelotaPaletaHistory.introduction}</p>
     </header>
+    <section className="history-museum-reference" aria-labelledby="history-museum-title">
+      <div>
+        <p className="eyebrow">Museo Pelotari</p>
+        <h2 id="history-museum-title">La memoria también vive en Pasión por la Paleta</h2>
+      </div>
+      <div>
+        <p>{museoPelotari.description}</p>
+        <div className="history-museum-actions">
+          <Link to="/museo-pelotari" className="primary-button">Conocer el museo</Link>
+          <a href={museoPelotari.links[0].url} target="_blank" rel="noreferrer" className="inline-link">Visitar su archivo web</a>
+        </div>
+      </div>
+    </section>
     {pelotaPaletaHistory.chapters.map((chapter, index) => <section key={chapter.period} className={`history-chapter${index % 2 === 1 ? ' is-reverse' : ''}`}>
       <div className="history-chapter-copy">
         <span>{chapter.period}</span>

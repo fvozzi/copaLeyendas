@@ -30,6 +30,9 @@ export function SiteLayout() {
               {sectionMeta[key].label}
             </NavLink>
           ))}
+          <NavLink to="/museo-pelotari" className="site-nav-link">
+            Museo Pelotari
+          </NavLink>
           <NavLink to="/inscripcion" className="site-nav-link site-nav-link-accent">
             Inscripcion
           </NavLink>

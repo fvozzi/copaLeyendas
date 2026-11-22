@@ -29,6 +29,7 @@ import { TournamentEditionPage } from './pages/TournamentEditionPage';
 import { AdminResultsPage } from './pages/AdminResultsPage';
 import { AdminDistributionPage } from './pages/AdminDistributionPage';
 import { TeamCuilPage } from './pages/TeamCuilPage';
+import { MuseumPage } from './pages/MuseumPage';
 
 export default function App() {
   return (
@@ -38,6 +39,7 @@ export default function App() {
           <Route element={<SiteLayout />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/secciones/:section" element={<SectionPage />} />
+            <Route path="/museo-pelotari" element={<MuseumPage />} />
             <Route path="/torneos/:edition" element={<TournamentEditionPage />} />
             <Route path="/post/:slug" element={<PostPage />} />
             <Route path="/inscripcion" element={<RegistrationPage />} />

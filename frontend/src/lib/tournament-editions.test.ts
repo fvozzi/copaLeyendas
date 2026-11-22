@@ -24,6 +24,8 @@ describe('tournament editions archive', () => {
 
   it('includes the editorial profiles and interviews supplied for each edition', () => {
     expect(getTournamentEdition('femme-2026')?.legendContent.image?.src).toContain('silvina-cimadamore.webp');
+    expect(getTournamentEdition('femme-2026')?.legendContent.interview?.url).toContain('3GmOVfJMYR0');
+    expect(getTournamentEdition('femme-2026')?.legendContent.interview?.embedUrl).toBe('https://www.youtube-nocookie.com/embed/3GmOVfJMYR0');
     expect(getTournamentEdition('2026')?.legendContent.interview?.url).toContain('mS0TVfKJn0I');
     expect(getTournamentEdition('2026')?.legendContent.interview?.embedUrl).toContain('youtube-nocookie.com/embed/mS0TVfKJn0I?start=17');
     expect(getTournamentEdition('2025')?.legendContent.interview?.url).toContain('WA8mIbbOJzs');
