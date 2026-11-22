@@ -77,9 +77,10 @@ export async function renderMatchLogoWatermark(photo: Buffer) {
   if (!logoPath) return normalized.data;
 
   const logoWidth = Math.max(120, Math.min(Math.round(width * 0.24), Math.round(height * 0.24)));
+  const logoTop = Math.max(24, Math.round(height * 0.035));
   const logo = await sharp(logoPath).resize({ width: logoWidth, height: logoWidth, fit: 'inside' }).png().toBuffer();
   const watermark = Buffer.from(`<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-    <image href="data:image/png;base64,${logo.toString('base64')}" x="${Math.round((width - logoWidth) / 2)}" y="${Math.round((height - logoWidth) / 2)}" width="${logoWidth}" height="${logoWidth}" opacity="0.78"/>
+    <image href="data:image/png;base64,${logo.toString('base64')}" x="${Math.round((width - logoWidth) / 2)}" y="${logoTop}" width="${logoWidth}" height="${logoWidth}" opacity="0.78"/>
   </svg>`);
   return sharp(normalized.data).composite([{ input: watermark, top: 0, left: 0 }]).jpeg({ quality: 92, mozjpeg: true }).toBuffer();
 }

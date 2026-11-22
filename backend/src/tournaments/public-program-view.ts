@@ -53,7 +53,7 @@ export function publicProgramView(detail: Awaited<ReturnType<TournamentQueryServ
         resultPhotoAvailable: Boolean(slot.match.resultPhotoStoredName),
         resultCleanPhotoAvailable: Boolean(slot.match.resultCleanPhotoStoredName || slot.match.resultSourcePhotoStoredName),
         photoUrl: slot.match.resultPhotoStoredName ? `/api/public/tournaments/matches/${slot.match.id}/photo?v=${encodeURIComponent((slot.match.resultSubmittedAt ?? slot.match.startedAt ?? new Date(0)).toISOString())}` : null,
-        cleanPhotoUrl: slot.match.resultCleanPhotoStoredName || slot.match.resultSourcePhotoStoredName ? `/api/public/tournaments/matches/${slot.match.id}/clean-photo?v=${encodeURIComponent((slot.match.resultSubmittedAt ?? slot.match.startedAt ?? new Date(0)).toISOString())}` : null,
+        cleanPhotoUrl: slot.match.resultCleanPhotoStoredName || slot.match.resultSourcePhotoStoredName ? `/api/public/tournaments/matches/${slot.match.id}/clean-photo?v=${encodeURIComponent((slot.match.resultSubmittedAt ?? slot.match.startedAt ?? new Date(0)).toISOString())}&layout=top-v2` : null,
       } : null,
     })),
   };

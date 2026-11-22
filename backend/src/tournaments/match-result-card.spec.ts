@@ -43,11 +43,16 @@ describe('match result card', () => {
     expect(metadata.height).toBe(1000);
   }, 15_000);
 
-  it('creates a clean sharing photo with the tournament logo centered', async () => {
+  it('creates a clean sharing photo with the tournament logo at the top', async () => {
     const source = await sharp({ create: { width: 750, height: 1000, channels: 3, background: '#376e9c' } }).jpeg().toBuffer();
     const result = await renderMatchLogoWatermark(source);
     const metadata = await sharp(result).metadata();
     expect(metadata).toMatchObject({ format: 'jpeg', width: 750, height: 1000 });
     expect(result.equals(source)).toBe(false);
+    const topLogoPixel = await sharp(result).extract({ left: 375, top: 125, width: 1, height: 1 }).raw().toBuffer();
+    const clearCenterPixel = await sharp(result).extract({ left: 375, top: 500, width: 1, height: 1 }).raw().toBuffer();
+    const distanceFromBackground = (pixel: Buffer) => Math.abs(pixel[0] - 55) + Math.abs(pixel[1] - 110) + Math.abs(pixel[2] - 156);
+    expect(distanceFromBackground(topLogoPixel)).toBeGreaterThan(20);
+    expect(distanceFromBackground(clearCenterPixel)).toBeLessThan(20);
   }, 15_000);
 });

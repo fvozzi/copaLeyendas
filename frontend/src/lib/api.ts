@@ -426,7 +426,7 @@ export function matchResultPhotoUrl(id: number, apiUrl = API_URL) {
   return resolveApiAssetUrl(`/api/public/tournaments/matches/${id}/photo`, apiUrl)!;
 }
 export function matchCleanPhotoUrl(id: number, apiUrl = API_URL) {
-  return resolveApiAssetUrl(`/api/public/tournaments/matches/${id}/clean-photo`, apiUrl)!;
+  return resolveApiAssetUrl(`/api/public/tournaments/matches/${id}/clean-photo?layout=top-v2`, apiUrl)!;
 }
 export function openMatchResultPhoto(id: number) {
   window.open(matchResultPhotoUrl(id), '_blank', 'noopener,noreferrer');
