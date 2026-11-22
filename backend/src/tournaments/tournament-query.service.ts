@@ -16,7 +16,8 @@ import { publicCourt, publicPair, publicProgramView, publicVenue } from './publi
 import { standings } from './zone-standings';
 import { Locality } from '../localities/locality.entity';
 import { Player } from '../players/player.entity';
-import { readMatchResultPhoto } from './match-result-photo-storage';
+import { readMatchResultPhoto, removeMatchResultPhoto, storeMatchPhotoBuffer } from './match-result-photo-storage';
+import { renderMatchLogoWatermark } from './match-result-card';
 
 @Injectable()
 export class TournamentQueryService {
@@ -138,6 +139,28 @@ export class TournamentQueryService {
     try {
       return { content: await readMatchResultPhoto(match.resultPhotoStoredName), contentType: match.resultPhotoMimeType };
     } catch {
+      throw new NotFoundException('Foto no encontrada');
+    }
+  }
+  async publicCleanMatchPhoto(id: number) {
+    const match = await this.matches.findOne({ where: { id }, relations: { scheduleSlot: { tournament: true } } });
+    if (!match || match.scheduleSlot?.tournament?.status !== TournamentStatus.ACTIVE) throw new NotFoundException('Foto no encontrada');
+    if (match.resultCleanPhotoStoredName) {
+      try {
+        return { content: await readMatchResultPhoto(match.resultCleanPhotoStoredName), contentType: 'image/jpeg' };
+      } catch {
+        // Regenerate a missing derivative from the preserved source photo below.
+      }
+    }
+    if (!match.resultSourcePhotoStoredName) throw new NotFoundException('Foto no encontrada');
+    let storedName: string | null = null;
+    try {
+      const content = await renderMatchLogoWatermark(await readMatchResultPhoto(match.resultSourcePhotoStoredName));
+      storedName = await storeMatchPhotoBuffer(content, '.jpg');
+      await this.matches.update(id, { resultCleanPhotoStoredName: storedName });
+      return { content, contentType: 'image/jpeg' };
+    } catch {
+      if (storedName) await removeMatchResultPhoto(storedName);
       throw new NotFoundException('Foto no encontrada');
     }
   }

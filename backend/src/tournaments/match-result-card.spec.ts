@@ -1,6 +1,6 @@
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
-import { normalizeMatchPhoto, renderMatchResultCard } from './match-result-card';
+import { normalizeMatchPhoto, renderMatchLogoWatermark, renderMatchResultCard } from './match-result-card';
 
 describe('match result card', () => {
   it('normalizes a mobile photo into a browser-friendly JPEG', async () => {
@@ -41,5 +41,13 @@ describe('match result card', () => {
     expect(metadata.format).toBe('jpeg');
     expect(metadata.width).toBe(750);
     expect(metadata.height).toBe(1000);
+  }, 15_000);
+
+  it('creates a clean sharing photo with the tournament logo centered', async () => {
+    const source = await sharp({ create: { width: 750, height: 1000, channels: 3, background: '#376e9c' } }).jpeg().toBuffer();
+    const result = await renderMatchLogoWatermark(source);
+    const metadata = await sharp(result).metadata();
+    expect(metadata).toMatchObject({ format: 'jpeg', width: 750, height: 1000 });
+    expect(result.equals(source)).toBe(false);
   }, 15_000);
 });

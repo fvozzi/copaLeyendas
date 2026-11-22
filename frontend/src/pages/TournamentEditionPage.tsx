@@ -135,7 +135,7 @@ function PhotoSection({ name, photos, current }: { name: string; photos: { src: 
 
 function MatchPhotoCard({ photo }: { photo: MatchGalleryPhoto }) {
   const { match } = photo;
-  const imageUrl = resolveApiAssetUrl(match.photoUrl) ?? undefined;
+  const imageUrl = resolveApiAssetUrl(match.cleanPhotoUrl) ?? undefined;
   const home = teamName(match.homeRegistration);
   const away = teamName(match.awayRegistration);
   const score = match.status === 'IN_PROGRESS'
@@ -154,13 +154,13 @@ function MatchPhotoCard({ photo }: { photo: MatchGalleryPhoto }) {
   </figure>;
 }
 
-function tournamentMatchPhotos(current: PublicCurrentTournament): MatchGalleryPhoto[] {
+export function tournamentMatchPhotos(current: PublicCurrentTournament): MatchGalleryPhoto[] {
   const tournament = current.tournament;
   if (!tournament) return [];
   const zonePhotos = tournament.zones.flatMap((zone) => zone.matches
-    .filter((match) => Boolean(match.photoUrl))
+    .filter((match) => match.status === 'PLAYED' && Boolean(match.cleanPhotoUrl))
     .map((match) => ({ id: match.id, category: zone.category, stage: zone.name, sequence: match.sequence ?? null, match, venue: zone.venue.name })));
-  const knockoutPhotos = (tournament.knockout ?? []).flatMap((slot) => slot.match?.photoUrl ? [{
+  const knockoutPhotos = (tournament.knockout ?? []).flatMap((slot) => slot.match?.status === 'PLAYED' && slot.match.cleanPhotoUrl ? [{
     id: slot.match.id,
     category: slot.tournamentCategory.category.name,
     stage: knockoutStageLabel(slot.stage),
@@ -212,7 +212,10 @@ function LiveMatches({ current }: { current: PublicCurrentTournament }) {
   return <section className="live-matches" aria-label="Partidos en juego"><div className="live-matches-heading"><span className="live-dot" /><div><p className="eyebrow">Ahora</p><h3>Partidos en juego</h3></div></div><div className="live-match-grid">{live.map(({ match, category, stage, venue }) => <article key={match.id} className="live-match-card">{match.photoUrl && <img src={resolveApiAssetUrl(match.photoUrl) ?? undefined} alt={`Partido en juego: ${teamName(match.homeRegistration)} contra ${teamName(match.awayRegistration)}`} />}<div><p>{category} · {stage}{venue ? ` · ${venue}` : ''}</p><TeamDisclosure registration={match.homeRegistration} side="home" /><span className="live-match-versus">vs.</span><TeamDisclosure registration={match.awayRegistration} side="away" /><small>Iniciado {match.startedAt ? new Intl.DateTimeFormat('es-AR', { timeStyle: 'short' }).format(new Date(match.startedAt)) : 'ahora'}</small></div></article>)}</div></section>;
 }
 
-function ZoneResults({ zone }: { zone: PublicTournamentZone }) { const complete = zone.matches.length > 0 && zone.matches.every((match) => match.homeScore !== null && match.awayScore !== null); return <article className="tournament-public-card"><p className="post-section">{zone.category} · {zone.name}</p><h3>{zone.venue.name}</h3><div className="public-table-wrap"><table className="public-table" aria-label={`Posiciones ${zone.name}`}><thead><tr><th>Pos.</th><th>Equipo</th><th>PJ</th><th>PG</th><th>Dif.</th><th>TF</th></tr></thead><tbody>{zone.standings.map((row, index) => <tr key={row.registration.id} className={complete && index < 2 ? 'is-qualified' : ''}><td>{index + 1}{complete && index < 2 ? ' · C' : ''}</td><td><TeamDisclosure registration={row.registration} compact /></td><td>{row.played}</td><td>{row.wins}</td><td>{row.pointsFor - row.pointsAgainst}</td><td>{row.pointsFor}</td></tr>)}</tbody></table></div>{zone.matches.length ? <ul className="match-list">{zone.matches.map((match) => <li key={match.id}><div className="match-teams"><TeamDisclosure registration={match.homeRegistration} side="home" /><TeamDisclosure registration={match.awayRegistration} side="away" />{match.status === 'PLAYED' && match.photoUrl && <a className="inline-link" href={resolveApiAssetUrl(match.photoUrl) ?? undefined} target="_blank" rel="noreferrer">Ver foto final</a>}</div><div className="match-score">{match.status === 'IN_PROGRESS' ? 'En juego' : match.homeScore === null || match.awayScore === null ? 'Pendiente' : `${match.homeScore} - ${match.awayScore}`}<small>{formatMatchDate(match.scheduledAt)}</small></div></li>)}</ul> : <p className="empty-copy">Fixture en preparación.</p>}</article>; }
+function ZoneResults({ zone }: { zone: PublicTournamentZone }) {
+  const complete = zone.matches.length > 0 && zone.matches.every((match) => match.homeScore !== null && match.awayScore !== null);
+  return <article className="tournament-public-card"><p className="post-section">{zone.category} · {zone.name}</p><h3>{zone.venue.name}</h3><div className="public-table-wrap"><table className="public-table" aria-label={`Posiciones ${zone.name}`}><thead><tr><th>Pos.</th><th>Equipo</th><th>PJ</th><th>PG</th><th>Dif.</th><th>TF</th></tr></thead><tbody>{zone.standings.map((row, index) => <tr key={row.registration.id} className={complete && index < 2 ? 'is-qualified' : ''}><td>{index + 1}{complete && index < 2 ? ' · C' : ''}</td><td><TeamDisclosure registration={row.registration} compact /></td><td>{row.played}</td><td>{row.wins}</td><td>{row.pointsFor - row.pointsAgainst}</td><td>{row.pointsFor}</td></tr>)}</tbody></table></div>{zone.matches.length ? <ul className="match-list">{zone.matches.map((match) => <li key={match.id}><div className="match-teams"><TeamDisclosure registration={match.homeRegistration} side="home" /><TeamDisclosure registration={match.awayRegistration} side="away" /><MatchPhotoLinks match={match} /></div><div className="match-score">{match.status === 'IN_PROGRESS' ? 'En juego' : match.homeScore === null || match.awayScore === null ? 'Pendiente' : `${match.homeScore} - ${match.awayScore}`}<small>{formatMatchDate(match.scheduledAt)}</small></div></li>)}</ul> : <p className="empty-copy">Fixture en preparación.</p>}</article>;
+}
 function KnockoutBracket({ category, slots, zones }: { category: string; slots: TournamentScheduleSlot[]; zones: PublicTournamentZone[] }) { const categorySlots = slots.filter((slot) => slot.tournamentCategory.category.name === category); const rounds = ([['QUARTERFINAL', 'Cuartos de final'], ['SEMIFINAL', 'Semifinales'], ['FINAL', 'Final']] as const).map(([stage, label]) => ({ stage, label, slots: categorySlots.filter((slot) => slot.stage === stage).sort((a, b) => a.matchOrder - b.matchOrder) })).filter((round) => round.slots.length); if (!rounds.length) return null; return <section className="knockout-section"><div><p className="eyebrow">{category}</p><h3>Clasificación y cruces finales</h3></div><div className="knockout-bracket">{rounds.map((round) => <div className={`bracket-round ${round.stage === 'FINAL' ? 'bracket-final' : ''}`} key={round.stage}><p>{round.label}</p>{round.slots.map((slot) => <BracketMatch key={slot.id} slot={slot} slots={categorySlots} zones={zones} />)}</div>)}</div></section>; }
 function BracketMatch({ slot, slots, zones }: { slot: TournamentScheduleSlot; slots: TournamentScheduleSlot[]; zones: PublicTournamentZone[] }) {
   const match = slot.match;
@@ -230,7 +233,18 @@ function BracketMatch({ slot, slots, zones }: { slot: TournamentScheduleSlot; sl
     const entry = participant(side);
     const score = side === 'home' ? match?.homeScore : match?.awayScore;
     return <div className="bracket-participant" key={side}>{entry.registration ? <TeamDisclosure registration={entry.registration} side={side} compact /> : <span>{entry.label}</span>}{score != null ? <strong>{score}</strong> : null}</div>;
-  })}</div>;
+  })}{match && <MatchPhotoLinks match={match} />}</div>;
+}
+
+function MatchPhotoLinks({ match }: { match: TournamentMatch }) {
+  if (match.status !== 'PLAYED') return null;
+  const resultUrl = resolveApiAssetUrl(match.photoUrl);
+  const cleanUrl = resolveApiAssetUrl(match.cleanPhotoUrl);
+  if (!resultUrl && !cleanUrl) return null;
+  return <div className="match-photo-actions">
+    {resultUrl && <a className="inline-link" href={resultUrl} target="_blank" rel="noreferrer">Foto con resultado</a>}
+    {cleanUrl && <a className="inline-link" href={cleanUrl} target="_blank" rel="noreferrer">Foto con logo</a>}
+  </div>;
 }
 function TeamDisclosure({ registration, side, compact = false }: { registration: PairRegistration | null; side?: 'home' | 'away'; compact?: boolean }) {
   if (!registration) return <span className="public-team-empty">A definir</span>;

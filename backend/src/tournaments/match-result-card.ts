@@ -69,6 +69,21 @@ export async function renderMatchResultCard(photo: Buffer, data: MatchResultCard
   return sharp(normalized.data).composite(composites).jpeg({ quality: 92, mozjpeg: true }).toBuffer();
 }
 
+export async function renderMatchLogoWatermark(photo: Buffer) {
+  const normalized = await normalizeMatchPhoto(photo);
+  const width = normalized.info.width;
+  const height = normalized.info.height;
+  const logoPath = resolveLogoPath();
+  if (!logoPath) return normalized.data;
+
+  const logoWidth = Math.max(120, Math.min(Math.round(width * 0.24), Math.round(height * 0.24)));
+  const logo = await sharp(logoPath).resize({ width: logoWidth, height: logoWidth, fit: 'inside' }).png().toBuffer();
+  const watermark = Buffer.from(`<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+    <image href="data:image/png;base64,${logo.toString('base64')}" x="${Math.round((width - logoWidth) / 2)}" y="${Math.round((height - logoWidth) / 2)}" width="${logoWidth}" height="${logoWidth}" opacity="0.78"/>
+  </svg>`);
+  return sharp(normalized.data).composite([{ input: watermark, top: 0, left: 0 }]).jpeg({ quality: 92, mozjpeg: true }).toBuffer();
+}
+
 function resolveLogoPath() {
   return [
     resolve(process.cwd(), '../frontend/dist/LogoFemme.png'),

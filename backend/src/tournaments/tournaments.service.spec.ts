@@ -37,6 +37,7 @@ vi.mock('../auth/user.entity', () => ({ UserRole: { DIRECTOR: 'DIRECTOR', COURT_
 vi.mock('./match-result-card', () => ({
   normalizeMatchPhoto: vi.fn(async () => ({ data: Buffer.from('normalized'), info: { width: 800, height: 600 } })),
   renderMatchResultCard: vi.fn(async () => Buffer.from('decorated')),
+  renderMatchLogoWatermark: vi.fn(async () => Buffer.from('clean')),
 }));
 vi.mock('./match-result-photo-storage', () => ({
   storeMatchPhotoBuffer: vi.fn(async (_buffer: Buffer, extension = '.jpg') => extension === '.jpg' ? 'match.jpg' : `match${extension}`),

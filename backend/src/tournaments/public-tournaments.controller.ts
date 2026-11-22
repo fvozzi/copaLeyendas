@@ -23,4 +23,12 @@ export class PublicTournamentsController {
     response.setHeader('Cache-Control', 'public, max-age=15');
     return new StreamableFile(file.content);
   }
+
+  @Get('matches/:id/clean-photo')
+  async cleanMatchPhoto(@Param('id', ParseIntPipe) id: number, @Res({ passthrough: true }) response: Response) {
+    const file = await this.tournaments.publicCleanMatchPhoto(id);
+    response.setHeader('Content-Type', file.contentType);
+    response.setHeader('Cache-Control', 'public, max-age=3600');
+    return new StreamableFile(file.content);
+  }
 }

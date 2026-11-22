@@ -1466,6 +1466,9 @@ img {
 .bracket-participant { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.75rem; align-items: center; }
 .bracket-participant + .bracket-participant { padding-top: 0.35rem; border-top: 1px solid var(--line); }
 .bracket-participant > span { color: var(--ink-soft); }
+.match-photo-actions { display: flex; flex-wrap: wrap; gap: 0.4rem 0.8rem; align-items: center; }
+.bracket-match > .match-photo-actions { margin-top: 0.25rem; padding-top: 0.55rem; border-top: 1px solid var(--line); }
+.match-photo-actions .inline-link { font-size: 0.82rem; }
 .bracket-final { position: relative; }
 .bracket-final::before { content: ''; position: absolute; left: -2.1rem; top: 50%; width: 1.5rem; height: 48%; border: solid var(--forest); border-width: 2px 0 2px 2px; transform: translateY(-50%); opacity: 0.55; }
 

@@ -30,7 +30,7 @@ import { TournamentRegistrationAttendance } from './tournament-registration-atte
 import { TournamentZoneVenuePlan } from './tournament-zone-venue-plan.entity';
 import { preservedProgramAssignments } from './distribution-program';
 import { inferredKnockoutStage, zoneMatchDefinitions, ZoneMethodology, type ZoneParticipantDefinition } from './tournament-methodology';
-import { normalizeMatchPhoto, renderMatchResultCard } from './match-result-card';
+import { normalizeMatchPhoto, renderMatchLogoWatermark, renderMatchResultCard } from './match-result-card';
 
 @Injectable()
 export class TournamentsService {
@@ -65,8 +65,8 @@ export class TournamentsService {
       courts,
       slots: programView(visibleSlots).map((slot) => {
         if (!slot.match) return slot;
-        const { resultSourcePhotoStoredName, resultPhotoStoredName, resultPhotoOriginalName, resultPhotoMimeType, resultPhotoSize, ...match } = slot.match;
-        return { ...slot, match: { ...match, resultSourcePhotoAvailable: Boolean(resultSourcePhotoStoredName), resultPhotoAvailable: Boolean(resultPhotoStoredName), resultPhotoOriginalName } };
+        const { resultSourcePhotoStoredName, resultPhotoStoredName, resultCleanPhotoStoredName, resultPhotoOriginalName, resultPhotoMimeType, resultPhotoSize, ...match } = slot.match;
+        return { ...slot, match: { ...match, resultSourcePhotoAvailable: Boolean(resultSourcePhotoStoredName), resultPhotoAvailable: Boolean(resultPhotoStoredName), resultCleanPhotoAvailable: Boolean(resultCleanPhotoStoredName || resultSourcePhotoStoredName), resultPhotoOriginalName } };
       }),
     };
   }
@@ -1091,7 +1091,7 @@ export class TournamentsService {
       const match = await repository.findOneBy({ id });
       if (!match) throw new NotFoundException('Partido no encontrado');
       if (match.status !== MatchStatus.IN_PROGRESS) throw new BadRequestException('El partido ya no está en juego y no se puede cancelar su inicio.');
-      photosToRemove = [...new Set([match.resultPhotoStoredName, match.resultSourcePhotoStoredName].filter((name): name is string => Boolean(name)))];
+      photosToRemove = [...new Set([match.resultPhotoStoredName, match.resultSourcePhotoStoredName, match.resultCleanPhotoStoredName].filter((name): name is string => Boolean(name)))];
       match.status = match.homeRegistrationId && match.awayRegistrationId ? MatchStatus.READY : MatchStatus.PENDING;
       match.homeScore = null;
       match.awayScore = null;
@@ -1100,6 +1100,7 @@ export class TournamentsService {
       match.startedAt = null;
       match.resultSourcePhotoStoredName = null;
       match.resultPhotoStoredName = null;
+      match.resultCleanPhotoStoredName = null;
       match.resultPhotoOriginalName = null;
       match.resultPhotoMimeType = null;
       match.resultPhotoSize = null;
@@ -1132,10 +1133,11 @@ export class TournamentsService {
         const match = await repository.findOneBy({ id });
         if (!match) throw new NotFoundException('Partido no encontrado');
         if (match.status !== MatchStatus.IN_PROGRESS) throw new BadRequestException('El partido ya no está en juego. Volvé a intentar desde su estado actual.');
-        photosToRemove = [...new Set([match.resultPhotoStoredName, match.resultSourcePhotoStoredName]
+        photosToRemove = [...new Set([match.resultPhotoStoredName, match.resultSourcePhotoStoredName, match.resultCleanPhotoStoredName]
           .filter((name): name is string => Boolean(name) && name !== storedName))];
         match.resultSourcePhotoStoredName = null;
         match.resultPhotoStoredName = storedName;
+        match.resultCleanPhotoStoredName = null;
         match.resultPhotoOriginalName = `${photo.originalname.replace(/\.[^.]+$/, '') || `partido-${id}`}.jpg`;
         match.resultPhotoMimeType = 'image/jpeg';
         match.resultPhotoSize = normalized.data.length;
@@ -1166,9 +1168,11 @@ export class TournamentsService {
     if (![MatchStatus.IN_PROGRESS, MatchStatus.PLAYED].includes(initial.status)) throw new BadRequestException('Primero cargá la foto inicial para marcar el partido como en juego.');
     if (!initial.resultPhotoStoredName || !initial.homeRegistration || !initial.awayRegistration) throw new BadRequestException('El partido no tiene la foto inicial o sus parejas completas.');
     let decoratedName: string | null = null;
+    let cleanName: string | null = null;
     let replacementSourceName: string | null = null;
     const previousResultName = initial.resultPhotoStoredName;
     const previousSourceName = initial.resultSourcePhotoStoredName;
+    const previousCleanName = initial.resultCleanPhotoStoredName;
     try {
       if (replacementPhoto) {
         const normalized = await normalizeMatchPhoto(replacementPhoto.buffer).catch(() => { throw new BadRequestException('No se pudo procesar la foto. Probá con una imagen JPG, PNG o WebP.'); });
@@ -1176,11 +1180,15 @@ export class TournamentsService {
       }
       const sourceName = replacementSourceName ?? initial.resultSourcePhotoStoredName ?? (initial.status === MatchStatus.IN_PROGRESS ? initial.resultPhotoStoredName : null);
       if (!sourceName) throw new BadRequestException('Para corregir este resultado anterior, seleccioná nuevamente la foto original sin la placa.');
-      const decorated = await renderMatchResultCard(await readMatchResultPhoto(sourceName), {
-        home: { team: teamLabel(initial.homeRegistration), players: playerLabel(initial.homeRegistration), score: homeScore },
-        away: { team: teamLabel(initial.awayRegistration), players: playerLabel(initial.awayRegistration), score: awayScore },
-      });
-      decoratedName = await storeMatchPhotoBuffer(decorated, '.jpg');
+      const sourcePhoto = await readMatchResultPhoto(sourceName);
+      const [decorated, clean] = await Promise.all([
+        renderMatchResultCard(sourcePhoto, {
+          home: { team: teamLabel(initial.homeRegistration), players: playerLabel(initial.homeRegistration), score: homeScore },
+          away: { team: teamLabel(initial.awayRegistration), players: playerLabel(initial.awayRegistration), score: awayScore },
+        }),
+        renderMatchLogoWatermark(sourcePhoto),
+      ]);
+      [decoratedName, cleanName] = await Promise.all([storeMatchPhotoBuffer(decorated, '.jpg'), storeMatchPhotoBuffer(clean, '.jpg')]);
       const saved = await this.withLockedMatch(initial, async (manager) => {
         const repository = manager.getRepository(TournamentMatch);
         const match = await repository.findOneBy({ id });
@@ -1192,6 +1200,7 @@ export class TournamentsService {
         match.status = MatchStatus.PLAYED;
         match.resultSourcePhotoStoredName = sourceName;
         match.resultPhotoStoredName = decoratedName;
+        match.resultCleanPhotoStoredName = cleanName;
         match.resultPhotoOriginalName = `resultado-p${id}.jpg`;
         match.resultPhotoMimeType = 'image/jpeg';
         match.resultPhotoSize = decorated.length;
@@ -1200,13 +1209,15 @@ export class TournamentsService {
         await repository.save(match);
         await this.resolveDependents(match, repository);
         if (match.zoneId) await this.resolveQualifiers(manager, match.zoneId);
-        return { ...match, resultPhotoStoredName: undefined, resultPhotoAvailable: true };
+        return { ...match, resultPhotoStoredName: undefined, resultCleanPhotoStoredName: undefined, resultPhotoAvailable: true, resultCleanPhotoAvailable: true };
       });
       if (previousResultName !== sourceName && previousResultName !== decoratedName) await removeMatchResultPhoto(previousResultName);
       if (replacementSourceName && previousSourceName && previousSourceName !== replacementSourceName) await removeMatchResultPhoto(previousSourceName);
+      if (previousCleanName && previousCleanName !== cleanName) await removeMatchResultPhoto(previousCleanName);
       return saved;
     } catch (error) {
       if (decoratedName) await removeMatchResultPhoto(decoratedName);
+      if (cleanName) await removeMatchResultPhoto(cleanName);
       if (replacementSourceName) await removeMatchResultPhoto(replacementSourceName);
       throw error;
     }

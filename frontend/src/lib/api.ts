@@ -425,8 +425,14 @@ export function saveMatchResult(id: number, homeScore: number, awayScore: number
 export function matchResultPhotoUrl(id: number, apiUrl = API_URL) {
   return resolveApiAssetUrl(`/api/public/tournaments/matches/${id}/photo`, apiUrl)!;
 }
+export function matchCleanPhotoUrl(id: number, apiUrl = API_URL) {
+  return resolveApiAssetUrl(`/api/public/tournaments/matches/${id}/clean-photo`, apiUrl)!;
+}
 export function openMatchResultPhoto(id: number) {
   window.open(matchResultPhotoUrl(id), '_blank', 'noopener,noreferrer');
+}
+export function openMatchCleanPhoto(id: number) {
+  window.open(matchCleanPhotoUrl(id), '_blank', 'noopener,noreferrer');
 }
 export function updateMatchSchedule(id: number, scheduledAt: string) { return request<TournamentMatch>(`/tournaments/matches/${id}/schedule`, { method: 'PATCH', body: JSON.stringify({ scheduledAt }) }, true); }
 export function getZone(id: number) { return request<ZoneDetail>(`/tournaments/zones/${id}`, {}, true); }
