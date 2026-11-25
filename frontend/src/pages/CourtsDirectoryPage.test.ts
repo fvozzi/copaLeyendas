@@ -9,8 +9,8 @@ vi.mock('../components/CourtMap', () => ({ CourtMap: () => null }));
 vi.mock('../lib/api', () => ({ getPublicCourts: vi.fn(async () => []), resolveApiAssetUrl: (path: string) => path }));
 
 const courts: CommunityCourt[] = [
-  { id: 1, name: 'Club Paraná', country: 'Argentina', province: 'Entre Ríos', locality: 'Paraná', address: null, courtType: 'TRINQUET', frontisFinish: 'HARD', courtColor: 'WHITE', history: 'Sede del primer torneo barrial.', hasSchool: true, photos: [], trinquetShareMaterial: 'WOOD', trinquetShareMaterialOther: null, frontonWallOrientation: null, frontonHasCacerola: null, frontonBackType: null, frontonReboundMaterial: null, latitude: -31, longitude: -60, lengthMeters: null, widthMeters: null, totalPlayers: 20, createdAt: '', playerGroups: [{ gender: 'FEMALE', minAge: 18, maxAge: 59, playerCount: 20 }] },
-  { id: 2, name: 'Frontón Sur', country: 'Uruguay', province: 'Montevideo', locality: 'Montevideo', address: null, courtType: 'FRONTON', frontisFinish: 'MARBLE', courtColor: 'BLUE', history: null, hasSchool: false, photos: [], trinquetShareMaterial: null, trinquetShareMaterialOther: null, frontonWallOrientation: 'LEFT_LONG', frontonHasCacerola: true, frontonBackType: 'REBOUND', frontonReboundMaterial: 'Material', latitude: -34, longitude: -56, lengthMeters: null, widthMeters: null, totalPlayers: 12, createdAt: '', playerGroups: [{ gender: 'MALE', minAge: 60, maxAge: 80, playerCount: 12 }] },
+  { id: 1, name: 'Club Paraná', country: 'Argentina', province: 'Entre Ríos', locality: 'Paraná', address: null, courtType: 'TRINQUET', frontisFinish: 'HARD', courtColor: 'WHITE', history: 'Sede del primer torneo barrial.', inaugurationDate: '1950-05-10', contactName: 'Secretaría del club', contactPhone: '+54 9 11 1234-5678', contactEmail: 'club@example.com', contactUrl: 'https://example.com', hasSchool: true, photos: [], trinquetShareMaterial: 'WOOD', trinquetShareMaterialOther: null, frontonWallOrientation: null, frontonHasCacerola: null, frontonBackType: null, frontonReboundMaterial: null, latitude: -31, longitude: -60, lengthMeters: null, widthMeters: null, totalPlayers: 20, createdAt: '', playerGroups: [{ gender: 'FEMALE', minAge: 18, maxAge: 59, playerCount: 20 }] },
+  { id: 2, name: 'Frontón Sur', country: 'Uruguay', province: 'Montevideo', locality: 'Montevideo', address: null, courtType: 'FRONTON', frontisFinish: 'MARBLE', courtColor: 'BLUE', history: null, inaugurationDate: null, contactName: null, contactPhone: null, contactEmail: null, contactUrl: null, hasSchool: false, photos: [], trinquetShareMaterial: null, trinquetShareMaterialOther: null, frontonWallOrientation: 'LEFT_LONG', frontonHasCacerola: true, frontonBackType: 'REBOUND', frontonReboundMaterial: 'Material', latitude: -34, longitude: -56, lengthMeters: null, widthMeters: null, totalPlayers: 12, createdAt: '', playerGroups: [{ gender: 'MALE', minAge: 60, maxAge: 80, playerCount: 12 }] },
 ];
 
 it('filters public courts by location, sex and age range', () => {
@@ -19,6 +19,8 @@ it('filters public courts by location, sex and age range', () => {
   expect(filterCommunityCourts(courts, { search: '', country: 'Uruguay', gender: '', age: 70 }).map((court) => court.id)).toEqual([2]);
   expect(filterCommunityCourts(courts, { search: '', country: '', courtType: 'FRONTON', gender: '' }).map((court) => court.id)).toEqual([2]);
   expect(filterCommunityCourts(courts, { search: 'primer torneo', country: '', gender: '' }).map((court) => court.id)).toEqual([1]);
+  expect(filterCommunityCourts(courts, { search: '1950', country: '', gender: '' }).map((court) => court.id)).toEqual([1]);
+  expect(filterCommunityCourts(courts, { search: 'secretaria', country: '', gender: '' }).map((court) => court.id)).toEqual([1]);
   expect(filterCommunityCourts(courts, { search: '', country: '', gender: '', age: 17 })).toEqual([]);
 });
 

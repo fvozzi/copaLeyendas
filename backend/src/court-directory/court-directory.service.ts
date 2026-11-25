@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CommunityCourtPlayerGroup } from './community-court-player-group.entity';
@@ -9,6 +9,10 @@ import { CreateCommunityCourtDto, QueryCommunityCourtsDto } from './court-direct
 
 @Injectable()
 export class CourtDirectoryService {
+  private readonly geocodeCache = new Map<string, { latitude: number; longitude: number; displayName: string }>();
+  private geocodeQueue = Promise.resolve();
+  private nextGeocodeAt = 0;
+
   constructor(
     @InjectRepository(CommunityCourt) private readonly courts: Repository<CommunityCourt>,
     @InjectRepository(CommunityCourtPhoto) private readonly photos: Repository<CommunityCourtPhoto>,
@@ -18,7 +22,7 @@ export class CourtDirectoryService {
     const courts = await this.courts.find({ where: { active: true }, relations: { playerGroups: true, photos: true }, order: { country: 'ASC', province: 'ASC', locality: 'ASC', name: 'ASC' } });
     const search = normalize(query.search ?? '');
     return courts.filter((court) => {
-      if (search && !normalize([court.name, court.locality, court.province, court.country, court.address, court.history].filter(Boolean).join(' ')).includes(search)) return false;
+      if (search && !normalize([court.name, court.locality, court.province, court.country, court.address, court.history, court.inaugurationDate, court.contactName].filter(Boolean).join(' ')).includes(search)) return false;
       if (query.country && court.country !== query.country) return false;
       if (query.courtType && court.courtType !== query.courtType) return false;
       if ((query.gender || query.age !== undefined) && !court.playerGroups.some((group) => (
@@ -52,7 +56,9 @@ export class CourtDirectoryService {
       frontonHasCacerola: dto.courtType === CommunityCourtType.FRONTON ? dto.frontonHasCacerola ?? false : null,
       frontonBackType: dto.courtType === CommunityCourtType.FRONTON ? dto.frontonBackType ?? null : null,
       frontonReboundMaterial: dto.courtType === CommunityCourtType.FRONTON && dto.frontonBackType === FrontonBackType.REBOUND ? dto.frontonReboundMaterial?.trim() || null : null,
-      frontisFinish: dto.frontisFinish, courtColor: dto.courtColor, history: dto.history?.trim() || null, hasSchool: dto.hasSchool,
+      frontisFinish: dto.frontisFinish, courtColor: dto.courtColor, history: dto.history?.trim() || null, inaugurationDate: dto.inaugurationDate ?? null,
+      contactName: dto.contactName?.trim() || null, contactPhone: dto.contactPhone?.trim() || null,
+      contactEmail: dto.contactEmail?.trim().toLocaleLowerCase('en') || null, contactUrl: dto.contactUrl?.trim() || null, hasSchool: dto.hasSchool,
       lengthMeters: dto.lengthMeters ?? null, widthMeters: dto.widthMeters ?? null, active: true,
       playerGroups: dto.playerGroups.map((group) => Object.assign(new CommunityCourtPlayerGroup(), {
         gender: group.gender, minAge: group.minAge ?? null, maxAge: group.maxAge ?? null, playerCount: group.playerCount,
@@ -78,6 +84,46 @@ export class CourtDirectoryService {
       throw new NotFoundException('Foto no encontrada.');
     }
   }
+
+  async geocode(query: string, countryCode?: string) {
+    const normalizedQuery = query.trim();
+    const normalizedCountryCode = countryCode?.trim().toLocaleLowerCase('en');
+    const cacheKey = `${normalize(normalizedQuery)}|${normalizedCountryCode ?? ''}`;
+    const cached = this.geocodeCache.get(cacheKey);
+    if (cached) return cached;
+
+    const request = this.geocodeQueue.then(async () => {
+      const waitMs = Math.max(0, this.nextGeocodeAt - Date.now());
+      if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
+      this.nextGeocodeAt = Date.now() + 1_000;
+      const parameters = new URLSearchParams({ q: normalizedQuery, format: 'jsonv2', limit: '1', addressdetails: '1', 'accept-language': 'es' });
+      if (normalizedCountryCode) parameters.set('countrycodes', normalizedCountryCode);
+      const baseUrl = process.env.NOMINATIM_BASE_URL?.trim() || 'https://nominatim.openstreetmap.org';
+      let response: Response;
+      try {
+        response = await fetch(`${baseUrl.replace(/\/$/, '')}/search?${parameters.toString()}`, {
+          headers: {
+            Accept: 'application/json',
+            'Accept-Language': 'es',
+            'User-Agent': process.env.NOMINATIM_USER_AGENT?.trim() || 'CopaLeyendas/1.0 (https://copaleyendas.com.ar)',
+            Referer: 'https://copaleyendas.com.ar/',
+          },
+          signal: AbortSignal.timeout(10_000),
+        });
+      } catch {
+        throw new ServiceUnavailableException('El buscador de localidades no está disponible en este momento. Podés marcar la cancha manualmente en el mapa.');
+      }
+      if (!response.ok) throw new ServiceUnavailableException('El buscador de localidades no está disponible en este momento. Podés marcar la cancha manualmente en el mapa.');
+      const [result] = await response.json() as Array<{ lat: string; lon: string; display_name: string }>;
+      if (!result || !Number.isFinite(Number(result.lat)) || !Number.isFinite(Number(result.lon))) throw new NotFoundException('No encontramos esa localidad. Probá agregando una dirección o marcala manualmente en el mapa.');
+      const location = { latitude: Number(result.lat), longitude: Number(result.lon), displayName: result.display_name };
+      if (this.geocodeCache.size >= 200) this.geocodeCache.delete(this.geocodeCache.keys().next().value as string);
+      this.geocodeCache.set(cacheKey, location);
+      return location;
+    });
+    this.geocodeQueue = request.then(() => undefined, () => undefined);
+    return request;
+  }
 }
 
 function publicCourt(court: CommunityCourt) {
@@ -89,7 +135,8 @@ function publicCourt(court: CommunityCourt) {
     trinquetShareMaterial: court.trinquetShareMaterial, trinquetShareMaterialOther: court.trinquetShareMaterialOther,
     frontonWallOrientation: court.frontonWallOrientation, frontonHasCacerola: court.frontonHasCacerola,
     frontonBackType: court.frontonBackType, frontonReboundMaterial: court.frontonReboundMaterial,
-    frontisFinish: court.frontisFinish, courtColor: court.courtColor, history: court.history, hasSchool: court.hasSchool,
+    frontisFinish: court.frontisFinish, courtColor: court.courtColor, history: court.history, inaugurationDate: court.inaugurationDate,
+    contactName: court.contactName, contactPhone: court.contactPhone, contactEmail: court.contactEmail, contactUrl: court.contactUrl, hasSchool: court.hasSchool,
     lengthMeters: court.lengthMeters === null ? null : Number(court.lengthMeters), widthMeters: court.widthMeters === null ? null : Number(court.widthMeters),
     playerGroups: playerGroups.map(({ id, gender, minAge, maxAge, playerCount }) => ({ id, gender, minAge, maxAge, playerCount })),
     photos: [...(court.photos ?? [])].sort((left, right) => left.sortOrder - right.sortOrder || left.id - right.id).map((photo) => ({

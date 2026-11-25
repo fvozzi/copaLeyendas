@@ -27,6 +27,11 @@ export class CommunityCourt {
   @Column({ type: 'varchar', length: 10, nullable: true }) frontisFinish: CommunityFrontisFinish | null;
   @Column({ type: 'varchar', length: 10, nullable: true }) courtColor: CommunityCourtColor | null;
   @Column({ type: 'text', nullable: true }) history: string | null;
+  @Column({ type: 'date', nullable: true }) inaugurationDate: string | null;
+  @Column({ type: 'varchar', length: 120, nullable: true }) contactName: string | null;
+  @Column({ type: 'varchar', length: 40, nullable: true }) contactPhone: string | null;
+  @Column({ type: 'varchar', length: 160, nullable: true }) contactEmail: string | null;
+  @Column({ type: 'varchar', length: 300, nullable: true }) contactUrl: string | null;
   @Column({ type: 'boolean', default: false }) hasSchool: boolean;
   @Column({ type: 'double precision' }) latitude: number;
   @Column({ type: 'double precision' }) longitude: number;

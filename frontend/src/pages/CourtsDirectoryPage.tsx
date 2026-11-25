@@ -63,6 +63,7 @@ export function CourtsDirectoryPage() {
       <div className="community-court-measures"><span><strong>{court.totalPlayers}</strong> jugadores/as</span>{court.lengthMeters && <span><strong>{court.lengthMeters} m</strong> de largo</span>}{court.widthMeters && <span><strong>{court.widthMeters} m</strong> de ancho</span>}</div>
       <div className="community-court-features">{courtFeatureLabels(court).map((feature) => <span key={feature}>{feature}</span>)}</div>
       {court.history && <details className="community-court-history"><summary>Historia de la cancha</summary><p>{court.history}</p></details>}
+      {(court.contactName || court.contactPhone || court.contactEmail || court.contactUrl) && <details className="community-court-contact"><summary>Datos de contacto</summary><div>{court.contactName && <strong>{court.contactName}</strong>}{court.contactPhone && <a href={`tel:${court.contactPhone.replace(/[^+\d]/g, '')}`}>{court.contactPhone}</a>}{court.contactEmail && <a href={`mailto:${court.contactEmail}`}>{court.contactEmail}</a>}{court.contactUrl && <a href={court.contactUrl} target="_blank" rel="noreferrer">Web o red social ↗</a>}</div></details>}
       <ul>{court.playerGroups.map((group, index) => <li key={group.id ?? `${group.gender}-${index}`}><strong>{group.playerCount}</strong><span>{communityGenderLabels[group.gender]} · {ageRangeLabel(group)}</span></li>)}</ul>
       <button type="button" className="inline-link" onClick={() => selectCourt(court)}>Ver en el mapa</button>
     </article>)}</div>}
@@ -72,7 +73,7 @@ export function CourtsDirectoryPage() {
 export function filterCommunityCourts(courts: CommunityCourt[], filters: { search: string; country: string; courtType?: CommunityCourtType | ''; gender: CommunityPlayerGender | ''; age?: number }) {
   const term = normalize(filters.search);
   return courts.filter((court) => {
-    if (term && !normalize([court.name, court.locality, court.province, court.country, court.address, court.history].filter(Boolean).join(' ')).includes(term)) return false;
+    if (term && !normalize([court.name, court.locality, court.province, court.country, court.address, court.history, court.inaugurationDate, court.contactName].filter(Boolean).join(' ')).includes(term)) return false;
     if (filters.country && court.country !== filters.country) return false;
     if (filters.courtType && court.courtType !== filters.courtType) return false;
     if ((filters.gender || filters.age !== undefined) && !court.playerGroups.some((group) => (

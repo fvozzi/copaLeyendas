@@ -93,6 +93,11 @@ export interface CommunityCourt {
   frontisFinish: CommunityFrontisFinish | null;
   courtColor: CommunityCourtColor | null;
   history: string | null;
+  inaugurationDate: string | null;
+  contactName: string | null;
+  contactPhone: string | null;
+  contactEmail: string | null;
+  contactUrl: string | null;
   hasSchool: boolean;
   trinquetShareMaterial: TrinquetShareMaterial | null;
   trinquetShareMaterialOther: string | null;

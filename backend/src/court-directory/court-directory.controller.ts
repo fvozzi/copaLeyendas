@@ -2,7 +2,7 @@ import { BadRequestException, Body, Controller, Get, Param, ParseIntPipe, Post, 
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import type { Response } from 'express';
-import { CreateCommunityCourtDto, QueryCommunityCourtsDto } from './court-directory.dto';
+import { CreateCommunityCourtDto, GeocodeCommunityCourtDto, QueryCommunityCourtsDto } from './court-directory.dto';
 import { CourtDirectoryService } from './court-directory.service';
 
 @Controller('public/court-directory')
@@ -12,6 +12,11 @@ export class CourtDirectoryController {
   @Get()
   list(@Query() query: QueryCommunityCourtsDto) {
     return this.directory.list(query);
+  }
+
+  @Get('geocode')
+  geocode(@Query() query: GeocodeCommunityCourtDto) {
+    return this.directory.geocode(query.query, query.countryCode);
   }
 
   @Post()

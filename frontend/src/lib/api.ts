@@ -53,6 +53,9 @@ export async function recordPageView(payload: { path: string; visitorId: string;
 export function getPublicCourts(filters: { search?: string; country?: string; courtType?: CommunityCourtType; gender?: CommunityPlayerGender; age?: number } = {}) {
   return request<CommunityCourt[]>(`/public/court-directory${buildQuery(filters)}`);
 }
+export function searchCommunityCourtLocation(params: { query: string; countryCode?: string }) {
+  return request<{ latitude: number; longitude: number; displayName: string }>(`/public/court-directory/geocode${buildQuery(params)}`);
+}
 export function createPublicCourt(payload: CommunityCourtPayload, photos: File[] = []) {
   const formData = new FormData();
   for (const [field, value] of Object.entries(payload)) {

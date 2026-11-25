@@ -1,5 +1,5 @@
 import { plainToInstance, Transform, Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength, ValidateIf, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsDateString, IsEmail, IsEnum, IsInt, IsNumber, IsOptional, IsString, IsUrl, Matches, Max, MaxLength, Min, MinLength, ValidateIf, ValidateNested } from 'class-validator';
 import { CommunityPlayerGender } from './community-court-player-group.entity';
 import { CommunityCourtColor, CommunityCourtType, CommunityFrontisFinish, FrontonBackType, FrontonWallOrientation, TrinquetShareMaterial } from './community-court.entity';
 
@@ -26,6 +26,11 @@ export class CreateCommunityCourtDto {
   @IsEnum(CommunityFrontisFinish) frontisFinish: CommunityFrontisFinish;
   @IsEnum(CommunityCourtColor) courtColor: CommunityCourtColor;
   @IsOptional() @IsString() @MaxLength(3000) history?: string;
+  @IsOptional() @IsDateString({ strict: true }) inaugurationDate?: string;
+  @IsOptional() @IsString() @MaxLength(120) contactName?: string;
+  @IsOptional() @IsString() @MaxLength(40) contactPhone?: string;
+  @IsOptional() @IsEmail() @MaxLength(160) contactEmail?: string;
+  @IsOptional() @IsUrl({ require_protocol: true }) @MaxLength(300) contactUrl?: string;
   @Transform(({ value }) => value === true || value === 'true') @IsBoolean() hasSchool: boolean;
   @Type(() => Number) @IsNumber() @Min(-90) @Max(90) latitude: number;
   @Type(() => Number) @IsNumber() @Min(-180) @Max(180) longitude: number;
@@ -50,4 +55,9 @@ export class QueryCommunityCourtsDto {
   @IsOptional() @IsEnum(CommunityCourtType) courtType?: CommunityCourtType;
   @IsOptional() @IsEnum(CommunityPlayerGender) gender?: CommunityPlayerGender;
   @IsOptional() @IsInt() @Min(0) @Max(120) age?: number;
+}
+
+export class GeocodeCommunityCourtDto {
+  @IsString() @MinLength(2) @MaxLength(300) query: string;
+  @IsOptional() @IsString() @Matches(/^[a-z]{2}$/i) countryCode?: string;
 }

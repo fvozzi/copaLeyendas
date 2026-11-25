@@ -270,6 +270,32 @@
   white-space: pre-line;
 }
 
+.community-court-contact {
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+}
+
+.community-court-contact summary {
+  cursor: pointer;
+  color: var(--forest);
+  font-weight: 700;
+}
+
+.community-court-contact div {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.65rem;
+}
+
+.community-court-contact a {
+  width: fit-content;
+  color: var(--clay);
+  overflow-wrap: anywhere;
+}
+
 .community-court-card ul {
   display: grid;
   gap: 0.4rem;
@@ -370,6 +396,28 @@
   grid-column: 1 / -1;
 }
 
+.court-contact-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.court-contact-fields legend {
+  padding: 0 0.35rem;
+  color: var(--forest);
+  font-weight: 800;
+}
+
+.court-contact-fields legend span {
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
 .court-location-actions,
 .court-form-submit {
   display: flex;
@@ -389,24 +437,48 @@
   box-shadow: none;
 }
 
-.court-player-groups {
-  display: grid;
-  gap: 0.75rem;
-}
-
-.court-player-group {
-  display: grid;
-  grid-template-columns: 1.4fr repeat(3, minmax(110px, 1fr)) auto;
-  gap: 0.7rem;
-  align-items: end;
-  padding: 0.85rem;
+.court-player-matrix {
+  overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: rgba(238, 242, 238, 0.7);
 }
 
-.court-player-group .danger-link {
-  min-height: 46px;
+.court-player-matrix table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.court-player-matrix th,
+.court-player-matrix td {
+  padding: 0.7rem;
+  border-bottom: 1px solid var(--line);
+  text-align: center;
+}
+
+.court-player-matrix thead th {
+  background: var(--forest);
+  color: var(--white);
+}
+
+.court-player-matrix th:first-child {
+  width: 42%;
+  text-align: left;
+}
+
+.court-player-matrix tbody th {
+  color: var(--forest);
+  font-size: 0.85rem;
+}
+
+.court-player-matrix tbody tr:last-child th,
+.court-player-matrix tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.court-player-matrix input {
+  min-height: 44px;
+  text-align: center;
 }
 
 .court-feature-checkbox {
@@ -443,8 +515,6 @@
 @media (max-width: 1100px) {
   .court-directory-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .community-court-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .court-player-group { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .court-player-group .danger-link { justify-self: start; }
 }
 
 @media (max-width: 640px) {
@@ -459,8 +529,11 @@
   .court-directory-filters,
   .court-form-grid,
   .community-court-grid,
-  .court-player-group { grid-template-columns: 1fr; }
+  .court-player-matrix th,
+  .court-player-matrix td { padding: 0.45rem; }
+  .court-player-matrix th:first-child { width: 40%; }
   .court-form-wide { grid-column: auto; }
+  .court-contact-fields { grid-template-columns: 1fr; }
   .court-map { height: 62vh; min-height: 420px; border-radius: 10px; }
   .court-picker-map { height: 52vh; min-height: 360px; }
   .court-directory-summary span + strong { margin-left: 0; }

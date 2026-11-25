@@ -8,6 +8,8 @@ describe('community court multipart payload', () => {
     const dto = plainToInstance(CreateCommunityCourtDto, {
       name: 'Club Central', country: 'Argentina', province: 'Buenos Aires', locality: 'Azul',
       courtType: 'FRONTON', frontisFinish: 'HARD', courtColor: 'BLUE', hasSchool: 'false',
+      inaugurationDate: '1950-05-10',
+      contactName: 'Secretaría del club', contactPhone: '+54 9 11 1234-5678', contactEmail: 'club@example.com', contactUrl: 'https://example.com',
       frontonWallOrientation: 'LEFT_LONG', frontonHasCacerola: 'false', frontonBackType: 'FREE_LIFT',
       latitude: '-36.77', longitude: '-59.85',
       playerGroups: JSON.stringify([{ gender: 'MIXED', minAge: null, maxAge: 17, playerCount: 20 }]),

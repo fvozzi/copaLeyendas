@@ -23,6 +23,7 @@ export function courtFeatureLabels(court: CommunityCourt) {
   const commonFeatures = [
     `Frontón: ${court.frontisFinish ? frontisFinishLabels[court.frontisFinish] : 'Sin informar'}`,
     `Color: ${court.courtColor ? courtColorLabels[court.courtColor] : 'Sin informar'}`,
+    court.inaugurationDate ? `Inaugurada: ${formatCourtDate(court.inaugurationDate)}` : 'Fecha de inauguración sin informar',
     court.hasSchool ? 'Con escuelita' : 'Sin escuelita',
   ];
   if (court.courtType === 'TRINQUET') return [
@@ -36,6 +37,11 @@ export function courtFeatureLabels(court: CommunityCourt) {
     court.frontonBackType === 'REBOUND' ? `Rebote: ${court.frontonReboundMaterial || 'material sin informar'}` : court.frontonBackType ? frontonBackLabels[court.frontonBackType] : 'Fondo sin informar',
   ];
   return [...commonFeatures, 'Tipo de cancha sin informar'];
+}
+
+function formatCourtDate(value: string) {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Intl.DateTimeFormat('es-AR').format(new Date(year, month - 1, day));
 }
 
 export function ageRangeLabel(group: Pick<CommunityCourtPlayerGroup, 'minAge' | 'maxAge'>) {
