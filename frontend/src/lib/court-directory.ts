@@ -1,4 +1,4 @@
-import type { CommunityCourt, CommunityCourtPlayerGroup, CommunityCourtType, CommunityPlayerGender, FrontonBackType, FrontonWallOrientation, TrinquetShareMaterial } from '../types';
+import type { CommunityCourt, CommunityCourtColor, CommunityCourtPlayerGroup, CommunityCourtType, CommunityFrontisFinish, CommunityPlayerGender, FrontonBackType, FrontonWallOrientation, TrinquetShareMaterial } from '../types';
 
 export const southAmericanCountries = [
   { code: 'ar', name: 'Argentina' }, { code: 'bo', name: 'Bolivia' }, { code: 'br', name: 'Brasil' },
@@ -13,20 +13,29 @@ export const communityGenderLabels: Record<CommunityPlayerGender, string> = {
 };
 
 export const communityCourtTypeLabels: Record<CommunityCourtType, string> = { TRINQUET: 'Trinquete', FRONTON: 'Frontón' };
+export const frontisFinishLabels: Record<CommunityFrontisFinish, string> = { HARD: 'Duro', MARBLE: 'Mármol' };
+export const courtColorLabels: Record<CommunityCourtColor, string> = { WHITE: 'Blanca', BLUE: 'Azul', GREEN: 'Verde', GRAY: 'Gris' };
 export const shareMaterialLabels: Record<TrinquetShareMaterial, string> = { WOOD: 'Madera', MASONRY: 'Material / mampostería', OTHER: 'Otro' };
 export const frontonWallLabels: Record<FrontonWallOrientation, string> = { LEFT_LONG: 'Pared izquierda larga y derecha corta', RIGHT_LONG: 'Pared derecha larga e izquierda corta' };
 export const frontonBackLabels: Record<FrontonBackType, string> = { REBOUND: 'Con rebote', FREE_LIFT: 'Levante libre' };
 
 export function courtFeatureLabels(court: CommunityCourt) {
+  const commonFeatures = [
+    `Frontón: ${court.frontisFinish ? frontisFinishLabels[court.frontisFinish] : 'Sin informar'}`,
+    `Color: ${court.courtColor ? courtColorLabels[court.courtColor] : 'Sin informar'}`,
+    court.hasSchool ? 'Con escuelita' : 'Sin escuelita',
+  ];
   if (court.courtType === 'TRINQUET') return [
+    ...commonFeatures,
     `Share: ${court.trinquetShareMaterial === 'OTHER' ? court.trinquetShareMaterialOther || 'Otro material' : court.trinquetShareMaterial ? shareMaterialLabels[court.trinquetShareMaterial] : 'Sin informar'}`,
   ];
   if (court.courtType === 'FRONTON') return [
+    ...commonFeatures,
     court.frontonWallOrientation ? frontonWallLabels[court.frontonWallOrientation] : 'Orientación de paredes sin informar',
     court.frontonHasCacerola ? 'Con cacerola' : 'Sin cacerola',
     court.frontonBackType === 'REBOUND' ? `Rebote: ${court.frontonReboundMaterial || 'material sin informar'}` : court.frontonBackType ? frontonBackLabels[court.frontonBackType] : 'Fondo sin informar',
   ];
-  return ['Tipo de cancha sin informar'];
+  return [...commonFeatures, 'Tipo de cancha sin informar'];
 }
 
 export function ageRangeLabel(group: Pick<CommunityCourtPlayerGroup, 'minAge' | 'maxAge'>) {

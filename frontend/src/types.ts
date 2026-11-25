@@ -62,6 +62,8 @@ export interface AnalyticsSummary {
 
 export type CommunityPlayerGender = 'FEMALE' | 'MALE' | 'MIXED' | 'OTHER';
 export type CommunityCourtType = 'TRINQUET' | 'FRONTON';
+export type CommunityFrontisFinish = 'HARD' | 'MARBLE';
+export type CommunityCourtColor = 'WHITE' | 'BLUE' | 'GREEN' | 'GRAY';
 export type TrinquetShareMaterial = 'WOOD' | 'MASONRY' | 'OTHER';
 export type FrontonWallOrientation = 'LEFT_LONG' | 'RIGHT_LONG';
 export type FrontonBackType = 'REBOUND' | 'FREE_LIFT';
@@ -74,6 +76,12 @@ export interface CommunityCourtPlayerGroup {
   playerCount: number;
 }
 
+export interface CommunityCourtPhoto {
+  id: number;
+  url: string;
+  originalName: string;
+}
+
 export interface CommunityCourt {
   id: number;
   name: string;
@@ -82,6 +90,10 @@ export interface CommunityCourt {
   locality: string;
   address: string | null;
   courtType: CommunityCourtType | null;
+  frontisFinish: CommunityFrontisFinish | null;
+  courtColor: CommunityCourtColor | null;
+  history: string | null;
+  hasSchool: boolean;
   trinquetShareMaterial: TrinquetShareMaterial | null;
   trinquetShareMaterialOther: string | null;
   frontonWallOrientation: FrontonWallOrientation | null;
@@ -93,12 +105,16 @@ export interface CommunityCourt {
   lengthMeters: number | null;
   widthMeters: number | null;
   playerGroups: CommunityCourtPlayerGroup[];
+  photos: CommunityCourtPhoto[];
   totalPlayers: number;
   createdAt: string;
 }
 
-export interface CommunityCourtPayload extends Omit<CommunityCourt, 'id' | 'totalPlayers' | 'createdAt' | 'playerGroups' | 'courtType'> {
+export interface CommunityCourtPayload extends Omit<CommunityCourt, 'id' | 'totalPlayers' | 'createdAt' | 'playerGroups' | 'photos' | 'courtType' | 'frontisFinish' | 'courtColor' | 'history'> {
   courtType: CommunityCourtType;
+  frontisFinish: CommunityFrontisFinish;
+  courtColor: CommunityCourtColor;
+  history: string | null;
   playerGroups: Omit<CommunityCourtPlayerGroup, 'id'>[];
 }
 

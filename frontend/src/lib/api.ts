@@ -53,8 +53,14 @@ export async function recordPageView(payload: { path: string; visitorId: string;
 export function getPublicCourts(filters: { search?: string; country?: string; courtType?: CommunityCourtType; gender?: CommunityPlayerGender; age?: number } = {}) {
   return request<CommunityCourt[]>(`/public/court-directory${buildQuery(filters)}`);
 }
-export function createPublicCourt(payload: CommunityCourtPayload) {
-  return request<CommunityCourt>('/public/court-directory', { method: 'POST', body: JSON.stringify(payload) });
+export function createPublicCourt(payload: CommunityCourtPayload, photos: File[] = []) {
+  const formData = new FormData();
+  for (const [field, value] of Object.entries(payload)) {
+    if (value === null || value === undefined) continue;
+    formData.append(field, field === 'playerGroups' ? JSON.stringify(value) : String(value));
+  }
+  for (const photo of photos) formData.append('photos', photo, photo.name);
+  return request<CommunityCourt>('/public/court-directory', { method: 'POST', body: formData });
 }
 export function updateBackupSettings(settings: BackupSettings) { return request<BackupOverview>('/backups/settings', { method: 'PATCH', body: JSON.stringify(settings) }, true); }
 export function createBackup() { return request<{ id: number; status: 'RUNNING' }>('/backups', { method: 'POST' }, true); }
