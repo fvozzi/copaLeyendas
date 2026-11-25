@@ -528,11 +528,11 @@
   .court-directory-hero .primary-button { width: 100%; }
   .court-directory-filters,
   .court-form-grid,
-  .community-court-grid,
+  .community-court-grid { grid-template-columns: 1fr; }
   .court-player-matrix th,
   .court-player-matrix td { padding: 0.45rem; }
   .court-player-matrix th:first-child { width: 40%; }
-  .court-form-wide { grid-column: auto; }
+  .court-form-wide { grid-column: 1 / -1; }
   .court-contact-fields { grid-template-columns: 1fr; }
   .court-map { height: 62vh; min-height: 420px; border-radius: 10px; }
   .court-picker-map { height: 52vh; min-height: 360px; }
