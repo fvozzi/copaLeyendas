@@ -17,6 +17,7 @@ import { WhatsAppModule } from './whatsapp/whatsapp.module';
 import { BackupsModule } from './backups/backups.module';
 import { ActivityModule } from './activity/activity.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { CourtDirectoryModule } from './court-directory/court-directory.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
     BackupsModule,
     ActivityModule,
     AnalyticsModule,
+    CourtDirectoryModule,
   ],
   controllers: [AppController],
 })

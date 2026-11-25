@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { AdminLayout } from './components/AdminLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -32,6 +33,9 @@ import { TeamCuilPage } from './pages/TeamCuilPage';
 import { MuseumPage } from './pages/MuseumPage';
 import { AdminAnalyticsPage } from './pages/AdminAnalyticsPage';
 
+const CourtsDirectoryPage = lazy(() => import('./pages/CourtsDirectoryPage').then((module) => ({ default: module.CourtsDirectoryPage })));
+const CourtSubmissionPage = lazy(() => import('./pages/CourtSubmissionPage').then((module) => ({ default: module.CourtSubmissionPage })));
+
 export default function App() {
   return (
     <AuthProvider>
@@ -45,6 +49,8 @@ export default function App() {
             <Route path="/post/:slug" element={<PostPage />} />
             <Route path="/inscripcion" element={<RegistrationPage />} />
             <Route path="/cuil" element={<TeamCuilPage />} />
+            <Route path="/canchas" element={<Suspense fallback={<div className="inline-state">Cargando mapa de canchas...</div>}><CourtsDirectoryPage /></Suspense>} />
+            <Route path="/canchas/nueva" element={<Suspense fallback={<div className="inline-state">Cargando formulario...</div>}><CourtSubmissionPage /></Suspense>} />
           </Route>
           <Route path="/app/login" element={<AdminLoginPage />} />
           <Route element={<ProtectedRoute />}>

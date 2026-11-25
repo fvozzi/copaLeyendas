@@ -60,6 +60,48 @@ export interface AnalyticsSummary {
   daily: { date: string; views: number; visitors: number }[];
 }
 
+export type CommunityPlayerGender = 'FEMALE' | 'MALE' | 'MIXED' | 'OTHER';
+export type CommunityCourtType = 'TRINQUET' | 'FRONTON';
+export type TrinquetShareMaterial = 'WOOD' | 'MASONRY' | 'OTHER';
+export type FrontonWallOrientation = 'LEFT_LONG' | 'RIGHT_LONG';
+export type FrontonBackType = 'REBOUND' | 'FREE_LIFT';
+
+export interface CommunityCourtPlayerGroup {
+  id?: number;
+  gender: CommunityPlayerGender;
+  minAge: number | null;
+  maxAge: number | null;
+  playerCount: number;
+}
+
+export interface CommunityCourt {
+  id: number;
+  name: string;
+  country: string;
+  province: string;
+  locality: string;
+  address: string | null;
+  courtType: CommunityCourtType | null;
+  trinquetShareMaterial: TrinquetShareMaterial | null;
+  trinquetShareMaterialOther: string | null;
+  frontonWallOrientation: FrontonWallOrientation | null;
+  frontonHasCacerola: boolean | null;
+  frontonBackType: FrontonBackType | null;
+  frontonReboundMaterial: string | null;
+  latitude: number;
+  longitude: number;
+  lengthMeters: number | null;
+  widthMeters: number | null;
+  playerGroups: CommunityCourtPlayerGroup[];
+  totalPlayers: number;
+  createdAt: string;
+}
+
+export interface CommunityCourtPayload extends Omit<CommunityCourt, 'id' | 'totalPlayers' | 'createdAt' | 'playerGroups' | 'courtType'> {
+  courtType: CommunityCourtType;
+  playerGroups: Omit<CommunityCourtPlayerGroup, 'id'>[];
+}
+
 export interface AdminUser {
   id: number;
   email: string;

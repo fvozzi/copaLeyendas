@@ -29,5 +29,6 @@ it('links the home hero to the current tournament edition', async () => {
   expect(link?.getAttribute('href')).toBe('/torneos/femme-2026');
   expect(container.querySelector('a[href="/secciones/leyendas"]')).toBeNull();
   expect(container.querySelector('a[href="/secciones/canchas"]')).toBeNull();
-  expect(container.querySelectorAll('.section-grid .section-card')).toHaveLength(2);
+  expect(container.querySelector('a[href="/canchas"]')?.textContent).toContain('Abrir mapa');
+  expect(container.querySelectorAll('.section-grid .section-card')).toHaveLength(3);
 });

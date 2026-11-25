@@ -35,6 +35,9 @@ export function SiteLayout() {
           <NavLink to="/museo-pelotari" className="site-nav-link">
             Museo Pelotari
           </NavLink>
+          <NavLink to="/canchas" className="site-nav-link">
+            Canchas
+          </NavLink>
           <NavLink to="/inscripcion" className="site-nav-link site-nav-link-accent">
             Inscripcion
           </NavLink>

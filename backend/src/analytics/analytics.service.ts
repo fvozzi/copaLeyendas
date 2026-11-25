@@ -69,6 +69,7 @@ function sectionForPath(path: string) {
   if (path === '/secciones/torneos') return 'Torneos';
   if (path === '/secciones/historias') return 'Historias';
   if (path === '/museo-pelotari') return 'Museo Pelotari';
+  if (path === '/canchas' || path.startsWith('/canchas/')) return 'Canchas';
   if (path === '/inscripcion') return 'Inscripción';
   if (path === '/cuil') return 'CUIL';
   if (path.startsWith('/post/')) return 'Publicaciones';

@@ -19,8 +19,8 @@ export const sectionMeta: Record<
     intro: 'Jugadoras, referentes y nombres que hicieron historia en la pelota paleta.',
   },
   canchas: {
-    label: 'Sedes',
-    intro: 'Direcciones y datos para llegar a cada sede del torneo.',
+    label: 'Canchas',
+    intro: 'Mapa comunitario de canchas de pelota paleta en Sudamérica.',
   },
   torneos: {
     label: 'Torneos',

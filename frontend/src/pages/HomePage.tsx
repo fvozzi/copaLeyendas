@@ -68,6 +68,11 @@ export function HomePage() {
               </Link>
             </article>
           ))}
+          <article className="section-card section-card-canchas">
+            <p className="section-card-kicker">{sectionMeta.canchas.label}</p>
+            <p>{sectionMeta.canchas.intro}</p>
+            <Link to="/canchas" className="inline-link">Abrir mapa de canchas</Link>
+          </article>
         </div>
       </section>
 
