@@ -22,7 +22,8 @@ it('submits the exact map point and a configurable player group', async () => {
   container = document.createElement('div'); document.body.append(container); root = createRoot(container);
   await act(async () => root.render(createElement(MemoryRouter, { future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(CourtSubmissionPage))));
 
-  setLabelValue('Nombre de la cancha', 'Club Central');
+  setLabelValue('Nombre', 'Central');
+  setLabelValue('Tipo de institución', 'ASSOCIATION');
   setLabelValue('Provincia / departamento / estado', 'Buenos Aires');
   setLabelValue('Localidad', 'Morón');
   const searchButton = [...container.querySelectorAll('button')].find((button) => button.textContent === 'Buscar localidad') as HTMLButtonElement;
@@ -37,6 +38,7 @@ it('submits the exact map point and a configurable player group', async () => {
   setLabelValue('Correo electrónico', 'club@example.com');
   setLabelValue('Web o red social', 'https://example.com');
   await clickLabelCheckbox('Cuenta con escuelita');
+  await clickLabelCheckbox('Tiene canchero');
   const photo = new File(['foto'], 'cancha.jpg', { type: 'image/jpeg' });
   const photoInput = container.querySelector('input[type="file"]') as HTMLInputElement;
   Object.defineProperty(photoInput, 'files', { value: [photo], configurable: true });
@@ -46,13 +48,14 @@ it('submits the exact map point and a configurable player group', async () => {
   setLabelValue('Tipo de cancha', 'FRONTON');
   expect(container.textContent).not.toContain('Material del share');
   expect(container.textContent).toContain('Orientación de las paredes');
+  setLabelValue('Tambur', 'BOTH');
   setLabelValue('Material del rebote', 'Material');
   await clickLabelCheckbox('Tiene cacerola');
   setInputValueByAria('Mujeres, entre 0 y 20', '30');
   await act(async () => { (container.querySelector('#choose-location') as HTMLButtonElement).click(); });
   await act(async () => { container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
 
-  expect(createPublicCourt).toHaveBeenCalledWith(expect.objectContaining({ name: 'Club Central', locality: 'Morón', latitude: -34.6, longitude: -58.4, frontisFinish: 'MARBLE', courtColor: 'BLUE', history: 'Construida por vecinos en 1950.', inaugurationDate: '1950-05-10', contactName: 'Secretaría del club', contactPhone: '+54 9 11 1234-5678', contactEmail: 'club@example.com', contactUrl: 'https://example.com', hasSchool: true, courtType: 'FRONTON', frontonWallOrientation: 'LEFT_LONG', frontonHasCacerola: true, frontonBackType: 'REBOUND', frontonReboundMaterial: 'Material', playerGroups: [{ gender: 'FEMALE', minAge: 0, maxAge: 20, playerCount: 30 }] }), [photo]);
+  expect(createPublicCourt).toHaveBeenCalledWith(expect.objectContaining({ name: 'Central', organizationType: 'ASSOCIATION', locality: 'Morón', latitude: -34.6, longitude: -58.4, frontisFinish: 'MARBLE', courtColor: 'BLUE', history: 'Construida por vecinos en 1950.', inaugurationDate: '1950-05-10', contactName: 'Secretaría del club', contactPhone: '+54 9 11 1234-5678', contactEmail: 'club@example.com', contactUrl: 'https://example.com', hasSchool: true, hasCourtKeeper: true, courtType: 'FRONTON', frontonWallOrientation: 'LEFT_LONG', frontonTambur: 'BOTH', frontonHasCacerola: true, frontonBackType: 'REBOUND', frontonReboundMaterial: 'Material', playerGroups: [{ gender: 'FEMALE', minAge: 0, maxAge: 20, playerCount: 30 }] }), [photo]);
 
   function setInputValueByAria(label: string, value: string) {
     const control = container.querySelector(`input[aria-label="${label}"]`) as HTMLInputElement;

@@ -1,7 +1,7 @@
 import { plainToInstance, Transform, Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsDateString, IsEmail, IsEnum, IsInt, IsNumber, IsOptional, IsString, IsUrl, Matches, Max, MaxLength, Min, MinLength, ValidateIf, ValidateNested } from 'class-validator';
 import { CommunityPlayerGender } from './community-court-player-group.entity';
-import { CommunityCourtColor, CommunityCourtType, CommunityFrontisFinish, FrontonBackType, FrontonWallOrientation, TrinquetShareMaterial } from './community-court.entity';
+import { CommunityCourtColor, CommunityCourtOrganizationType, CommunityCourtType, CommunityFrontisFinish, FrontonBackType, FrontonTambur, FrontonWallOrientation, TrinquetShareMaterial } from './community-court.entity';
 
 export class CommunityCourtPlayerGroupDto {
   @IsEnum(CommunityPlayerGender) gender: CommunityPlayerGender;
@@ -12,6 +12,7 @@ export class CommunityCourtPlayerGroupDto {
 
 export class CreateCommunityCourtDto {
   @IsString() @MinLength(2) @MaxLength(140) name: string;
+  @IsEnum(CommunityCourtOrganizationType) organizationType: CommunityCourtOrganizationType;
   @IsString() @MinLength(2) @MaxLength(80) country: string;
   @IsString() @MinLength(2) @MaxLength(120) province: string;
   @IsString() @MinLength(2) @MaxLength(120) locality: string;
@@ -20,6 +21,7 @@ export class CreateCommunityCourtDto {
   @ValidateIf((dto: CreateCommunityCourtDto) => dto.courtType === CommunityCourtType.TRINQUET) @IsEnum(TrinquetShareMaterial) trinquetShareMaterial?: TrinquetShareMaterial;
   @ValidateIf((dto: CreateCommunityCourtDto) => dto.courtType === CommunityCourtType.TRINQUET && dto.trinquetShareMaterial === TrinquetShareMaterial.OTHER) @IsString() @MinLength(2) @MaxLength(100) trinquetShareMaterialOther?: string;
   @ValidateIf((dto: CreateCommunityCourtDto) => dto.courtType === CommunityCourtType.FRONTON) @IsEnum(FrontonWallOrientation) frontonWallOrientation?: FrontonWallOrientation;
+  @ValidateIf((dto: CreateCommunityCourtDto) => dto.courtType === CommunityCourtType.FRONTON) @IsEnum(FrontonTambur) frontonTambur?: FrontonTambur;
   @ValidateIf((dto: CreateCommunityCourtDto) => dto.courtType === CommunityCourtType.FRONTON) @Transform(({ value }) => value === true || value === 'true') @IsBoolean() frontonHasCacerola?: boolean;
   @ValidateIf((dto: CreateCommunityCourtDto) => dto.courtType === CommunityCourtType.FRONTON) @IsEnum(FrontonBackType) frontonBackType?: FrontonBackType;
   @ValidateIf((dto: CreateCommunityCourtDto) => dto.courtType === CommunityCourtType.FRONTON && dto.frontonBackType === FrontonBackType.REBOUND) @IsString() @MinLength(2) @MaxLength(100) frontonReboundMaterial?: string;
@@ -32,6 +34,7 @@ export class CreateCommunityCourtDto {
   @IsOptional() @IsEmail() @MaxLength(160) contactEmail?: string;
   @IsOptional() @IsUrl({ require_protocol: true }) @MaxLength(300) contactUrl?: string;
   @Transform(({ value }) => value === true || value === 'true') @IsBoolean() hasSchool: boolean;
+  @Transform(({ value }) => value === true || value === 'true') @IsBoolean() hasCourtKeeper: boolean;
   @Type(() => Number) @IsNumber() @Min(-90) @Max(90) latitude: number;
   @Type(() => Number) @IsNumber() @Min(-180) @Max(180) longitude: number;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(1) @Max(200) lengthMeters?: number | null;

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CourtMap } from '../components/CourtMap';
 import { getPublicCourts, resolveApiAssetUrl } from '../lib/api';
-import { ageRangeLabel, communityCourtTypeLabels, communityGenderLabels, courtFeatureLabels, southAmericanCountries } from '../lib/court-directory';
+import { ageRangeLabel, communityCourtOrganizationLabels, communityCourtTypeLabels, communityGenderLabels, courtFeatureLabels, southAmericanCountries } from '../lib/court-directory';
 import type { CommunityCourt, CommunityCourtType, CommunityPlayerGender } from '../types';
 
 export function CourtsDirectoryPage() {
@@ -36,7 +36,7 @@ export function CourtsDirectoryPage() {
 
   return <section className="content-band court-directory-page">
     <header className="court-directory-hero">
-      <div><p className="eyebrow">Mapa comunitario</p><h1>Canchas de pelota paleta en Sudamérica</h1><p>Encontrá dónde jugar, conocé su comunidad y ayudanos a construir el mapa más completo de canchas.</p></div>
+      <div><p className="eyebrow">Mapa comunitario</p><h1>Canchas de pelota paleta</h1><p>Encontrá dónde jugar, conocé su comunidad y ayudanos a construir el mapa más completo de canchas.</p></div>
       <Link to="/canchas/nueva" className="primary-button">Dar de alta una cancha</Link>
     </header>
 
@@ -59,11 +59,11 @@ export function CourtsDirectoryPage() {
 
     {!loading && !visible.length ? <div className="edition-empty"><p className="eyebrow">Sin coincidencias</p><h2>No encontramos canchas con esos filtros</h2><p>Probá otra búsqueda o sumá una cancha que todavía no figure.</p><Link to="/canchas/nueva" className="primary-button">Agregar cancha</Link></div> : <div className="community-court-grid">{visible.map((court) => <article className={`community-court-card${court.id === selectedCourtId ? ' is-selected' : ''}`} key={court.id}>
       {(court.photos ?? []).length > 0 && <div className={`community-court-gallery${court.photos.length === 1 ? ' is-single' : ''}`}>{court.photos.map((photo, index) => <a key={photo.id} href={resolveApiAssetUrl(photo.url) ?? undefined} target="_blank" rel="noreferrer"><img src={resolveApiAssetUrl(photo.url) ?? undefined} alt={`${court.name}, foto ${index + 1}`} loading="lazy" decoding="async" /></a>)}</div>}
-      <div><p className="eyebrow">{court.courtType ? `${communityCourtTypeLabels[court.courtType]} · ` : ''}{court.country}</p><h2>{court.name}</h2><p>{court.locality}, {court.province}</p>{court.address && <small>{court.address}</small>}</div>
+      <div><p className="eyebrow">{court.organizationType ? `${communityCourtOrganizationLabels[court.organizationType]} · ` : ''}{court.courtType ? `${communityCourtTypeLabels[court.courtType]} · ` : ''}{court.country}</p><h2>{court.name}</h2><p>{court.locality}, {court.province}</p>{court.address && <small>{court.address}</small>}</div>
       <div className="community-court-measures"><span><strong>{court.totalPlayers}</strong> jugadores/as</span>{court.lengthMeters && <span><strong>{court.lengthMeters} m</strong> de largo</span>}{court.widthMeters && <span><strong>{court.widthMeters} m</strong> de ancho</span>}</div>
       <div className="community-court-features">{courtFeatureLabels(court).map((feature) => <span key={feature}>{feature}</span>)}</div>
       {court.history && <details className="community-court-history"><summary>Historia de la cancha</summary><p>{court.history}</p></details>}
-      {(court.contactName || court.contactPhone || court.contactEmail || court.contactUrl) && <details className="community-court-contact"><summary>Datos de contacto</summary><div>{court.contactName && <strong>{court.contactName}</strong>}{court.contactPhone && <a href={`tel:${court.contactPhone.replace(/[^+\d]/g, '')}`}>{court.contactPhone}</a>}{court.contactEmail && <a href={`mailto:${court.contactEmail}`}>{court.contactEmail}</a>}{court.contactUrl && <a href={court.contactUrl} target="_blank" rel="noreferrer">Web o red social ↗</a>}</div></details>}
+      {(court.contactName || court.contactPhone || court.contactEmail || court.contactUrl || court.hasCourtKeeper) && <details className="community-court-contact"><summary>Datos de contacto</summary><div><span>{court.hasCourtKeeper ? 'Tiene canchero' : 'No tiene canchero'}</span>{court.contactName && <strong>{court.contactName}</strong>}{court.contactPhone && <a href={`tel:${court.contactPhone.replace(/[^+\d]/g, '')}`}>{court.contactPhone}</a>}{court.contactEmail && <a href={`mailto:${court.contactEmail}`}>{court.contactEmail}</a>}{court.contactUrl && <a href={court.contactUrl} target="_blank" rel="noreferrer">Web o red social ↗</a>}</div></details>}
       <ul>{court.playerGroups.map((group, index) => <li key={group.id ?? `${group.gender}-${index}`}><strong>{group.playerCount}</strong><span>{communityGenderLabels[group.gender]} · {ageRangeLabel(group)}</span></li>)}</ul>
       <button type="button" className="inline-link" onClick={() => selectCourt(court)}>Ver en el mapa</button>
     </article>)}</div>}
@@ -73,7 +73,7 @@ export function CourtsDirectoryPage() {
 export function filterCommunityCourts(courts: CommunityCourt[], filters: { search: string; country: string; courtType?: CommunityCourtType | ''; gender: CommunityPlayerGender | ''; age?: number }) {
   const term = normalize(filters.search);
   return courts.filter((court) => {
-    if (term && !normalize([court.name, court.locality, court.province, court.country, court.address, court.history, court.inaugurationDate, court.contactName].filter(Boolean).join(' ')).includes(term)) return false;
+    if (term && !normalize([court.name, court.organizationType, court.locality, court.province, court.country, court.address, court.history, court.inaugurationDate, court.contactName].filter(Boolean).join(' ')).includes(term)) return false;
     if (filters.country && court.country !== filters.country) return false;
     if (filters.courtType && court.courtType !== filters.courtType) return false;
     if ((filters.gender || filters.age !== undefined) && !court.playerGroups.some((group) => (

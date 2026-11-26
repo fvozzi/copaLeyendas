@@ -62,10 +62,12 @@ export interface AnalyticsSummary {
 
 export type CommunityPlayerGender = 'FEMALE' | 'MALE' | 'MIXED' | 'OTHER';
 export type CommunityCourtType = 'TRINQUET' | 'FRONTON';
+export type CommunityCourtOrganizationType = 'CLUB' | 'ASSOCIATION' | 'PRIVATE_ESTABLISHMENT' | 'EDUCATIONAL_INSTITUTION' | 'MUNICIPAL_PUBLIC' | 'UNION_MUTUAL' | 'NEIGHBORHOOD_CENTER' | 'OTHER';
 export type CommunityFrontisFinish = 'HARD' | 'MARBLE';
 export type CommunityCourtColor = 'WHITE' | 'BLUE' | 'GREEN' | 'GRAY';
 export type TrinquetShareMaterial = 'WOOD' | 'MASONRY' | 'OTHER';
 export type FrontonWallOrientation = 'LEFT_LONG' | 'RIGHT_LONG';
+export type FrontonTambur = 'LEFT' | 'RIGHT' | 'BOTH' | 'NONE';
 export type FrontonBackType = 'REBOUND' | 'FREE_LIFT';
 
 export interface CommunityCourtPlayerGroup {
@@ -85,6 +87,7 @@ export interface CommunityCourtPhoto {
 export interface CommunityCourt {
   id: number;
   name: string;
+  organizationType: CommunityCourtOrganizationType | null;
   country: string;
   province: string;
   locality: string;
@@ -99,9 +102,11 @@ export interface CommunityCourt {
   contactEmail: string | null;
   contactUrl: string | null;
   hasSchool: boolean;
+  hasCourtKeeper: boolean;
   trinquetShareMaterial: TrinquetShareMaterial | null;
   trinquetShareMaterialOther: string | null;
   frontonWallOrientation: FrontonWallOrientation | null;
+  frontonTambur: FrontonTambur | null;
   frontonHasCacerola: boolean | null;
   frontonBackType: FrontonBackType | null;
   frontonReboundMaterial: string | null;

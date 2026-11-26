@@ -1,18 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CommunityPlayerGender } from './community-court-player-group.entity';
-import { CommunityCourtColor, CommunityCourtType, CommunityFrontisFinish, TrinquetShareMaterial } from './community-court.entity';
+import { CommunityCourtColor, CommunityCourtOrganizationType, CommunityCourtType, CommunityFrontisFinish, FrontonTambur, TrinquetShareMaterial } from './community-court.entity';
 import { CourtDirectoryService } from './court-directory.service';
 
 afterEach(() => vi.unstubAllGlobals());
 
 const court = (overrides = {}) => ({
-  id: 1, name: 'Club Paraná', country: 'Argentina', province: 'Entre Ríos', locality: 'Paraná', address: 'Centro',
+  id: 1, name: 'Club Paraná', organizationType: CommunityCourtOrganizationType.CLUB, country: 'Argentina', province: 'Entre Ríos', locality: 'Paraná', address: 'Centro',
   latitude: -31.73, longitude: -60.53, lengthMeters: 30, widthMeters: 10, active: true, createdAt: new Date(),
   courtType: CommunityCourtType.TRINQUET, trinquetShareMaterial: TrinquetShareMaterial.WOOD, trinquetShareMaterialOther: null,
   frontisFinish: CommunityFrontisFinish.HARD, courtColor: CommunityCourtColor.WHITE, history: 'Fundada por la comunidad local.', inaugurationDate: '1950-05-10',
   contactName: 'Secretaría del club', contactPhone: '+54 9 11 1234-5678', contactEmail: 'club@example.com', contactUrl: 'https://example.com',
-  hasSchool: true, photos: [],
-  frontonWallOrientation: null, frontonHasCacerola: null, frontonBackType: null, frontonReboundMaterial: null,
+  hasSchool: true, hasCourtKeeper: true, photos: [],
+  frontonWallOrientation: null, frontonTambur: null, frontonHasCacerola: null, frontonBackType: null, frontonReboundMaterial: null,
   playerGroups: [{ id: 1, gender: CommunityPlayerGender.FEMALE, minAge: 18, maxAge: 59, playerCount: 24 }],
   ...overrides,
 });
@@ -33,10 +33,10 @@ describe('community court directory', () => {
     const repository = { create: vi.fn(), save: vi.fn() };
     const service = new CourtDirectoryService(repository as never, {} as never);
     await expect(service.create({
-      name: 'Cancha', country: 'Argentina', province: 'Buenos Aires', locality: 'Azul', latitude: -36.77, longitude: -59.85,
+      name: 'Cancha', organizationType: CommunityCourtOrganizationType.CLUB, country: 'Argentina', province: 'Buenos Aires', locality: 'Azul', latitude: -36.77, longitude: -59.85,
       courtType: CommunityCourtType.TRINQUET, trinquetShareMaterial: TrinquetShareMaterial.WOOD,
       frontisFinish: CommunityFrontisFinish.HARD, courtColor: CommunityCourtColor.WHITE,
-      hasSchool: false,
+      hasSchool: false, hasCourtKeeper: false,
       playerGroups: [{ gender: CommunityPlayerGender.MIXED, minAge: 60, maxAge: 18, playerCount: 10 }],
     })).rejects.toThrow('edad mínima');
     expect(repository.save).not.toHaveBeenCalled();

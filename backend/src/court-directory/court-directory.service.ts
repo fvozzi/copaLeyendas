@@ -22,7 +22,7 @@ export class CourtDirectoryService {
     const courts = await this.courts.find({ where: { active: true }, relations: { playerGroups: true, photos: true }, order: { country: 'ASC', province: 'ASC', locality: 'ASC', name: 'ASC' } });
     const search = normalize(query.search ?? '');
     return courts.filter((court) => {
-      if (search && !normalize([court.name, court.locality, court.province, court.country, court.address, court.history, court.inaugurationDate, court.contactName].filter(Boolean).join(' ')).includes(search)) return false;
+      if (search && !normalize([court.name, court.organizationType, court.locality, court.province, court.country, court.address, court.history, court.inaugurationDate, court.contactName].filter(Boolean).join(' ')).includes(search)) return false;
       if (query.country && court.country !== query.country) return false;
       if (query.courtType && court.courtType !== query.courtType) return false;
       if ((query.gender || query.age !== undefined) && !court.playerGroups.some((group) => (
@@ -47,18 +47,20 @@ export class CourtDirectoryService {
       throw new BadRequestException('No pudimos procesar una de las fotos. Probá con imágenes JPG, PNG, WebP, HEIC o HEIF.');
     }
     const court = this.courts.create({
-      name: dto.name.trim(), country: dto.country.trim(), province: dto.province.trim(), locality: dto.locality.trim(),
+      name: dto.name.trim(), organizationType: dto.organizationType, country: dto.country.trim(), province: dto.province.trim(), locality: dto.locality.trim(),
       address: dto.address?.trim() || null, latitude: dto.latitude, longitude: dto.longitude,
       courtType: dto.courtType,
       trinquetShareMaterial: dto.courtType === CommunityCourtType.TRINQUET ? dto.trinquetShareMaterial ?? null : null,
       trinquetShareMaterialOther: dto.courtType === CommunityCourtType.TRINQUET && dto.trinquetShareMaterial === TrinquetShareMaterial.OTHER ? dto.trinquetShareMaterialOther?.trim() || null : null,
       frontonWallOrientation: dto.courtType === CommunityCourtType.FRONTON ? dto.frontonWallOrientation ?? null : null,
+      frontonTambur: dto.courtType === CommunityCourtType.FRONTON ? dto.frontonTambur ?? null : null,
       frontonHasCacerola: dto.courtType === CommunityCourtType.FRONTON ? dto.frontonHasCacerola ?? false : null,
       frontonBackType: dto.courtType === CommunityCourtType.FRONTON ? dto.frontonBackType ?? null : null,
       frontonReboundMaterial: dto.courtType === CommunityCourtType.FRONTON && dto.frontonBackType === FrontonBackType.REBOUND ? dto.frontonReboundMaterial?.trim() || null : null,
       frontisFinish: dto.frontisFinish, courtColor: dto.courtColor, history: dto.history?.trim() || null, inaugurationDate: dto.inaugurationDate ?? null,
       contactName: dto.contactName?.trim() || null, contactPhone: dto.contactPhone?.trim() || null,
-      contactEmail: dto.contactEmail?.trim().toLocaleLowerCase('en') || null, contactUrl: dto.contactUrl?.trim() || null, hasSchool: dto.hasSchool,
+      contactEmail: dto.contactEmail?.trim().toLocaleLowerCase('en') || null, contactUrl: dto.contactUrl?.trim() || null,
+      hasSchool: dto.hasSchool, hasCourtKeeper: dto.hasCourtKeeper,
       lengthMeters: dto.lengthMeters ?? null, widthMeters: dto.widthMeters ?? null, active: true,
       playerGroups: dto.playerGroups.map((group) => Object.assign(new CommunityCourtPlayerGroup(), {
         gender: group.gender, minAge: group.minAge ?? null, maxAge: group.maxAge ?? null, playerCount: group.playerCount,
@@ -129,14 +131,15 @@ export class CourtDirectoryService {
 function publicCourt(court: CommunityCourt) {
   const playerGroups = [...(court.playerGroups ?? [])].sort((left, right) => left.gender.localeCompare(right.gender) || (left.minAge ?? -1) - (right.minAge ?? -1));
   return {
-    id: court.id, name: court.name, country: court.country, province: court.province, locality: court.locality,
+    id: court.id, name: court.name, organizationType: court.organizationType, country: court.country, province: court.province, locality: court.locality,
     address: court.address, latitude: Number(court.latitude), longitude: Number(court.longitude),
     courtType: court.courtType,
     trinquetShareMaterial: court.trinquetShareMaterial, trinquetShareMaterialOther: court.trinquetShareMaterialOther,
-    frontonWallOrientation: court.frontonWallOrientation, frontonHasCacerola: court.frontonHasCacerola,
+    frontonWallOrientation: court.frontonWallOrientation, frontonTambur: court.frontonTambur, frontonHasCacerola: court.frontonHasCacerola,
     frontonBackType: court.frontonBackType, frontonReboundMaterial: court.frontonReboundMaterial,
     frontisFinish: court.frontisFinish, courtColor: court.courtColor, history: court.history, inaugurationDate: court.inaugurationDate,
-    contactName: court.contactName, contactPhone: court.contactPhone, contactEmail: court.contactEmail, contactUrl: court.contactUrl, hasSchool: court.hasSchool,
+    contactName: court.contactName, contactPhone: court.contactPhone, contactEmail: court.contactEmail, contactUrl: court.contactUrl,
+    hasSchool: court.hasSchool, hasCourtKeeper: court.hasCourtKeeper,
     lengthMeters: court.lengthMeters === null ? null : Number(court.lengthMeters), widthMeters: court.widthMeters === null ? null : Number(court.widthMeters),
     playerGroups: playerGroups.map(({ id, gender, minAge, maxAge, playerCount }) => ({ id, gender, minAge, maxAge, playerCount })),
     photos: [...(court.photos ?? [])].sort((left, right) => left.sortOrder - right.sortOrder || left.id - right.id).map((photo) => ({

@@ -3,8 +3,10 @@ import { CommunityCourtPlayerGroup } from './community-court-player-group.entity
 import { CommunityCourtPhoto } from './community-court-photo.entity';
 
 export enum CommunityCourtType { TRINQUET = 'TRINQUET', FRONTON = 'FRONTON' }
+export enum CommunityCourtOrganizationType { CLUB = 'CLUB', ASSOCIATION = 'ASSOCIATION', PRIVATE_ESTABLISHMENT = 'PRIVATE_ESTABLISHMENT', EDUCATIONAL_INSTITUTION = 'EDUCATIONAL_INSTITUTION', MUNICIPAL_PUBLIC = 'MUNICIPAL_PUBLIC', UNION_MUTUAL = 'UNION_MUTUAL', NEIGHBORHOOD_CENTER = 'NEIGHBORHOOD_CENTER', OTHER = 'OTHER' }
 export enum TrinquetShareMaterial { WOOD = 'WOOD', MASONRY = 'MASONRY', OTHER = 'OTHER' }
 export enum FrontonWallOrientation { LEFT_LONG = 'LEFT_LONG', RIGHT_LONG = 'RIGHT_LONG' }
+export enum FrontonTambur { LEFT = 'LEFT', RIGHT = 'RIGHT', BOTH = 'BOTH', NONE = 'NONE' }
 export enum FrontonBackType { REBOUND = 'REBOUND', FREE_LIFT = 'FREE_LIFT' }
 export enum CommunityFrontisFinish { HARD = 'HARD', MARBLE = 'MARBLE' }
 export enum CommunityCourtColor { WHITE = 'WHITE', BLUE = 'BLUE', GREEN = 'GREEN', GRAY = 'GRAY' }
@@ -13,6 +15,7 @@ export enum CommunityCourtColor { WHITE = 'WHITE', BLUE = 'BLUE', GREEN = 'GREEN
 export class CommunityCourt {
   @PrimaryGeneratedColumn() id: number;
   @Column({ type: 'varchar', length: 140 }) name: string;
+  @Column({ type: 'varchar', length: 32, nullable: true }) organizationType: CommunityCourtOrganizationType | null;
   @Column({ type: 'varchar', length: 80 }) country: string;
   @Column({ type: 'varchar', length: 120 }) province: string;
   @Column({ type: 'varchar', length: 120 }) locality: string;
@@ -21,6 +24,7 @@ export class CommunityCourt {
   @Column({ type: 'varchar', length: 12, nullable: true }) trinquetShareMaterial: TrinquetShareMaterial | null;
   @Column({ type: 'varchar', length: 100, nullable: true }) trinquetShareMaterialOther: string | null;
   @Column({ type: 'varchar', length: 12, nullable: true }) frontonWallOrientation: FrontonWallOrientation | null;
+  @Column({ type: 'varchar', length: 16, nullable: true }) frontonTambur: FrontonTambur | null;
   @Column({ type: 'boolean', nullable: true }) frontonHasCacerola: boolean | null;
   @Column({ type: 'varchar', length: 12, nullable: true }) frontonBackType: FrontonBackType | null;
   @Column({ type: 'varchar', length: 100, nullable: true }) frontonReboundMaterial: string | null;
@@ -33,6 +37,7 @@ export class CommunityCourt {
   @Column({ type: 'varchar', length: 160, nullable: true }) contactEmail: string | null;
   @Column({ type: 'varchar', length: 300, nullable: true }) contactUrl: string | null;
   @Column({ type: 'boolean', default: false }) hasSchool: boolean;
+  @Column({ type: 'boolean', default: false }) hasCourtKeeper: boolean;
   @Column({ type: 'double precision' }) latitude: number;
   @Column({ type: 'double precision' }) longitude: number;
   @Column({ type: 'real', nullable: true }) lengthMeters: number | null;

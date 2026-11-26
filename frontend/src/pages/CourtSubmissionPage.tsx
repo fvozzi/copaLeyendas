@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CourtMap } from '../components/CourtMap';
 import { createPublicCourt, searchCommunityCourtLocation } from '../lib/api';
-import { communityCourtTypeLabels, courtColorLabels, frontisFinishLabels, frontonBackLabels, frontonWallLabels, shareMaterialLabels, southAmericanCountries } from '../lib/court-directory';
-import type { CommunityCourt, CommunityCourtColor, CommunityCourtType, CommunityFrontisFinish, FrontonBackType, FrontonWallOrientation, TrinquetShareMaterial } from '../types';
+import { communityCourtOrganizationLabels, communityCourtTypeLabels, courtColorLabels, frontisFinishLabels, frontonBackLabels, frontonTamburLabels, frontonWallLabels, shareMaterialLabels, southAmericanCountries } from '../lib/court-directory';
+import type { CommunityCourt, CommunityCourtColor, CommunityCourtOrganizationType, CommunityCourtType, CommunityFrontisFinish, FrontonBackType, FrontonTambur, FrontonWallOrientation, TrinquetShareMaterial } from '../types';
 
 type SimplePlayerGender = 'MALE' | 'FEMALE';
 const playerAgeBands = [
@@ -13,11 +13,11 @@ const playerAgeBands = [
 ] as const;
 const emptyPlayerCounts = (): Record<SimplePlayerGender, string[]> => ({ MALE: ['', '', ''], FEMALE: ['', '', ''] });
 const emptyCourtForm = () => ({
-  name: '', country: 'Argentina', province: '', locality: '', address: '', lengthMeters: '', widthMeters: '',
+  name: '', organizationType: 'CLUB' as CommunityCourtOrganizationType, country: 'Argentina', province: '', locality: '', address: '', lengthMeters: '', widthMeters: '',
   frontisFinish: 'HARD' as CommunityFrontisFinish, courtColor: 'WHITE' as CommunityCourtColor, history: '', inaugurationDate: '',
-  contactName: '', contactPhone: '', contactEmail: '', contactUrl: '', hasSchool: false,
+  contactName: '', contactPhone: '', contactEmail: '', contactUrl: '', hasSchool: false, hasCourtKeeper: false,
   courtType: 'TRINQUET' as CommunityCourtType, trinquetShareMaterial: 'WOOD' as TrinquetShareMaterial, trinquetShareMaterialOther: '',
-  frontonWallOrientation: 'LEFT_LONG' as FrontonWallOrientation, frontonHasCacerola: false,
+  frontonWallOrientation: 'LEFT_LONG' as FrontonWallOrientation, frontonTambur: 'NONE' as FrontonTambur, frontonHasCacerola: false,
   frontonBackType: 'REBOUND' as FrontonBackType, frontonReboundMaterial: '',
 });
 
@@ -80,7 +80,7 @@ export function CourtSubmissionPage() {
     setSaving(true);
     try {
       setCreated(await createPublicCourt({
-        name: form.name.trim(), country: form.country, province: form.province.trim(), locality: form.locality.trim(), address: form.address.trim() || null,
+        name: form.name.trim(), organizationType: form.organizationType, country: form.country, province: form.province.trim(), locality: form.locality.trim(), address: form.address.trim() || null,
         courtType: form.courtType,
         frontisFinish: form.frontisFinish,
         courtColor: form.courtColor,
@@ -91,9 +91,11 @@ export function CourtSubmissionPage() {
         contactEmail: form.contactEmail.trim() || null,
         contactUrl: form.contactUrl.trim() || null,
         hasSchool: form.hasSchool,
+        hasCourtKeeper: form.hasCourtKeeper,
         trinquetShareMaterial: form.courtType === 'TRINQUET' ? form.trinquetShareMaterial : null,
         trinquetShareMaterialOther: form.courtType === 'TRINQUET' && form.trinquetShareMaterial === 'OTHER' ? form.trinquetShareMaterialOther.trim() || null : null,
         frontonWallOrientation: form.courtType === 'FRONTON' ? form.frontonWallOrientation : null,
+        frontonTambur: form.courtType === 'FRONTON' ? form.frontonTambur : null,
         frontonHasCacerola: form.courtType === 'FRONTON' ? form.frontonHasCacerola : null,
         frontonBackType: form.courtType === 'FRONTON' ? form.frontonBackType : null,
         frontonReboundMaterial: form.courtType === 'FRONTON' && form.frontonBackType === 'REBOUND' ? form.frontonReboundMaterial.trim() || null : null,
@@ -113,7 +115,8 @@ export function CourtSubmissionPage() {
     <form className="court-submission-form" onSubmit={submit}>
       {error && <div className="inline-state court-form-wide" role="alert">{error}</div>}
       <section className="court-form-card"><div className="section-heading"><div><p className="eyebrow">1 · Identificación</p><h2>Datos de la cancha</h2></div></div>
-        <div className="court-form-grid"><label className="court-form-wide">Nombre de la cancha<input value={form.name} onChange={(event) => change('name', event.target.value)} minLength={2} maxLength={140} required /></label>
+        <div className="court-form-grid"><label>Nombre<input value={form.name} onChange={(event) => change('name', event.target.value)} minLength={2} maxLength={140} required /></label>
+          <label>Tipo de institución<select value={form.organizationType} onChange={(event) => change('organizationType', event.target.value)}>{Object.entries(communityCourtOrganizationLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           <label>Tipo de cancha<select value={form.courtType} onChange={(event) => change('courtType', event.target.value)}>{Object.entries(communityCourtTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           <label>País<select value={form.country} onChange={(event) => change('country', event.target.value)} required>{southAmericanCountries.map((country) => <option key={country.code}>{country.name}</option>)}</select></label>
           <label>Provincia / departamento / estado<input value={form.province} onChange={(event) => change('province', event.target.value)} required /></label>
@@ -131,12 +134,14 @@ export function CourtSubmissionPage() {
             <label>Teléfono / WhatsApp<input type="tel" maxLength={40} value={form.contactPhone} onChange={(event) => change('contactPhone', event.target.value)} placeholder="Ej. +54 9 11 1234-5678" /></label>
             <label>Correo electrónico<input type="email" maxLength={160} value={form.contactEmail} onChange={(event) => change('contactEmail', event.target.value)} /></label>
             <label>Web o red social<input type="url" maxLength={300} value={form.contactUrl} onChange={(event) => change('contactUrl', event.target.value)} placeholder="https://..." /></label>
+            <label className="checkbox-row court-feature-checkbox court-contact-keeper"><input type="checkbox" checked={form.hasCourtKeeper} onChange={(event) => setForm((current) => ({ ...current, hasCourtKeeper: event.target.checked }))} /><span>Tiene canchero</span></label>
           </fieldset>
           {form.courtType === 'TRINQUET' ? <>
             <label>Material del share<select value={form.trinquetShareMaterial} onChange={(event) => change('trinquetShareMaterial', event.target.value)}>{Object.entries(shareMaterialLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
             {form.trinquetShareMaterial === 'OTHER' && <label>Otro material del share<input value={form.trinquetShareMaterialOther} onChange={(event) => change('trinquetShareMaterialOther', event.target.value)} minLength={2} maxLength={100} required /></label>}
           </> : <>
             <label className="court-form-wide">Orientación de las paredes<select value={form.frontonWallOrientation} onChange={(event) => change('frontonWallOrientation', event.target.value)}>{Object.entries(frontonWallLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+            <label>Tambur<select value={form.frontonTambur} onChange={(event) => change('frontonTambur', event.target.value)}>{Object.entries(frontonTamburLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
             <label className="checkbox-row court-feature-checkbox"><input type="checkbox" checked={form.frontonHasCacerola} onChange={(event) => setForm((current) => ({ ...current, frontonHasCacerola: event.target.checked }))} /><span>Tiene cacerola</span></label>
             <label>Fondo<select value={form.frontonBackType} onChange={(event) => change('frontonBackType', event.target.value)}>{Object.entries(frontonBackLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
             {form.frontonBackType === 'REBOUND' && <label>Material del rebote<input value={form.frontonReboundMaterial} onChange={(event) => change('frontonReboundMaterial', event.target.value)} minLength={2} maxLength={100} placeholder="Ej. material, madera, chapa" required /></label>}
